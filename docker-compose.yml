@@ -1,0 +1,27 @@
+version: '3.8'
+
+services:
+  backend:
+    build: .
+    container_name: support_bot_backend
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+      - ./chatbot.db:/app/chatbot.db
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+
+  bot:
+    build: .
+    container_name: support_bot_telegram
+    restart: unless-stopped
+    env_file:
+      - .env
+    depends_on:
+      - backend
+    environment:
+      - BACKEND_URL=http://backend:8000
+    command: python -m bot.main
