@@ -26,5 +26,15 @@ class Settings(BaseSettings):
     AI_PROVIDER: str = "openai"
     KB_CONFIDENCE_THRESHOLD: float = 0.3
 
+    # Email & SMTP configuration
+    EMAIL_ENABLED: bool = False
+    SMTP_HOST: str = "smtp.example.com"
+    SMTP_PORT: int = 587
+    SMTP_USER: Optional[str] = None
+    SMTP_PASSWORD: Optional[str] = None
+    SMTP_FROM: str = "support-bot@example.com"
+    SUPPORT_EMAIL_RECIPIENT: str = "support-team@example.com"
+    SMTP_USE_TLS: bool = True
+
 
 settings = Settings()

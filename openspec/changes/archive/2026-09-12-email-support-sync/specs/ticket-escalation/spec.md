@@ -1,9 +1,4 @@
-# ticket-escalation Specification
-
-## Purpose
-Tracks support ticket lifecycles, persists user context and question history, coordinates ticket escalation to support agents, and records verified resolutions.
-
-## Requirements
+## MODIFIED Requirements
 
 ### Requirement: Ticket creation on unresolved queries
 The system SHALL create a unique support ticket whenever a user indicates their problem was not resolved or when no automated answer could be determined, and dispatch notifications to both Telegram and Email channels.
@@ -22,10 +17,3 @@ The system SHALL manage ticket states through `OPEN`, `IN_PROGRESS`, and `RESOLV
 #### Scenario: Agent submits solution
 - **WHEN** an agent provides a solution to an open or in-progress ticket via Telegram or Email
 - **THEN** the ticket status transitions to `RESOLVED`, storing the agent identifier, resolution channel, resolution text, and completion timestamp
-
-### Requirement: Triggering knowledge base ingestion upon ticket resolution
-The system SHALL forward the resolved ticket's original question and agent-provided solution to the Knowledge Base system.
-
-#### Scenario: Automated knowledge update trigger
-- **WHEN** a ticket is transitioned to `RESOLVED` with a verified solution
-- **THEN** the system triggers ingestion of the question and solution into the knowledge base

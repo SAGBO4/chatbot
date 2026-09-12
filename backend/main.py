@@ -1,6 +1,7 @@
+import re
 from contextlib import asynccontextmanager
-from typing import List, Optional
-from fastapi import FastAPI, Depends, HTTPException, status
+from typing import List, Optional, Dict, Any
+from fastapi import FastAPI, Depends, HTTPException, status, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,23 +14,43 @@ from backend.schemas import (
     TicketResolveRequest,
     KnowledgeIngestRequest,
     KnowledgeArticleResponse,
+    InboundEmailWebhookRequest,
 )
 from backend.services.query_orchestrator import QueryOrchestrator
 from backend.services.ticket_service import TicketService
 from backend.services.knowledge_base import KnowledgeBaseService
+from backend.services.email_service import EmailService
+from backend.services.telegram_relay import TelegramRelay
+
+TICKET_SUBJECT_REGEX = re.compile(r"Ticket\s*#(\d+)", re.IGNORECASE)
+
+
+def clean_email_reply_body(body: str) -> str:
+    """Strips email thread history and quote lines."""
+    lines = body.splitlines()
+    clean_lines = []
+    for line in lines:
+        stripped = line.strip()
+        # Common email quote markers
+        if stripped.startswith(">") or stripped.startswith("---"):
+            break
+        if re.search(r"^(On\s+.+wrote:|Le\s+.+a écrit\s*:)", stripped, re.IGNORECASE):
+            break
+        clean_lines.append(line)
+    result = "\n".join(clean_lines).strip()
+    return result if result else body.strip()
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Initialize DB tables on startup
     await init_db()
     yield
 
 
 app = FastAPI(
     title="Telegram Support Bot Backend API",
-    description="Backend API for telegram support bot with knowledge base and ticketing",
-    version="1.0.0",
+    description="Backend API for telegram support bot with knowledge base, multi-channel ticketing and email sync",
+    version="1.1.0",
     lifespan=lifespan,
 )
 
@@ -52,22 +73,20 @@ async def handle_query(
     payload: QueryRequest,
     session: AsyncSession = Depends(get_db),
 ):
-    """Processes an incoming user query against the Knowledge Base and optional AI."""
-    response = await QueryOrchestrator.process_query(
+    return await QueryOrchestrator.process_query(
         session=session,
         query=payload.query,
         user_id=payload.user_id,
         user_handle=payload.user_handle,
     )
-    return response
 
 
 @app.post("/api/tickets", response_model=TicketResponse, status_code=status.HTTP_201_CREATED)
 async def create_ticket(
     payload: TicketCreateRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
 ):
-    """Creates a new support ticket when an issue is not resolved."""
     ticket = await TicketService.create_ticket(
         session=session,
         user_id=payload.user_id,
@@ -75,6 +94,17 @@ async def create_ticket(
         question=payload.question,
         automated_answer=payload.automated_answer,
     )
+
+    # Multi-channel alert: dispatch email notification to support team in the background
+    background_tasks.add_task(
+        EmailService.send_ticket_created_notification,
+        ticket_id=ticket.id,
+        user_handle=ticket.user_handle,
+        user_id=ticket.user_id,
+        question=ticket.question,
+        automated_answer=ticket.automated_answer,
+    )
+
     return ticket
 
 
@@ -83,7 +113,6 @@ async def list_tickets(
     status_filter: Optional[str] = None,
     session: AsyncSession = Depends(get_db),
 ):
-    """Lists support tickets, optionally filtered by status."""
     return await TicketService.get_all_tickets(session=session, status=status_filter)
 
 
@@ -102,19 +131,99 @@ async def get_ticket(
 async def resolve_ticket(
     ticket_id: int,
     payload: TicketResolveRequest,
+    background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
 ):
-    """Resolves a ticket with a solution and automatically ingests into Knowledge Base."""
+    channel = payload.resolution_channel or "TELEGRAM"
     ticket, newly_resolved = await TicketService.resolve_ticket(
         session=session,
         ticket_id=ticket_id,
         solution=payload.solution,
         resolved_by=payload.resolved_by,
+        resolution_channel=channel,
         add_to_knowledge_base=payload.add_to_knowledge_base,
     )
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
+
+    # If newly resolved on Telegram, inform the email channel
+    if newly_resolved and channel.upper() == "TELEGRAM":
+        background_tasks.add_task(
+            EmailService.send_ticket_resolved_notification,
+            ticket_id=ticket.id,
+            resolved_by=ticket.resolved_by,
+            resolution_channel="TELEGRAM",
+            solution=ticket.solution,
+        )
+
     return ticket
+
+
+@app.post("/api/webhooks/email-inbound")
+async def handle_inbound_email(
+    payload: InboundEmailWebhookRequest,
+    background_tasks: BackgroundTasks,
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Handles incoming support reply emails.
+    Extracts ticket ID from subject ([Ticket #123]), resolves the ticket,
+    delivers the answer to the user on Telegram, and updates the knowledge base.
+    """
+    match = TICKET_SUBJECT_REGEX.search(payload.subject)
+    if not match:
+        raise HTTPException(
+            status_code=400,
+            detail="Could not identify Ticket ID in email subject (expected '[Ticket #123]').",
+        )
+
+    ticket_id = int(match.group(1))
+    clean_solution = clean_email_reply_body(payload.body)
+
+    ticket, newly_resolved = await TicketService.resolve_ticket(
+        session=session,
+        ticket_id=ticket_id,
+        solution=clean_solution,
+        resolved_by=payload.sender,
+        resolution_channel="EMAIL",
+        add_to_knowledge_base=True,
+    )
+
+    if not ticket:
+        raise HTTPException(status_code=404, detail=f"Ticket #{ticket_id} not found.")
+
+    if not newly_resolved:
+        return {
+            "status": "already_resolved",
+            "ticket_id": ticket_id,
+            "message": f"Ticket #{ticket_id} was already resolved by {ticket.resolved_by} via {ticket.resolution_channel}.",
+        }
+
+    # 1. Forward the solution to the user on Telegram
+    user_text = (
+        f"📬 **Réponse de l'équipe support par Email (Ticket #{ticket_id})**\n\n"
+        f"{clean_solution}\n\n"
+        f"━━━━━━━━━━━━━━━━━━━\n"
+        f"Traité par : *{payload.sender}*\n"
+        f"Merci de votre confiance ! 👋"
+    )
+    background_tasks.add_task(TelegramRelay.send_message_to_user, ticket.user_id, user_text)
+
+    # 2. Inform the Telegram Support Group that the ticket was resolved via email
+    group_notification = (
+        f"✅ **Ticket #{ticket_id} résolu par Email !**\n"
+        f"• Par : `{payload.sender}`\n"
+        f"• La solution a été transmise à l'utilisateur (`ID: {ticket.user_id}`).\n"
+        f"• La base de connaissances a été mise à jour automatiquement."
+    )
+    background_tasks.add_task(TelegramRelay.notify_support_group, group_notification)
+
+    return {
+        "status": "resolved",
+        "ticket_id": ticket_id,
+        "resolved_by": payload.sender,
+        "channel": "EMAIL",
+    }
 
 
 @app.post("/api/knowledge/ingest", response_model=KnowledgeArticleResponse, status_code=status.HTTP_201_CREATED)
@@ -122,15 +231,13 @@ async def ingest_knowledge(
     payload: KnowledgeIngestRequest,
     session: AsyncSession = Depends(get_db),
 ):
-    """Directly ingests a question-solution pair into the knowledge base."""
-    article = await KnowledgeBaseService.add_article(
+    return await KnowledgeBaseService.add_article(
         session=session,
         question=payload.question,
         solution=payload.solution,
         keywords=payload.keywords,
         source_ticket_id=payload.source_ticket_id,
     )
-    return article
 
 
 @app.get("/api/knowledge", response_model=List[KnowledgeArticleResponse])

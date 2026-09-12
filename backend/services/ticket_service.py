@@ -48,6 +48,7 @@ class TicketService:
         ticket_id: int,
         solution: str,
         resolved_by: Optional[str] = None,
+        resolution_channel: str = "TELEGRAM",
         add_to_knowledge_base: bool = True,
     ) -> Tuple[Optional[Ticket], bool]:
         """
@@ -64,6 +65,7 @@ class TicketService:
         ticket.status = TicketStatus.RESOLVED.value
         ticket.solution = solution.strip()
         ticket.resolved_by = resolved_by
+        ticket.resolution_channel = resolution_channel
         ticket.resolved_at = utc_now()
 
         # Feedback loop: dynamically ingest new solution into Knowledge Base

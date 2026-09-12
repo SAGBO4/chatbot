@@ -28,6 +28,7 @@ class TicketCreateRequest(BaseModel):
 class TicketResolveRequest(BaseModel):
     solution: str
     resolved_by: Optional[str] = None
+    resolution_channel: Optional[str] = "TELEGRAM"
     add_to_knowledge_base: bool = True
 
 
@@ -42,8 +43,15 @@ class TicketResponse(BaseModel):
     automated_answer: Optional[str] = None
     solution: Optional[str] = None
     resolved_by: Optional[str] = None
+    resolution_channel: Optional[str] = None
     created_at: datetime
     resolved_at: Optional[datetime] = None
+
+
+class InboundEmailWebhookRequest(BaseModel):
+    sender: str
+    subject: str
+    body: str
 
 
 class KnowledgeIngestRequest(BaseModel):
