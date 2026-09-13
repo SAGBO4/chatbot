@@ -1,5 +1,5 @@
 import pytest
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 from aiogram.types import User, Chat, Message, CallbackQuery
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage, StorageKey
@@ -279,6 +279,150 @@ async def test_support_agent_reply_no_match_replies_with_explicit_notice(monkeyp
     mock_bot.send_message.assert_not_called()
     agent_message.reply.assert_called_once()
     assert "n'ai pas pu associer" in agent_message.reply.call_args[0][0]
+
+
+def _make_support_agent_message(group_chat, agent_user, replied_card):
+    """A MagicMock(spec=Message) with every non-text media field defaulted to
+    None, like a real aiogram Message where only one content type is set."""
+    message = MagicMock(spec=Message)
+    message.message_id = 51
+    message.chat = group_chat
+    message.from_user = agent_user
+    message.reply_to_message = replied_card
+    message.reply = AsyncMock()
+    message.text = None
+    message.caption = None
+    message.photo = None
+    message.sticker = None
+    message.voice = None
+    message.audio = None
+    message.video = None
+    message.animation = None
+    return message
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_media_without_caption_asks_for_text(monkeypatch):
+    """A photo/sticker/voice reply with no usable text must not crash
+    (message.text is None for media) and must not resolve the ticket."""
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+
+    agent_message = _make_support_agent_message(group_chat, agent_user, replied_card)
+    agent_message.sticker = MagicMock()  # e.g. a sticker reply, no caption possible
+
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {"id": 101, "user_id": 789}
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    mock_client.resolve_ticket.assert_not_called()
+    agent_message.reply.assert_called_once()
+    assert "texte" in agent_message.reply.call_args[0][0].lower()
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_photo_with_caption_resolves_ticket(monkeypatch):
+    """A photo (e.g. a screenshot) with a caption uses the caption as the
+    solution, instead of crashing or being discarded."""
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+
+    agent_message = _make_support_agent_message(group_chat, agent_user, replied_card)
+    agent_message.photo = [MagicMock()]
+    agent_message.caption = "Voici une capture d'écran : redémarrez l'application."
+
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {"id": 101, "user_id": 789}
+    mock_client.resolve_ticket.return_value = {"id": 101, "user_id": 789, "status": "RESOLVED"}
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    mock_client.resolve_ticket.assert_called_once_with(
+        ticket_id=101,
+        solution="Voici une capture d'écran : redémarrez l'application.",
+        resolved_by="agent_sophie",
+        add_to_knowledge_base=True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_voice_transcribed_via_whisper(monkeypatch):
+    """A voice reply is transcribed via OpenAI Whisper when AI_PROVIDER=openai,
+    then used as the ticket solution."""
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("backend.config.settings.AI_PROVIDER", "openai")
+    monkeypatch.setattr("backend.config.settings.AI_API_KEY", "sk-test-key")
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+
+    agent_message = _make_support_agent_message(group_chat, agent_user, replied_card)
+    agent_message.voice = MagicMock(file_id="voice123", file_size=1000)
+
+    mock_bot = AsyncMock()
+    mock_bot.get_file.return_value = MagicMock(file_path="voice/file_123.oga")
+    audio_buffer = MagicMock()
+    audio_buffer.read.return_value = b"fake-ogg-bytes"
+    mock_bot.download_file.return_value = audio_buffer
+
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {"id": 101, "user_id": 789}
+    mock_client.resolve_ticket.return_value = {"id": 101, "user_id": 789, "status": "RESOLVED"}
+
+    mock_whisper_response = MagicMock(status_code=200)
+    mock_whisper_response.json.return_value = {"text": "Redémarrez le daemon de synchronisation."}
+
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=mock_whisper_response)):
+        await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    mock_bot.get_file.assert_called_once_with("voice123")
+    mock_client.resolve_ticket.assert_called_once_with(
+        ticket_id=101,
+        solution="Redémarrez le daemon de synchronisation.",
+        resolved_by="agent_sophie",
+        add_to_knowledge_base=True,
+    )
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_voice_without_openai_asks_for_text(monkeypatch):
+    """Without AI_PROVIDER=openai, a voice reply cannot be transcribed - the
+    handler must ask for text instead of crashing or silently failing."""
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("backend.config.settings.AI_PROVIDER", "gemini")
+    monkeypatch.setattr("backend.config.settings.AI_API_KEY", None)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+
+    agent_message = _make_support_agent_message(group_chat, agent_user, replied_card)
+    agent_message.voice = MagicMock(file_id="voice123", file_size=1000)
+
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {"id": 101, "user_id": 789}
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    mock_bot.get_file.assert_not_called()
+    mock_client.resolve_ticket.assert_not_called()
+    agent_message.reply.assert_called_once()
+    assert "texte" in agent_message.reply.call_args[0][0].lower()
 
 
 @pytest.mark.asyncio

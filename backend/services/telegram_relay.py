@@ -34,7 +34,7 @@ class TelegramRelay:
     async def notify_support_group(text: str) -> bool:
         """Posts a notification message to the Telegram Support Group."""
         group_id = settings.TELEGRAM_SUPPORT_GROUP_ID
-        if not group_id or str(group_id) == "0":
+        if not settings.support_group_is_configured():
             logger.info("Telegram group notification simulated: %s", text)
             return True
 

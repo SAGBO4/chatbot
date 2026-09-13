@@ -33,3 +33,14 @@ def test_settings_environment_override(monkeypatch):
     assert s.KB_CONFIDENCE_THRESHOLD == 0.75
     assert s.EMAIL_ENABLED is True
     assert s.SUPPORT_EMAIL_RECIPIENT == "team@example.com"
+
+
+def test_support_group_is_configured():
+    unconfigured_default = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
+    assert unconfigured_default.support_group_is_configured() is False
+
+    unconfigured_zero = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", TELEGRAM_SUPPORT_GROUP_ID="0")
+    assert unconfigured_zero.support_group_is_configured() is False
+
+    configured = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", TELEGRAM_SUPPORT_GROUP_ID=-100123456)
+    assert configured.support_group_is_configured() is True

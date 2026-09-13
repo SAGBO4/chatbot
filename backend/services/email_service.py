@@ -17,8 +17,13 @@ class EmailService:
                 logger.info("SMTP sending simulated (host not configured): %s", msg["Subject"])
                 return True
 
-            with smtplib.SMTP(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10.0) as server:
-                if settings.SMTP_USE_TLS:
+            # Port 465 is implicit-TLS/SMTPS (Gmail SSL, iCloud, many corporate
+            # hosts): it expects a TLS handshake from the very first byte and
+            # rejects a plaintext EHLO, so it needs SMTP_SSL rather than
+            # SMTP + starttls() (which only works with STARTTLS-style port 587).
+            smtp_cls = smtplib.SMTP_SSL if settings.SMTP_PORT == 465 else smtplib.SMTP
+            with smtp_cls(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10.0) as server:
+                if settings.SMTP_USE_TLS and settings.SMTP_PORT != 465:
                     server.starttls()
                 if settings.SMTP_USER and settings.SMTP_PASSWORD:
                     server.login(settings.SMTP_USER, settings.SMTP_PASSWORD)

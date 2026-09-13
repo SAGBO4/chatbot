@@ -115,6 +115,33 @@ class KnowledgeBaseService:
         result = await session.execute(select(KnowledgeArticle))
         return list(result.scalars().all())
 
+    @staticmethod
+    async def get_article_by_question(session: AsyncSession, question: str) -> Optional[KnowledgeArticle]:
+        result = await session.execute(
+            select(KnowledgeArticle).where(KnowledgeArticle.question == question)
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def update_article(
+        session: AsyncSession,
+        article: KnowledgeArticle,
+        solution: Optional[str] = None,
+        keywords: Optional[str] = None,
+    ) -> KnowledgeArticle:
+        if solution is not None:
+            article.solution = solution.strip()
+        if keywords is not None:
+            article.keywords = keywords.strip()
+        await session.commit()
+        await session.refresh(article)
+        return article
+
+    @staticmethod
+    async def delete_article(session: AsyncSession, article: KnowledgeArticle) -> None:
+        await session.delete(article)
+        await session.commit()
+
     @classmethod
     async def search(
         cls,

@@ -80,7 +80,17 @@ def verify_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
 
 
 def clean_email_reply_body(body: str) -> str:
-    """Strips email thread history and quote lines."""
+    """
+    Strips email thread history and quote lines.
+
+    Returns whatever precedes the first quote marker, which is legitimately
+    empty when the marker sits on the first line (bottom-posted replies,
+    forwards, some Brevo payloads whose extraction fell back to the raw
+    text) - i.e. the reply added no new content of its own. Callers must
+    treat an empty result as "nothing to resolve with" rather than falling
+    back to the untouched body, which would leak the quoted thread history
+    back into the ticket solution and the knowledge base.
+    """
     lines = body.splitlines()
     clean_lines = []
     for line in lines:
@@ -91,8 +101,12 @@ def clean_email_reply_body(body: str) -> str:
         if re.search(r"^(On\s+.+wrote:|Le\s+.+a écrit\s*:)", stripped, re.IGNORECASE):
             break
         clean_lines.append(line)
-    result = "\n".join(clean_lines).strip()
-    return result if result else body.strip()
+    return "\n".join(clean_lines).strip()
+
+
+def escape_telegram_markdown(text: str) -> str:
+    """Escapes legacy Telegram Markdown metacharacters in untrusted text."""
+    return re.sub(r"([_*`\[])", r"\\\1", text)
 
 
 @asynccontextmanager
@@ -305,6 +319,16 @@ async def _resolve_inbound_email(
     ticket_id = int(match.group(1))
     clean_solution = clean_email_reply_body(body)
 
+    if not clean_solution:
+        return {
+            "status": "empty_body",
+            "ticket_id": ticket_id,
+            "message": (
+                f"Email reply for Ticket #{ticket_id} had no content once quoted "
+                "thread history was stripped; ticket left unresolved."
+            ),
+        }
+
     ticket, newly_resolved = await TicketService.resolve_ticket(
         session=session,
         ticket_id=ticket_id,
@@ -328,12 +352,19 @@ async def _resolve_inbound_email(
             "message": f"Ticket #{ticket_id} was already resolved by {ticket.resolved_by} via {ticket.resolution_channel}.",
         }
 
-    # 1. Forward the solution to the user on Telegram
+    # 1. Forward the solution to the user on Telegram. The solution and sender
+    # come straight from an inbound email, so any Markdown metacharacter they
+    # contain must be escaped before being wrapped in our own ** / * / ` -
+    # otherwise an unbalanced '*', '_' or '`' makes Telegram reject the whole
+    # message with a 400 after the ticket has already been marked resolved.
+    safe_solution = escape_telegram_markdown(clean_solution)
+    safe_sender = escape_telegram_markdown(sender)
+
     user_text = (
         f"📬 **Réponse de l'équipe support par Email (Ticket #{ticket_id})**\n\n"
-        f"{clean_solution}\n\n"
+        f"{safe_solution}\n\n"
         f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Traité par : *{sender}*\n"
+        f"Traité par : *{safe_sender}*\n"
         f"Merci de votre confiance ! 👋"
     )
     background_tasks.add_task(TelegramRelay.send_message_to_user, ticket.user_id, user_text)
@@ -341,7 +372,7 @@ async def _resolve_inbound_email(
     # 2. Inform the Telegram Support Group that the ticket was resolved via email
     group_notification = (
         f"✅ **Ticket #{ticket_id} résolu par Email !**\n"
-        f"• Par : `{sender}`\n"
+        f"• Par : `{safe_sender}`\n"
         f"• La solution a été transmise à l'utilisateur (`ID: {ticket.user_id}`).\n"
         f"• La base de connaissances a été mise à jour automatiquement."
     )
@@ -429,13 +460,15 @@ async def handle_inbound_email(
         raise HTTPException(status_code=400, detail=result["message"])
     if result["status"] == "ticket_not_found":
         raise HTTPException(status_code=404, detail=result["message"])
+    if result["status"] == "empty_body":
+        raise HTTPException(status_code=400, detail=result["message"])
 
     return result
 
 
 @app.post("/api/webhooks/email-inbound/brevo")
 async def handle_brevo_inbound_email(
-    payload: BrevoInboundWebhookRequest,
+    request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
     token: Optional[str] = None,
@@ -450,8 +483,20 @@ async def handle_brevo_inbound_email(
     /api/webhooks/email-inbound endpoint (_resolve_inbound_email): one item's
     failure (no ticket id in its subject, unknown ticket) is reported in that
     item's result entry without aborting the rest of the batch.
+
+    The token is checked before the body is parsed (raw bytes -> manual
+    model_validate_json, same as the generic endpoint) rather than via a
+    `payload: BrevoInboundWebhookRequest` parameter, so an unauthenticated
+    caller gets a plain 401 instead of a 422 disclosing the expected JSON
+    shape.
     """
     verify_brevo_inbound_token(token)
+
+    raw_body = await request.body()
+    try:
+        payload = BrevoInboundWebhookRequest.model_validate_json(raw_body)
+    except ValidationError as exc:
+        raise HTTPException(status_code=422, detail=exc.errors())
 
     results = []
     for item in payload.items:

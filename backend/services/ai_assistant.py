@@ -24,7 +24,8 @@ class AIAssistantService:
 
         return (
             "Tu es un assistant support technique bienveillant et concis. "
-            "Réponds à la question de l'utilisateur en te basant UNIQUEMENT sur les solutions fournies ci-dessous.\n\n"
+            "Réponds à la question de l'utilisateur en te basant UNIQUEMENT sur les solutions fournies ci-dessous. "
+            "Réponds toujours dans la même langue que la question de l'utilisateur (français ou anglais).\n\n"
             f"--- CONTEXTE FOURNI ---\n{context_str}\n\n"
             f"--- QUESTION UTILISATEUR ---\n{query}\n\n"
             "--- RÉPONSE ---"
@@ -76,8 +77,12 @@ class AIAssistantService:
         base_url: str,
     ) -> Optional[str]:
         """Calls an OpenAI-compatible chat completions endpoint (used by OpenAI and DeepSeek)."""
-        http_client = client or httpx.AsyncClient(timeout=10.0)
-        async with http_client as session:
+        # A caller-supplied client is shared (connection pool, custom
+        # transport) and must outlive this call, so only a client we create
+        # ourselves gets closed via `async with`.
+        owns_client = client is None
+        session = client or httpx.AsyncClient(timeout=10.0)
+        try:
             response = await session.post(
                 base_url,
                 headers={
@@ -87,7 +92,13 @@ class AIAssistantService:
                 json={
                     "model": model,
                     "messages": [
-                        {"role": "system", "content": "Tu es un assistant support utile et concis."},
+                        {
+                            "role": "system",
+                            "content": (
+                                "Tu es un assistant support utile et concis. Réponds toujours dans la "
+                                "même langue que la question de l'utilisateur (français ou anglais)."
+                            ),
+                        },
                         {"role": "user", "content": prompt},
                     ],
                     "temperature": 0.2,
@@ -100,6 +111,9 @@ class AIAssistantService:
             else:
                 logger.warning("AI provider error %s: %s", response.status_code, response.text)
                 return None
+        finally:
+            if owns_client:
+                await session.aclose()
 
     @staticmethod
     async def _call_gemini(
@@ -109,8 +123,10 @@ class AIAssistantService:
     ) -> Optional[str]:
         """Calls the Google Gemini generateContent endpoint."""
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        http_client = client or httpx.AsyncClient(timeout=10.0)
-        async with http_client as session:
+        # See _call_openai_compatible: only close a client we created ourselves.
+        owns_client = client is None
+        session = client or httpx.AsyncClient(timeout=10.0)
+        try:
             response = await session.post(
                 url,
                 params={"key": settings.AI_API_KEY},
@@ -137,3 +153,6 @@ class AIAssistantService:
             else:
                 logger.warning("AI provider error %s: %s", response.status_code, response.text)
                 return None
+        finally:
+            if owns_client:
+                await session.aclose()

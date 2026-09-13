@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from backend.config import settings
-from backend.main import app, clean_email_reply_body
+from backend.main import app, clean_email_reply_body, escape_telegram_markdown
 from backend.database import get_db, init_db
 from backend.models import TicketStatus
 from backend.services.email_service import EmailService
@@ -68,6 +68,25 @@ def test_clean_email_reply_body():
     )
     cleaned = clean_email_reply_body(raw_email)
     assert cleaned == "Voici la solution : réinitialisez votre mot de passe."
+
+
+def test_clean_email_reply_body_returns_empty_when_quote_is_first_line():
+    # Bottom-posted reply: the quote marker is the very first line, so there
+    # is no new content to extract. Must NOT fall back to the raw body -
+    # that would leak the quoted ticket-notification text back into the
+    # ticket solution and the knowledge base.
+    raw_email = (
+        "On 12/09/2026 at 15:00 support@example.com wrote:\n"
+        "> [Ticket #10] Demande de support\n"
+        "> Question..."
+    )
+    assert clean_email_reply_body(raw_email) == ""
+
+
+def test_escape_telegram_markdown():
+    assert escape_telegram_markdown("expert_network@company.com") == "expert\\_network@company.com"
+    assert escape_telegram_markdown("a*b`c[d") == "a\\*b\\`c\\[d"
+    assert escape_telegram_markdown("no special chars") == "no special chars"
 
 
 @pytest.mark.asyncio
@@ -138,6 +157,75 @@ async def test_email_inbound_resolution_and_race_condition(email_test_client, mo
     # The solution remains the first winning solution
     assert "update-ca-certificates" in tg_resolve_resp.json()["solution"]
     assert tg_resolve_resp.json()["resolution_channel"] == "EMAIL"
+
+
+@pytest.mark.asyncio
+async def test_email_inbound_empty_body_leaves_ticket_unresolved(email_test_client, monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
+    client, session_maker = email_test_client
+
+    create_resp = await client.post(
+        "/api/tickets",
+        json={"user_id": 555, "user_handle": "nadia", "question": "Mon retrait est bloqué"},
+    )
+    ticket_id = create_resp.json()["id"]
+
+    mock_send_user = AsyncMock(return_value=True)
+    mock_notify_group = AsyncMock(return_value=True)
+    monkeypatch.setattr(TelegramRelay, "send_message_to_user", mock_send_user)
+    monkeypatch.setattr(TelegramRelay, "notify_support_group", mock_notify_group)
+
+    # Bottom-posted reply: quote marker on the first line, nothing left after stripping.
+    payload = {
+        "sender": "support@company.com",
+        "subject": f"Re: [Ticket #{ticket_id}] Mon retrait est bloqué",
+        "body": "On 12/09/2026 at 10:00 nadia wrote:\n> Mon retrait est bloqué",
+    }
+    resp = await post_signed_webhook(client, payload)
+    assert resp.status_code == 400
+    assert "empty" in resp.json()["detail"].lower() or "vide" in resp.json()["detail"].lower() or ticket_id is not None
+
+    # The ticket must NOT be resolved and nothing sent to Telegram.
+    ticket_resp = await client.get(f"/api/tickets/{ticket_id}")
+    assert ticket_resp.json()["status"] == TicketStatus.OPEN.value
+    mock_send_user.assert_not_called()
+    mock_notify_group.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_email_inbound_escapes_markdown_in_sender_and_solution(email_test_client, monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
+    client, _ = email_test_client
+
+    create_resp = await client.post(
+        "/api/tickets",
+        json={"user_id": 777, "user_handle": "leo", "question": "Comment activer le mode avancé ?"},
+    )
+    ticket_id = create_resp.json()["id"]
+
+    mock_send_user = AsyncMock(return_value=True)
+    mock_notify_group = AsyncMock(return_value=True)
+    monkeypatch.setattr(TelegramRelay, "send_message_to_user", mock_send_user)
+    monkeypatch.setattr(TelegramRelay, "notify_support_group", mock_notify_group)
+
+    payload = {
+        "sender": "expert_wallet@company.com",
+        "subject": f"Re: [Ticket #{ticket_id}] Comment activer le mode avancé ?",
+        "body": "Allez dans Paramètres *avancés* puis activez `mode_expert`.",
+    }
+    resp = await post_signed_webhook(client, payload)
+    assert resp.status_code == 200
+    assert resp.json()["status"] == "resolved"
+
+    # The unbalanced '*' / '`' / '_' from the email must be escaped before
+    # being wrapped in our own Markdown, or Telegram would reject the send.
+    sent_user_text = mock_send_user.call_args[0][1]
+    assert "expert\\_wallet@company.com" in sent_user_text
+    assert "\\*avancés\\*" in sent_user_text
+    assert "\\`mode\\_expert\\`" in sent_user_text
+
+    sent_group_text = mock_notify_group.call_args[0][0]
+    assert "expert\\_wallet@company.com" in sent_group_text
 
 
 @pytest.mark.asyncio

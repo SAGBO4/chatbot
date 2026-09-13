@@ -73,5 +73,17 @@ class Settings(BaseSettings):
     # from a browser.
     CORS_ALLOWED_ORIGINS: str = "*"
 
+    def support_group_is_configured(self) -> bool:
+        """
+        Whether TELEGRAM_SUPPORT_GROUP_ID points to a real Telegram group.
+
+        The default `0` (and any falsy value) means "not configured yet".
+        Single source of truth for this check - it used to be copy-pasted as
+        `not group_id or str(group_id) == "0"` in three places (bot support
+        handlers, bot user handlers, backend telegram relay), which risked
+        drifting out of sync.
+        """
+        return bool(self.TELEGRAM_SUPPORT_GROUP_ID) and str(self.TELEGRAM_SUPPORT_GROUP_ID) != "0"
+
 
 settings = Settings()

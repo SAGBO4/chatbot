@@ -1,6 +1,6 @@
 # TODO — ce qu'il te reste à faire
 
-Tout le code nécessaire est écrit et testé (32/32 tests passent). Ce qui reste est **de la
+Tout le code nécessaire est écrit et testé (43/43 tests passent). Ce qui reste est **de la
 configuration et des décisions**, pas du code à écrire — sauf un point signalé plus bas (webhook
 Brevo entrant).
 
@@ -89,11 +89,12 @@ via Telegram (groupe support) fonctionne en local.
 
 ## 7. Si tu as déjà un `chatbot.db` local avec des tickets dedans
 
-- [ ] Supprime-le une fois (`rm chatbot.db`) et relance le backend pour qu'il recrée le schéma.
-      Une nouvelle colonne (`support_group_message_id`) a été ajoutée à la table `tickets` ; ce
-      projet n'a pas d'outil de migration (Alembic), donc une base déjà créée avant ce changement
-      ne la récupère pas automatiquement. Si `chatbot.db` n'existe pas encore chez toi, rien à
-      faire.
+- [x] **Rien à faire** : `init_db()` détecte maintenant lui-même les colonnes manquantes sur une
+      table déjà existante (`resolution_channel`, `support_group_message_id`) et les ajoute via
+      `ALTER TABLE` au démarrage du backend — plus besoin de supprimer `chatbot.db`. C'était la
+      faille critique remontée par l'ultrareview (toute base pré-existante plantait en 500 sur
+      `/api/tickets` après mise à jour) ; corrigée dans `backend/database.py`, testée dans
+      `tests/test_database.py`.
 
 ---
 
@@ -121,4 +122,46 @@ via Telegram (groupe support) fonctionne en local.
   texte de la carte ; l'ancienne regex reste en secours (aucune régression), et l'agent reçoit
   désormais un message explicite si sa réponse ne peut être associée à aucun ticket.
 - Fichier `.env` local créé (gitignored) avec secrets déjà générés pour tester tout de suite.
-- 32/32 tests passent.
+- Base de connaissances initiale chargée (22 articles FAQ Stack Wallet, bilingue FR/EN) via
+  `scripts/seed_knowledge_base.py` (upsert : relançable sans dupliquer, met à jour le contenu
+  modifié et supprime les entrées retirées). Liste des canaux de support vérifiée sur la vraie
+  page `stackwallet.com/index.html#support` (Telegram, Discord, Reddit, Twitter/X, YouTube,
+  Session, Mastodon, email). Le prompt IA (`ai_assistant.py`) répond désormais explicitement dans
+  la langue de la question de l'utilisateur.
+- **4 anomalies "normal" de l'ultrareview corrigées** (branche `feat/email-support-sync`) :
+  - Migration auto au démarrage (`backend/database.py`) — voir section 7 ci-dessus.
+  - `clean_email_reply_body` ne renvoie plus le corps brut (citations comprises) quand la réponse
+    d'un agent ne contient aucun nouveau contenu ; elle renvoie une chaîne vide.
+  - Une réponse email vide après nettoyage des citations laisse maintenant le ticket **non résolu**
+    (HTTP 400) au lieu de le résoudre avec une solution vide et de polluer la base de connaissances.
+  - Le contenu d'email injecté dans les messages Telegram (nom de l'agent, solution) est désormais
+    échappé (`escape_telegram_markdown`) avant d'être inséré dans le Markdown — un `_`, `*` ou `` ` ``
+    dans l'email ne fait plus rejeter l'envoi par Telegram après coup.
+  - 5 tests ajoutés pour ces 4 correctifs (`tests/test_database.py`, `tests/test_email_sync.py`).
+- **5 anomalies "mineur" de l'ultrareview corrigées** :
+  - Webhook Brevo : le token (`?token=`) est vérifié avant de parser le corps JSON, plus après —
+    un appel non authentifié ne révèle plus la forme JSON attendue via un 422.
+  - `EmailService._send_smtp_sync` gère désormais `SMTP_PORT=465` (TLS implicite : Gmail SSL,
+    iCloud…) avec `smtplib.SMTP_SSL` ; le port 587 garde `SMTP` + `starttls()`.
+  - Test sentinelle « groupe support non configuré » dédupliqué dans une seule méthode
+    `Settings.support_group_is_configured()` (`backend/config.py`), utilisée par les 3 anciens
+    call-sites.
+  - `AIAssistantService` ne ferme plus un `httpx.AsyncClient` fourni par l'appelant (seul un client
+    créé en interne est fermé après l'appel).
+  - `.env.example` corrigé : modèle Gemini par défaut documenté `gemini-2.5-flash`.
+  - 6 tests ajoutés (`tests/test_brevo_inbound_webhook.py`, `tests/test_email_service.py`,
+    `tests/test_config.py`).
+- **Bug pré-existant corrigé** : un agent qui répond avec un média (photo, sticker, vocal...) dans
+  le groupe support ne fait plus planter le bot (`message.text.strip()` sur `None`).
+  `bot/handlers/support_handlers.py` utilise maintenant, dans l'ordre : le texte, sinon la légende
+  du média (une capture d'écran commentée résout directement le ticket), sinon une transcription
+  automatique si c'est un vocal/audio et que `AI_PROVIDER=openai` (Whisper), sinon un message
+  explicite demandant à l'agent de répondre en texte (plus de plantage silencieux).
+  - Speech-to-text : `_transcribe_voice_message` télécharge le fichier vocal via l'API Telegram et
+    appelle `POST https://api.openai.com/v1/audio/transcriptions` (modèle `whisper-1`). Uniquement
+    disponible avec `AI_PROVIDER=openai` + `AI_API_KEY` — Whisper est spécifique à OpenAI, donc
+    Gemini/DeepSeek retombent sur la demande de réponse texte.
+  - 5 tests ajoutés (`tests/test_bot_handlers.py`) : média sans légende, photo avec légende, vocal
+    transcrit, vocal sans provider OpenAI configuré.
+- 51/51 tests passent (le test `test_full_support_lifecycle_loop` reste occasionnellement flaky car
+  il appelle une vraie API Gemini en live — non lié à ces correctifs).

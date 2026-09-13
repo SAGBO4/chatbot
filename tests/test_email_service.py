@@ -1,3 +1,7 @@
+import smtplib
+from email.message import EmailMessage
+from unittest.mock import MagicMock
+
 import pytest
 from backend.config import settings
 from backend.services.email_service import EmailService
@@ -56,3 +60,55 @@ async def test_email_service_ticket_created_and_resolved():
     assert "agent_claire" in m2.get_content()
 
     settings.EMAIL_ENABLED = False
+
+
+def _mock_smtp_context_manager():
+    """A MagicMock that behaves like the object returned by smtplib.SMTP(...)/SMTP_SSL(...)."""
+    server = MagicMock()
+    server.__enter__.return_value = server
+    server.__exit__.return_value = False
+    return server
+
+
+def test_send_smtp_sync_uses_ssl_for_implicit_tls_port_465(monkeypatch):
+    """Port 465 (Gmail SSL, iCloud, ...) requires SMTP_SSL, not STARTTLS."""
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp.gmail.com")
+    monkeypatch.setattr(settings, "SMTP_PORT", 465)
+    monkeypatch.setattr(settings, "SMTP_USE_TLS", True)
+    monkeypatch.setattr(settings, "SMTP_USER", None)
+    monkeypatch.setattr(settings, "SMTP_PASSWORD", None)
+
+    ssl_server = _mock_smtp_context_manager()
+    starttls_ctor = MagicMock()
+    monkeypatch.setattr(smtplib, "SMTP_SSL", MagicMock(return_value=ssl_server))
+    monkeypatch.setattr(smtplib, "SMTP", starttls_ctor)
+
+    msg = EmailMessage()
+    msg["Subject"] = "test"
+    assert EmailService._send_smtp_sync(msg) is True
+
+    smtplib.SMTP_SSL.assert_called_once_with("smtp.gmail.com", 465, timeout=10.0)
+    starttls_ctor.assert_not_called()
+    ssl_server.starttls.assert_not_called()
+
+
+def test_send_smtp_sync_uses_starttls_for_port_587(monkeypatch):
+    """Port 587 keeps using plain SMTP + starttls(), as before."""
+    monkeypatch.setattr(settings, "SMTP_HOST", "smtp-relay.brevo.com")
+    monkeypatch.setattr(settings, "SMTP_PORT", 587)
+    monkeypatch.setattr(settings, "SMTP_USE_TLS", True)
+    monkeypatch.setattr(settings, "SMTP_USER", None)
+    monkeypatch.setattr(settings, "SMTP_PASSWORD", None)
+
+    plain_server = _mock_smtp_context_manager()
+    ssl_ctor = MagicMock()
+    monkeypatch.setattr(smtplib, "SMTP", MagicMock(return_value=plain_server))
+    monkeypatch.setattr(smtplib, "SMTP_SSL", ssl_ctor)
+
+    msg = EmailMessage()
+    msg["Subject"] = "test"
+    assert EmailService._send_smtp_sync(msg) is True
+
+    smtplib.SMTP.assert_called_once_with("smtp-relay.brevo.com", 587, timeout=10.0)
+    ssl_ctor.assert_not_called()
+    plain_server.starttls.assert_called_once()

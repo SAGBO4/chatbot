@@ -151,6 +151,25 @@ async def test_brevo_missing_token_rejected(brevo_test_client, monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_brevo_malformed_body_without_token_rejected_before_parsing(brevo_test_client, monkeypatch):
+    """
+    The token must be checked before the body is parsed against
+    BrevoInboundWebhookRequest, so a malformed/unauthenticated request gets a
+    plain 401 - not a 422 that discloses the expected JSON schema to an
+    unauthenticated caller.
+    """
+    monkeypatch.setattr(settings, "BREVO_INBOUND_SECRET", TEST_BREVO_SECRET)
+    client, _ = brevo_test_client
+
+    resp = await client.post(
+        "/api/webhooks/email-inbound/brevo",
+        content=b"not even json",
+        headers={"Content-Type": "application/json"},
+    )
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
 async def test_brevo_wrong_token_rejected(brevo_test_client, monkeypatch):
     monkeypatch.setattr(settings, "BREVO_INBOUND_SECRET", TEST_BREVO_SECRET)
     client, _ = brevo_test_client

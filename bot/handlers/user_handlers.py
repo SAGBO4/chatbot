@@ -132,7 +132,7 @@ async def handle_resolve_no(
 
         # Notify Telegram Support Group
         support_group_id = settings.TELEGRAM_SUPPORT_GROUP_ID
-        if support_group_id and str(support_group_id) != "0":
+        if settings.support_group_is_configured():
             group_card = (
                 f"🚨 **NOUVEAU TICKET SUPPORT #{ticket_id}**\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
