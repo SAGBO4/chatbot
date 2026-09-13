@@ -142,11 +142,25 @@ async def handle_resolve_no(
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"👉 *Pour répondre, répondez directement à ce message avec votre solution.*"
             )
-            await bot.send_message(
+            sent_card = await bot.send_message(
                 chat_id=support_group_id,
                 text=group_card,
                 parse_mode="Markdown",
             )
+
+            # Best-effort: record the card's message id so a reply can later
+            # be matched by message identity rather than by parsing its text.
+            # Failure here must not block the ticket/escalation flow - the
+            # regex-based fallback in support_handlers.py still covers it.
+            try:
+                await client.attach_support_card(
+                    ticket_id=ticket_id, message_id=sent_card.message_id
+                )
+            except Exception as attach_exc:
+                logger.warning(
+                    "Could not attach support card message id for ticket %s: %s",
+                    ticket_id, attach_exc,
+                )
     except Exception as exc:
         logger.error("Error creating or escalating ticket: %s", exc)
         await callback.answer("Erreur lors de la création du ticket", show_alert=True)

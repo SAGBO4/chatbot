@@ -40,6 +40,10 @@ class Ticket(Base):
     resolved_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Telegram message id of the ticket card posted to the Support Group, used
+    # to resolve an agent's reply by message identity rather than by parsing
+    # the card's text (see openspec change harden-support-reply-ticket-lookup).
+    support_group_message_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class KnowledgeArticle(Base):

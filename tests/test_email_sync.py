@@ -1,18 +1,42 @@
+import hashlib
+import hmac
+import json
+
 import pytest
 import pytest_asyncio
 import httpx
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
+from backend.config import settings
 from backend.main import app, clean_email_reply_body
 from backend.database import get_db, init_db
 from backend.models import TicketStatus
 from backend.services.email_service import EmailService
 from backend.services.telegram_relay import TelegramRelay
 
+TEST_WEBHOOK_SECRET = "test-webhook-secret"
+TEST_API_KEY = "test-api-key"
+
+
+def sign_payload(payload: dict, secret: str = TEST_WEBHOOK_SECRET) -> tuple[bytes, str]:
+    raw_body = json.dumps(payload).encode("utf-8")
+    signature = hmac.new(secret.encode("utf-8"), raw_body, hashlib.sha256).hexdigest()
+    return raw_body, signature
+
+
+async def post_signed_webhook(client, payload: dict, secret: str = TEST_WEBHOOK_SECRET, signature: str = None):
+    raw_body, computed_signature = sign_payload(payload, secret)
+    headers = {"Content-Type": "application/json"}
+    if signature is not False:
+        headers["X-Webhook-Signature"] = signature if signature is not None else computed_signature
+    return await client.post("/api/webhooks/email-inbound", content=raw_body, headers=headers)
+
 
 @pytest_asyncio.fixture
-async def email_test_client(tmp_path):
+async def email_test_client(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "API_KEY", TEST_API_KEY)
+
     db_file = tmp_path / "email_sync_test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_file}", echo=False)
     await init_db(db_engine=engine)
@@ -26,7 +50,9 @@ async def email_test_client(tmp_path):
     app.dependency_overrides[get_db] = override_get_db
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers={"X-API-Key": TEST_API_KEY}
+    ) as client:
         yield client, session_maker
 
     app.dependency_overrides.clear()
@@ -46,6 +72,7 @@ def test_clean_email_reply_body():
 
 @pytest.mark.asyncio
 async def test_email_inbound_resolution_and_race_condition(email_test_client, monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
     client, session_maker = email_test_client
 
     # 1. Create a ticket
@@ -73,7 +100,7 @@ async def test_email_inbound_resolution_and_race_condition(email_test_client, mo
         "subject": f"Re: [Ticket #{ticket_id}] Nouvelle demande de support de @samuel",
         "body": "Installez les certificats racine CA à jour via update-ca-certificates.\n\nLe 12/09/2026 support a écrit :\n> ...",
     }
-    inbound_resp = await client.post("/api/webhooks/email-inbound", json=email_webhook_payload)
+    inbound_resp = await post_signed_webhook(client, email_webhook_payload)
     assert inbound_resp.status_code == 200
     inbound_data = inbound_resp.json()
     assert inbound_data["status"] == "resolved"
@@ -94,7 +121,7 @@ async def test_email_inbound_resolution_and_race_condition(email_test_client, mo
     assert "update-ca-certificates" in query_resp.json()["answer"]
 
     # 3. Race condition check: another agent tries to resolve on Telegram or Email
-    second_email_resp = await client.post("/api/webhooks/email-inbound", json=email_webhook_payload)
+    second_email_resp = await post_signed_webhook(client, email_webhook_payload)
     assert second_email_resp.status_code == 200
     assert second_email_resp.json()["status"] == "already_resolved"
 
@@ -111,3 +138,45 @@ async def test_email_inbound_resolution_and_race_condition(email_test_client, mo
     # The solution remains the first winning solution
     assert "update-ca-certificates" in tg_resolve_resp.json()["solution"]
     assert tg_resolve_resp.json()["resolution_channel"] == "EMAIL"
+
+
+@pytest.mark.asyncio
+async def test_email_inbound_rejected_without_configured_secret(email_test_client, monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", None)
+    client, _ = email_test_client
+
+    payload = {
+        "sender": "attacker@evil.com",
+        "subject": "Re: [Ticket #1]",
+        "body": "Forged solution",
+    }
+    resp = await post_signed_webhook(client, payload)
+    assert resp.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_email_inbound_rejected_without_signature_header(email_test_client, monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
+    client, _ = email_test_client
+
+    payload = {
+        "sender": "attacker@evil.com",
+        "subject": "Re: [Ticket #1]",
+        "body": "Forged solution",
+    }
+    resp = await post_signed_webhook(client, payload, signature=False)
+    assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_email_inbound_rejected_with_invalid_signature(email_test_client, monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
+    client, _ = email_test_client
+
+    payload = {
+        "sender": "attacker@evil.com",
+        "subject": "Re: [Ticket #1]",
+        "body": "Forged solution",
+    }
+    resp = await post_signed_webhook(client, payload, signature="deadbeef" * 8)
+    assert resp.status_code == 401

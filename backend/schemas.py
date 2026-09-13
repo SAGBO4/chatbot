@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -46,12 +46,32 @@ class TicketResponse(BaseModel):
     resolution_channel: Optional[str] = None
     created_at: datetime
     resolved_at: Optional[datetime] = None
+    support_group_message_id: Optional[int] = None
+
+
+class TicketSupportCardRequest(BaseModel):
+    message_id: int
 
 
 class InboundEmailWebhookRequest(BaseModel):
     sender: str
     subject: str
     body: str
+
+
+class BrevoInboundFrom(BaseModel):
+    Address: str
+
+
+class BrevoInboundItem(BaseModel):
+    From: BrevoInboundFrom
+    Subject: str
+    RawTextBody: Optional[str] = None
+    ExtractedMarkdownMessage: Optional[str] = None
+
+
+class BrevoInboundWebhookRequest(BaseModel):
+    items: List[BrevoInboundItem]
 
 
 class KnowledgeIngestRequest(BaseModel):

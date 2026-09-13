@@ -8,8 +8,31 @@ logger = logging.getLogger(__name__)
 
 
 class AIAssistantService:
+    # Sane default model per provider, used when AI_MODEL is not set.
+    DEFAULT_MODELS = {
+        "openai": "gpt-4o-mini",
+        "gemini": "gemini-2.5-flash",
+        "deepseek": "deepseek-chat",
+    }
+
     @staticmethod
+    def _build_prompt(query: str, retrieved_articles: List[Tuple[KnowledgeArticle, float]]) -> str:
+        context_snippets = []
+        for idx, (art, score) in enumerate(retrieved_articles[:3], start=1):
+            context_snippets.append(f"[{idx}] Question: {art.question}\nSolution: {art.solution}")
+        context_str = "\n\n".join(context_snippets)
+
+        return (
+            "Tu es un assistant support technique bienveillant et concis. "
+            "Réponds à la question de l'utilisateur en te basant UNIQUEMENT sur les solutions fournies ci-dessous.\n\n"
+            f"--- CONTEXTE FOURNI ---\n{context_str}\n\n"
+            f"--- QUESTION UTILISATEUR ---\n{query}\n\n"
+            "--- RÉPONSE ---"
+        )
+
+    @classmethod
     async def generate_answer(
+        cls,
         query: str,
         retrieved_articles: List[Tuple[KnowledgeArticle, float]],
         client: Optional[httpx.AsyncClient] = None,
@@ -21,47 +44,96 @@ class AIAssistantService:
         if not retrieved_articles:
             return None
 
-        # Build context from top articles
-        context_snippets = []
-        for idx, (art, score) in enumerate(retrieved_articles[:3], start=1):
-            context_snippets.append(f"[{idx}] Question: {art.question}\nSolution: {art.solution}")
-        context_str = "\n\n".join(context_snippets)
-
-        prompt = (
-            "Tu es un assistant support technique bienveillant et concis. "
-            "Réponds à la question de l'utilisateur en te basant UNIQUEMENT sur les solutions fournies ci-dessous.\n\n"
-            f"--- CONTEXTE FOURNI ---\n{context_str}\n\n"
-            f"--- QUESTION UTILISATEUR ---\n{query}\n\n"
-            "--- RÉPONSE ---"
-        )
+        prompt = cls._build_prompt(query, retrieved_articles)
+        provider = (settings.AI_PROVIDER or "openai").strip().lower()
+        model = settings.AI_MODEL or cls.DEFAULT_MODELS.get(provider, cls.DEFAULT_MODELS["openai"])
 
         try:
-            http_client = client or httpx.AsyncClient(timeout=10.0)
-            async with http_client as session:
-                # Compatible with OpenAI-compatible chat completion endpoints
-                response = await session.post(
-                    "https://api.openai.com/v1/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {settings.AI_API_KEY}",
-                        "Content-Type": "application/json",
-                    },
-                    json={
-                        "model": settings.AI_MODEL,
-                        "messages": [
-                            {"role": "system", "content": "Tu es un assistant support utile et concis."},
-                            {"role": "user", "content": prompt},
-                        ],
-                        "temperature": 0.2,
-                        "max_tokens": 500,
-                    },
+            if provider == "gemini":
+                return await cls._call_gemini(prompt, model, client)
+            elif provider == "deepseek":
+                return await cls._call_openai_compatible(
+                    prompt, model, client,
+                    base_url="https://api.deepseek.com/chat/completions",
                 )
-                if response.status_code == 200:
-                    data = response.json()
-                    answer = data["choices"][0]["message"]["content"].strip()
-                    return answer
-                else:
-                    logger.warning("AI provider error %s: %s", response.status_code, response.text)
-                    return None
+            elif provider == "openai":
+                return await cls._call_openai_compatible(
+                    prompt, model, client,
+                    base_url="https://api.openai.com/v1/chat/completions",
+                )
+            else:
+                logger.warning("Unknown AI_PROVIDER '%s', falling back to no AI answer.", provider)
+                return None
         except Exception as exc:
-            logger.error("Error communicating with AI provider: %s", exc)
+            logger.error("Error communicating with AI provider '%s': %s", provider, exc)
             return None
+
+    @staticmethod
+    async def _call_openai_compatible(
+        prompt: str,
+        model: str,
+        client: Optional[httpx.AsyncClient],
+        base_url: str,
+    ) -> Optional[str]:
+        """Calls an OpenAI-compatible chat completions endpoint (used by OpenAI and DeepSeek)."""
+        http_client = client or httpx.AsyncClient(timeout=10.0)
+        async with http_client as session:
+            response = await session.post(
+                base_url,
+                headers={
+                    "Authorization": f"Bearer {settings.AI_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": model,
+                    "messages": [
+                        {"role": "system", "content": "Tu es un assistant support utile et concis."},
+                        {"role": "user", "content": prompt},
+                    ],
+                    "temperature": 0.2,
+                    "max_tokens": 500,
+                },
+            )
+            if response.status_code == 200:
+                data = response.json()
+                return data["choices"][0]["message"]["content"].strip()
+            else:
+                logger.warning("AI provider error %s: %s", response.status_code, response.text)
+                return None
+
+    @staticmethod
+    async def _call_gemini(
+        prompt: str,
+        model: str,
+        client: Optional[httpx.AsyncClient],
+    ) -> Optional[str]:
+        """Calls the Google Gemini generateContent endpoint."""
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
+        http_client = client or httpx.AsyncClient(timeout=10.0)
+        async with http_client as session:
+            response = await session.post(
+                url,
+                params={"key": settings.AI_API_KEY},
+                headers={"Content-Type": "application/json"},
+                json={
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {
+                        "temperature": 0.2,
+                        "maxOutputTokens": 500,
+                    },
+                },
+            )
+            if response.status_code == 200:
+                data = response.json()
+                candidates = data.get("candidates") or []
+                if not candidates:
+                    logger.warning("Gemini returned no candidates: %s", data)
+                    return None
+                parts = candidates[0].get("content", {}).get("parts") or []
+                if not parts:
+                    logger.warning("Gemini returned no content parts: %s", data)
+                    return None
+                return parts[0]["text"].strip()
+            else:
+                logger.warning("AI provider error %s: %s", response.status_code, response.text)
+                return None

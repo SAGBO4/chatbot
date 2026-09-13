@@ -43,6 +43,33 @@ class TicketService:
         return list(result.scalars().all())
 
     @staticmethod
+    async def attach_support_card(
+        session: AsyncSession, ticket_id: int, message_id: int
+    ) -> Optional[Ticket]:
+        """
+        Records the Telegram message id of the ticket card posted to the
+        Support Group, so a later reply can be matched by message identity
+        rather than by parsing the card's text.
+        """
+        ticket = await TicketService.get_ticket(session, ticket_id)
+        if not ticket:
+            return None
+
+        ticket.support_group_message_id = message_id
+        await session.commit()
+        await session.refresh(ticket)
+        return ticket
+
+    @staticmethod
+    async def get_ticket_by_support_message_id(
+        session: AsyncSession, message_id: int
+    ) -> Optional[Ticket]:
+        result = await session.execute(
+            select(Ticket).where(Ticket.support_group_message_id == message_id)
+        )
+        return result.scalars().first()
+
+    @staticmethod
     async def resolve_ticket(
         session: AsyncSession,
         ticket_id: int,

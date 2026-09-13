@@ -9,7 +9,9 @@ from aiogram.fsm.context import FSMContext
 
 from backend.main import app
 from backend.database import get_db, init_db
-from backend.models import TicketStatus
+from backend.config import settings
+from backend.models import Ticket, TicketStatus
+from sqlalchemy import select
 from bot.api_client import BackendClient
 from bot.handlers.user_handlers import (
     handle_user_query,
@@ -18,9 +20,13 @@ from bot.handlers.user_handlers import (
 )
 from bot.handlers.support_handlers import handle_support_agent_reply
 
+TEST_API_KEY = "test-api-key"
+
 
 @pytest_asyncio.fixture
-async def e2e_environment(tmp_path):
+async def e2e_environment(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "API_KEY", TEST_API_KEY)
+
     # 1. Setup in-memory / temporary database
     db_file = tmp_path / "e2e_test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_file}", echo=False)
@@ -36,7 +42,9 @@ async def e2e_environment(tmp_path):
 
     # 2. Client connecting to in-memory ASGI app
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://testserver", headers={"X-API-Key": TEST_API_KEY}
+    ) as client:
         backend_client = BackendClient(base_url="http://testserver")
         # Patch BackendClient to route via ASGI transport
         backend_client.query = lambda query, user_id, user_handle=None: client.post(
@@ -62,6 +70,21 @@ async def e2e_environment(tmp_path):
             )
             return r.json()
 
+        async def mock_attach_support_card(ticket_id: int, message_id: int):
+            r = await client.post(
+                f"/api/tickets/{ticket_id}/support-card",
+                json={"message_id": message_id},
+            )
+            return r.json()
+
+        async def mock_get_ticket_by_support_message(message_id: int):
+            r = await client.get(f"/api/tickets/by-support-message/{message_id}")
+            if r.status_code == 404:
+                return None
+            return r.json()
+
+        backend_client.attach_support_card = mock_attach_support_card
+        backend_client.get_ticket_by_support_message = mock_get_ticket_by_support_message
         backend_client.query = mock_query
         backend_client.create_ticket = mock_create_ticket
         backend_client.resolve_ticket = mock_resolve_ticket
@@ -96,6 +119,10 @@ async def test_full_support_lifecycle_loop(e2e_environment, monkeypatch):
     user_chat = MagicMock(spec=Chat, id=1001, type="private")
     user_state = FSMContext(storage=storage, key=StorageKey(bot_id=1, chat_id=1001, user_id=1001))
     mock_bot = AsyncMock()
+    # The group card's posted message; its id is what links the ticket to the
+    # agent's later reply (see harden-support-reply-ticket-lookup).
+    posted_card_message_id = 7001
+    mock_bot.send_message.return_value = MagicMock(message_id=posted_card_message_id)
 
     # Step 1: User asks a new, unknown question
     initial_question = "Mon imprimante affiche erreur 404 sur l'écran"
@@ -134,11 +161,20 @@ async def test_full_support_lifecycle_loop(e2e_environment, monkeypatch):
     assert "David" in group_card or "david_user" in group_card
     assert initial_question in group_card
 
+    # Verifies the card's Telegram message id was persisted against the ticket
+    async with session_maker() as verify_session:
+        persisted_ticket = (
+            await verify_session.execute(select(Ticket).where(Ticket.id == 1))
+        ).scalars().first()
+        assert persisted_ticket.support_group_message_id == posted_card_message_id
+
     # Step 3: Support Agent replies in the Support Group with a new solution
     agent_user = MagicMock(spec=User, id=2002, username="support_hero", first_name="Hero")
     group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
 
-    card_in_group = MagicMock(spec=Message, chat=group_chat, text=group_card)
+    card_in_group = MagicMock(
+        spec=Message, chat=group_chat, text=group_card, message_id=posted_card_message_id
+    )
     agent_solution = "Éteignez l'imprimante 30 secondes puis rebranchez le câble réseau."
 
     agent_reply_msg = MagicMock(

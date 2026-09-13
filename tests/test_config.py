@@ -4,7 +4,10 @@ from backend.config import Settings
 
 
 def test_settings_defaults():
+    # _env_file=None bypasses the project's real .env, so this checks pure
+    # class defaults regardless of what a developer has configured locally.
     s = Settings(
+        _env_file=None,
         TELEGRAM_BOT_TOKEN="test_token",
         TELEGRAM_SUPPORT_GROUP_ID=-100123456,
     )

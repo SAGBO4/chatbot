@@ -11,9 +11,13 @@ from backend.models import Base, TicketStatus, KnowledgeArticle
 from backend.services.knowledge_base import KnowledgeBaseService
 from backend.services.ai_assistant import AIAssistantService
 
+TEST_API_KEY = "test-api-key"
+
 
 @pytest_asyncio.fixture
-async def test_client(tmp_path):
+async def test_client(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, "API_KEY", TEST_API_KEY)
+
     db_file = tmp_path / "api_test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_file}", echo=False)
     await init_db(db_engine=engine)
@@ -27,7 +31,9 @@ async def test_client(tmp_path):
     app.dependency_overrides[get_db] = override_get_db
 
     transport = httpx.ASGITransport(app=app)
-    async with httpx.AsyncClient(transport=transport, base_url="http://test") as client:
+    async with httpx.AsyncClient(
+        transport=transport, base_url="http://test", headers={"X-API-Key": TEST_API_KEY}
+    ) as client:
         yield client, session_maker
 
     app.dependency_overrides.clear()
@@ -66,16 +72,21 @@ async def test_query_endpoint_matching_and_fallback(test_client):
 
 
 @pytest.mark.asyncio
-async def test_ai_assistant_pluggable_behavior():
+async def test_ai_assistant_pluggable_behavior(monkeypatch):
     # 1. When AI is disabled, generate_answer returns None
-    settings.AI_ENABLED = False
+    monkeypatch.setattr(settings, "AI_ENABLED", False)
     article = KnowledgeArticle(question="Test question", solution="Test solution")
     ans_disabled = await AIAssistantService.generate_answer("Test query", [(article, 0.9)])
     assert ans_disabled is None
 
     # 2. When AI is enabled, mock LLM response
-    settings.AI_ENABLED = True
-    settings.AI_API_KEY = "mock_key"
+    # AI_PROVIDER/AI_MODEL are pinned explicitly here (rather than relying on
+    # class defaults) so this test is unaffected by whatever a developer has
+    # configured in their local .env (e.g. AI_PROVIDER=gemini).
+    monkeypatch.setattr(settings, "AI_ENABLED", True)
+    monkeypatch.setattr(settings, "AI_API_KEY", "mock_key")
+    monkeypatch.setattr(settings, "AI_PROVIDER", "openai")
+    monkeypatch.setattr(settings, "AI_MODEL", None)
 
     mock_resp = httpx.Response(
         status_code=200,
@@ -91,6 +102,63 @@ async def test_ai_assistant_pluggable_behavior():
         "Test query", [(article, 0.9)], client=mock_client
     )
     assert ans_enabled == "Solution synthétisée par l'IA."
+
+
+@pytest.mark.asyncio
+async def test_ai_assistant_deepseek_provider(monkeypatch):
+    monkeypatch.setattr(settings, "AI_ENABLED", True)
+    monkeypatch.setattr(settings, "AI_API_KEY", "mock_deepseek_key")
+    monkeypatch.setattr(settings, "AI_PROVIDER", "deepseek")
+    monkeypatch.setattr(settings, "AI_MODEL", None)
+
+    article = KnowledgeArticle(question="Test question", solution="Test solution")
+
+    mock_resp = httpx.Response(
+        status_code=200,
+        json={"choices": [{"message": {"content": "Réponse DeepSeek."}}]},
+    )
+    mock_client = AsyncMock()
+    mock_client.post.return_value = mock_resp
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    answer = await AIAssistantService.generate_answer(
+        "Test query", [(article, 0.9)], client=mock_client
+    )
+    assert answer == "Réponse DeepSeek."
+    call_url = mock_client.post.call_args[0][0]
+    assert "deepseek.com" in call_url
+
+
+@pytest.mark.asyncio
+async def test_ai_assistant_gemini_provider(monkeypatch):
+    monkeypatch.setattr(settings, "AI_ENABLED", True)
+    monkeypatch.setattr(settings, "AI_API_KEY", "mock_gemini_key")
+    monkeypatch.setattr(settings, "AI_PROVIDER", "gemini")
+    monkeypatch.setattr(settings, "AI_MODEL", None)
+
+    article = KnowledgeArticle(question="Test question", solution="Test solution")
+
+    mock_resp = httpx.Response(
+        status_code=200,
+        json={
+            "candidates": [
+                {"content": {"parts": [{"text": "Réponse Gemini."}]}}
+            ]
+        },
+    )
+    mock_client = AsyncMock()
+    mock_client.post.return_value = mock_resp
+    mock_client.__aenter__.return_value = mock_client
+    mock_client.__aexit__.return_value = None
+
+    answer = await AIAssistantService.generate_answer(
+        "Test query", [(article, 0.9)], client=mock_client
+    )
+    assert answer == "Réponse Gemini."
+    call_url = mock_client.post.call_args[0][0]
+    assert "generativelanguage.googleapis.com" in call_url
+    assert "gemini-2.5-flash" in call_url  # default model used since AI_MODEL unset
 
     # Reset
     settings.AI_ENABLED = False
@@ -145,3 +213,75 @@ async def test_ticket_lifecycle_and_feedback_loop(test_client):
     q_data = query_resp.json()
     assert q_data["found"] is True
     assert "Activez les popups" in q_data["answer"]
+
+
+@pytest.mark.asyncio
+async def test_api_rejects_missing_or_invalid_key(test_client):
+    client, _ = test_client
+
+    # No X-API-Key header at all
+    resp_no_key = await client.post(
+        "/api/query", json={"query": "test"}, headers={"X-API-Key": ""}
+    )
+    assert resp_no_key.status_code == 401
+
+    # Wrong X-API-Key
+    resp_wrong_key = await client.post(
+        "/api/query", json={"query": "test"}, headers={"X-API-Key": "wrong-key"}
+    )
+    assert resp_wrong_key.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_api_rejected_when_key_not_configured(test_client, monkeypatch):
+    client, _ = test_client
+    monkeypatch.setattr(settings, "API_KEY", None)
+
+    resp = await client.post("/api/query", json={"query": "test"})
+    assert resp.status_code == 503
+
+
+@pytest.mark.asyncio
+async def test_support_card_attach_and_lookup_round_trip(test_client):
+    client, _ = test_client
+
+    create_resp = await client.post(
+        "/api/tickets",
+        json={
+            "user_id": 111222333,
+            "user_handle": "diane",
+            "question": "Le bouton d'export ne répond plus",
+            "automated_answer": None,
+        },
+    )
+    assert create_resp.status_code == 201
+    ticket_id = create_resp.json()["id"]
+
+    # Attach the support-group card's Telegram message id
+    attach_resp = await client.post(
+        f"/api/tickets/{ticket_id}/support-card",
+        json={"message_id": 4242},
+    )
+    assert attach_resp.status_code == 200
+    assert attach_resp.json()["support_group_message_id"] == 4242
+
+    # Look it back up by that message id
+    lookup_resp = await client.get("/api/tickets/by-support-message/4242")
+    assert lookup_resp.status_code == 200
+    assert lookup_resp.json()["id"] == ticket_id
+
+
+@pytest.mark.asyncio
+async def test_support_card_attach_on_unknown_ticket_returns_404(test_client):
+    client, _ = test_client
+
+    resp = await client.post("/api/tickets/999999/support-card", json={"message_id": 1})
+    assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_support_card_lookup_unknown_message_returns_404(test_client):
+    client, _ = test_client
+
+    resp = await client.get("/api/tickets/by-support-message/999999")
+    assert resp.status_code == 404
