@@ -71,6 +71,8 @@ async def handle_user_query(
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"❓ **Votre problème est-il résolu ?**"
         )
+        if len(reply_text) > 4000:
+            reply_text = reply_text[:4000] + "...(tronqué)"
         await message.answer(reply_text, reply_markup=get_resolution_keyboard(), parse_mode="Markdown")
         await state.set_state(UserQueryState.waiting_for_resolution)
 

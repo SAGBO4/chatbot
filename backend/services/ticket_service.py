@@ -33,12 +33,12 @@ class TicketService:
 
     @staticmethod
     async def get_all_tickets(
-        session: AsyncSession, status: Optional[str] = None
+        session: AsyncSession, status: Optional[str] = None, limit: int = 50, offset: int = 0
     ) -> List[Ticket]:
         query = select(Ticket)
         if status:
             query = query.where(Ticket.status == status)
-        query = query.order_by(Ticket.id.desc())
+        query = query.order_by(Ticket.id.desc()).limit(limit).offset(offset)
         result = await session.execute(query)
         return list(result.scalars().all())
 

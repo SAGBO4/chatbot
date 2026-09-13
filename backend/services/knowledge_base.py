@@ -2,7 +2,7 @@ import re
 import math
 from collections import Counter
 from typing import List, Tuple, Optional, Set
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import KnowledgeArticle
 
@@ -155,12 +155,23 @@ class KnowledgeBaseService:
         if not query_text:
             return []
 
-        articles = await cls.get_all_articles(session)
-        if not articles:
-            return []
-
         query_tokens = tokenize(query_text, remove_stopwords=True)
         query_vec = compute_tf_vector(query_tokens)
+
+        stmt = select(KnowledgeArticle)
+        if query_tokens:
+            conditions = []
+            for token in query_tokens:
+                term = f"%{token}%"
+                conditions.append(KnowledgeArticle.question.ilike(term))
+                conditions.append(KnowledgeArticle.keywords.ilike(term))
+            stmt = stmt.where(or_(*conditions))
+            
+        result = await session.execute(stmt)
+        articles = list(result.scalars().all())
+
+        if not articles:
+            return []
 
         scored: List[Tuple[KnowledgeArticle, float]] = []
 

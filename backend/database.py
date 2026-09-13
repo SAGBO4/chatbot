@@ -1,4 +1,4 @@
-from typing import AsyncGenerator
+from typing import AsyncGenerator, Optional
 from sqlalchemy import inspect, text
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from backend.config import settings
@@ -46,8 +46,35 @@ def _add_missing_columns(sync_conn) -> None:
             )
 
 
+import os
+import logging
+from pathlib import Path
+from alembic.config import Config
+from alembic import command
+
+logger = logging.getLogger(__name__)
+
+
+def run_alembic_upgrade(connection_url: Optional[str] = None) -> None:
+    """Runs Alembic migrations up to head revision programmatically."""
+    ini_path = Path(__file__).resolve().parent.parent / "alembic.ini"
+    if ini_path.exists():
+        alembic_cfg = Config(str(ini_path))
+        url = connection_url or settings.DATABASE_URL
+        alembic_cfg.set_main_option("sqlalchemy.url", url)
+        command.upgrade(alembic_cfg, "head")
+
+
 async def init_db(db_engine=None) -> None:
     target_engine = db_engine or engine
+    # For standard application startup on the configured database, run Alembic migrations
+    if db_engine is None:
+        try:
+            run_alembic_upgrade()
+            logger.info("Alembic migrations applied successfully.")
+        except Exception as exc:
+            logger.warning("Alembic upgrade encountered an issue, falling back to direct metadata sync: %s", exc)
+
     async with target_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(_add_missing_columns)

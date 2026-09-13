@@ -28,6 +28,8 @@ from backend.services.ticket_service import TicketService
 from backend.services.knowledge_base import KnowledgeBaseService
 from backend.services.email_service import EmailService
 from backend.services.telegram_relay import TelegramRelay
+from backend.services.ai_assistant import AIAssistantService
+import httpx
 
 TICKET_SUBJECT_REGEX = re.compile(r"Ticket\s*#(\d+)", re.IGNORECASE)
 
@@ -112,7 +114,16 @@ def escape_telegram_markdown(text: str) -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
-    yield
+    client = httpx.AsyncClient(timeout=15.0)
+    app.state.http_client = client
+    TelegramRelay.set_shared_client(client)
+    AIAssistantService.set_shared_client(client)
+    try:
+        yield
+    finally:
+        TelegramRelay.set_shared_client(None)
+        AIAssistantService.set_shared_client(None)
+        await client.aclose()
 
 
 app = FastAPI(
@@ -188,9 +199,11 @@ async def create_ticket(
 @app.get("/api/tickets", response_model=List[TicketResponse], dependencies=[Depends(verify_api_key)])
 async def list_tickets(
     status_filter: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
     session: AsyncSession = Depends(get_db),
 ):
-    return await TicketService.get_all_tickets(session=session, status=status_filter)
+    return await TicketService.get_all_tickets(session=session, status=status_filter, limit=limit, offset=offset)
 
 
 @app.get(

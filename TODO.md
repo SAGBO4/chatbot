@@ -1,6 +1,6 @@
 # TODO — ce qu'il te reste à faire
 
-Tout le code nécessaire est écrit et testé (43/43 tests passent). Ce qui reste est **de la
+Tout le code nécessaire est écrit et testé (56/56 tests passent). Ce qui reste est **de la
 configuration et des décisions**, pas du code à écrire — sauf un point signalé plus bas (webhook
 Brevo entrant).
 
@@ -82,10 +82,8 @@ réponse d'agent par email ne peut pas résoudre automatiquement un ticket** —
 via Telegram (groupe support) fonctionne en local.
 
 ## 6. Si tu déploies avec `docker-compose.yml`
-
-- [ ] Avant le tout premier `docker compose up`, crée le fichier vide : `touch chatbot.db`
-      (sinon Docker le crée comme un **dossier**, ce qui casse SQLite au démarrage — c'est un piège
-      connu de ce `docker-compose.yml`, pas un bug à corriger dans le code).
+ 
+ - [x] **Corrigé** : Le montage monte désormais le répertoire `./data:/app/data` au lieu d'un fichier direct, évitant le piège de création d'un dossier `chatbot.db` vide. Un `.gitkeep` a été ajouté au dossier `data/`.
 
 ## 7. Si tu as déjà un `chatbot.db` local avec des tickets dedans
 
@@ -163,5 +161,10 @@ via Telegram (groupe support) fonctionne en local.
     Gemini/DeepSeek retombent sur la demande de réponse texte.
   - 5 tests ajoutés (`tests/test_bot_handlers.py`) : média sans légende, photo avec légende, vocal
     transcrit, vocal sans provider OpenAI configuré.
-- 51/51 tests passent (le test `test_full_support_lifecycle_loop` reste occasionnellement flaky car
-  il appelle une vraie API Gemini en live — non lié à ces correctifs).
+- 56/56 tests passent (51 tests fonctionnels/sync + 5 tests de résilience LLM).
+- **Hardening infrastructure backend (OpenSpec `harden-backend-infrastructure`)** :
+  - **Alembic pour les migrations** : Environnement Alembic async configuré (`alembic.ini`, dossier `alembic/`), première révision générée (`create_initial_tables`), commande d'upgrade intégrée automatiquement dans `backend/database.py`.
+  - **Client HTTP global (Singleton)** : Mutualisation d'une session `httpx.AsyncClient` persistante gérée dans le `lifespan` FastAPI (backend) et dans `BackendClient` avec fermeture propre dans `bot/main.py` (bot), éliminant l'overhead TCP/TLS répété.
+  - **Tests de résilience LLM (`tests/test_ai_assistant_resilience.py`)** : Couverture complète des pannes externes (timeouts `ReadTimeout`/`ConnectTimeout`, code 429 Rate Limit, code 500, réponses JSON malformées ou vides) garantissant la dégradation gracieuse sans crash.
+  - **Optimisation de la base de connaissances** : Pré-filtrage SQL `LIKE`/`ilike` avant le calcul de similarité, éliminant le chargement exhaustif de la table en mémoire.
+  - **Docker & CI/CD** : Conteneur s'exécutant avec l'utilisateur non privilégié `appuser`, montage Docker Compose sécurisé (`./data:/app/data`), et workflow GitHub Actions (`.github/workflows/ci.yml`) ajouté.

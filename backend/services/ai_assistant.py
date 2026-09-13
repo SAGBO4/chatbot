@@ -8,6 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 class AIAssistantService:
+    _shared_client: Optional[httpx.AsyncClient] = None
+
+    @classmethod
+    def set_shared_client(cls, client: Optional[httpx.AsyncClient]) -> None:
+        """Configures a shared persistent httpx client for AI API calls."""
+        cls._shared_client = client
+
     # Sane default model per provider, used when AI_MODEL is not set.
     DEFAULT_MODELS = {
         "openai": "gpt-4o-mini",
@@ -45,26 +52,30 @@ class AIAssistantService:
         if not retrieved_articles:
             return None
 
+        effective_client = client or cls._shared_client
         prompt = cls._build_prompt(query, retrieved_articles)
         provider = (settings.AI_PROVIDER or "openai").strip().lower()
         model = settings.AI_MODEL or cls.DEFAULT_MODELS.get(provider, cls.DEFAULT_MODELS["openai"])
 
         try:
             if provider == "gemini":
-                return await cls._call_gemini(prompt, model, client)
+                return await cls._call_gemini(prompt, model, effective_client)
             elif provider == "deepseek":
                 return await cls._call_openai_compatible(
-                    prompt, model, client,
+                    prompt, model, effective_client,
                     base_url="https://api.deepseek.com/chat/completions",
                 )
             elif provider == "openai":
                 return await cls._call_openai_compatible(
-                    prompt, model, client,
+                    prompt, model, effective_client,
                     base_url="https://api.openai.com/v1/chat/completions",
                 )
             else:
                 logger.warning("Unknown AI_PROVIDER '%s', falling back to no AI answer.", provider)
                 return None
+        except (httpx.HTTPError, KeyError, ValueError) as exc:
+            logger.error("Error communicating with AI provider '%s': %s", provider, exc)
+            return None
         except Exception as exc:
             logger.error("Error communicating with AI provider '%s': %s", provider, exc)
             return None
