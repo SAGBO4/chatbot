@@ -1,7 +1,7 @@
 import enum
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import String, Text, Integer, DateTime, Enum
+from sqlalchemy import String, Text, Integer, BigInteger, DateTime, Enum
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
@@ -24,7 +24,7 @@ class Ticket(Base):
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
-    user_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
     user_handle: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     question: Mapped[str] = mapped_column(Text, nullable=False)
     status: Mapped[str] = mapped_column(
@@ -43,7 +43,7 @@ class Ticket(Base):
     # Telegram message id of the ticket card posted to the Support Group, used
     # to resolve an agent's reply by message identity rather than by parsing
     # the card's text (see openspec change harden-support-reply-ticket-lookup).
-    support_group_message_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    support_group_message_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True)
 
 
 class KnowledgeArticle(Base):

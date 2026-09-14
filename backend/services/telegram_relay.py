@@ -39,7 +39,10 @@ class TelegramRelay:
                     "parse_mode": "Markdown",
                 },
             )
-            return resp.status_code == 200
+            if resp.status_code != 200:
+                logger.error("Failed to relay message to Telegram user %s (status %s): %s", user_id, resp.status_code, resp.text)
+                return False
+            return True
         except httpx.HTTPError as exc:
             logger.error("Failed to relay message to Telegram user %s: %s", user_id, exc)
             return False
@@ -73,7 +76,10 @@ class TelegramRelay:
                     "parse_mode": "Markdown",
                 },
             )
-            return resp.status_code == 200
+            if resp.status_code != 200:
+                logger.error("Failed to notify Telegram support group (status %s): %s", resp.status_code, resp.text)
+                return False
+            return True
         except httpx.HTTPError as exc:
             logger.error("Failed to notify Telegram support group: %s", exc)
             return False

@@ -165,13 +165,23 @@ class KnowledgeBaseService:
                 term = f"%{token}%"
                 conditions.append(KnowledgeArticle.question.ilike(term))
                 conditions.append(KnowledgeArticle.keywords.ilike(term))
+                if len(token) >= 4:
+                    prefix_term = f"%{token[:4]}%"
+                    conditions.append(KnowledgeArticle.question.ilike(prefix_term))
+                    conditions.append(KnowledgeArticle.keywords.ilike(prefix_term))
             stmt = stmt.where(or_(*conditions))
             
         result = await session.execute(stmt)
         articles = list(result.scalars().all())
 
         if not articles:
-            return []
+            # Fallback: if SQL filtering found no exact token/prefix matches (e.g. typos or fuzzy variations),
+            # load candidate articles to allow character n-gram and fuzzy scoring to evaluate them.
+            fallback_stmt = select(KnowledgeArticle).limit(200)
+            fallback_res = await session.execute(fallback_stmt)
+            articles = list(fallback_res.scalars().all())
+            if not articles:
+                return []
 
         scored: List[Tuple[KnowledgeArticle, float]] = []
 

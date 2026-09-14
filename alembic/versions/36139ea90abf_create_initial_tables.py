@@ -38,7 +38,7 @@ def upgrade() -> None:
     op.create_table(
         'tickets',
         sa.Column('id', sa.Integer(), autoincrement=True, nullable=False),
-        sa.Column('user_id', sa.Integer(), nullable=False),
+        sa.Column('user_id', sa.BigInteger(), nullable=False),
         sa.Column('user_handle', sa.String(length=255), nullable=True),
         sa.Column('question', sa.Text(), nullable=False),
         sa.Column('status', sa.String(length=50), nullable=False),
@@ -48,7 +48,7 @@ def upgrade() -> None:
         sa.Column('resolution_channel', sa.String(length=50), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False),
         sa.Column('resolved_at', sa.DateTime(timezone=True), nullable=True),
-        sa.Column('support_group_message_id', sa.Integer(), nullable=True),
+        sa.Column('support_group_message_id', sa.BigInteger(), nullable=True),
         sa.PrimaryKeyConstraint('id'),
         if_not_exists=True,
     )

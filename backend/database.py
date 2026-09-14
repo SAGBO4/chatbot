@@ -69,6 +69,10 @@ async def init_db(db_engine=None) -> None:
     target_engine = db_engine or engine
     # For standard application startup on the configured database, run Alembic migrations
     if db_engine is None:
+        if "sqlite" in settings.DATABASE_URL:
+            db_path_str = settings.DATABASE_URL.split(":///")[-1]
+            if db_path_str:
+                Path(db_path_str).resolve().parent.mkdir(parents=True, exist_ok=True)
         try:
             run_alembic_upgrade()
             logger.info("Alembic migrations applied successfully.")

@@ -168,3 +168,12 @@ via Telegram (groupe support) fonctionne en local.
   - **Tests de résilience LLM (`tests/test_ai_assistant_resilience.py`)** : Couverture complète des pannes externes (timeouts `ReadTimeout`/`ConnectTimeout`, code 429 Rate Limit, code 500, réponses JSON malformées ou vides) garantissant la dégradation gracieuse sans crash.
   - **Optimisation de la base de connaissances** : Pré-filtrage SQL `LIKE`/`ilike` avant le calcul de similarité, éliminant le chargement exhaustif de la table en mémoire.
   - **Docker & CI/CD** : Conteneur s'exécutant avec l'utilisateur non privilégié `appuser`, montage Docker Compose sécurisé (`./data:/app/data`), et workflow GitHub Actions (`.github/workflows/ci.yml`) ajouté.
+- **Correctifs de l'Ultra-Review (branche `feat/ultra-review-fixes`)** :
+  - **SEC-01 (Markdown & fallback Telegram)** : Échappement Markdown systématique des données utilisateur/agent (`bot/utils.py`, `support_handlers.py`, `user_handlers.py`) et fallback automatique en texte brut en cas d'erreur de parsing Telegram.
+  - **OPS-01 (Permissions conteneur & persistance SQLite)** : `COPY --chown=appuser:appuser` et création de `/app/data` dans le `Dockerfile` ; `DATABASE_URL` par défaut aligné sur `./data/chatbot.db` pour garantir la persistance via le volume docker-compose.
+  - **DB-01 (Telegram IDs 64-bit)** : Migration de `user_id` et `support_group_message_id` en `BigInteger` dans `backend/models.py` et dans la révision Alembic initiale pour compatibilité complète PostgreSQL.
+  - **PERF-01 (Moteur de recherche hybride & fuzzy)** : Ajout des préfixes de stems dans le filtre SQL et fallback vers l'analyse n-grammes/floue en mémoire si aucun mot-clé exact n'est trouvé.
+  - **RES-01 (Singleton HTTP dans le bot)** : Injection du `BackendClient` singleton dans le Dispatcher (`bot/main.py`) et fermeture propre dans le `finally` de l'application.
+  - **OBS-01 (Logs TelegramRelay)** : Log explicite du code HTTP et du corps de rejet Telegram en cas d'échec d'envoi.
+  - **TEST-01 & CI-01 (Tests & CI)** : Isolation hermétique des tests E2E (`AI_ENABLED=False`) et ajout de l'installation de `ruff` dans le workflow GitHub Actions.
+  - **58/58 tests passent**.

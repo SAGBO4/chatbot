@@ -17,7 +17,7 @@ class Settings(BaseSettings):
     BACKEND_HOST: str = "0.0.0.0"
     BACKEND_PORT: int = 8000
     BACKEND_URL: str = "http://localhost:8000"
-    DATABASE_URL: str = "sqlite+aiosqlite:///./chatbot.db"
+    DATABASE_URL: str = "sqlite+aiosqlite:///./data/chatbot.db"
 
     # AI & Knowledge Base configuration
     AI_ENABLED: bool = False
