@@ -1,6 +1,6 @@
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, inspect, text
 from backend.models import Base, Ticket, KnowledgeArticle, TicketStatus
 from backend.database import init_db
 
@@ -54,5 +54,67 @@ async def test_database_initialization_and_models(tmp_path):
         assert found_ticket is not None
         assert found_ticket.status == TicketStatus.OPEN.value
         assert found_ticket.user_handle == "john_doe"
+
+    await test_engine.dispose()
+
+
+@pytest.mark.asyncio
+async def test_init_db_backfills_missing_columns_on_existing_deployment(tmp_path):
+    """
+    Simulates a deployment whose `chatbot.db` predates the
+    `resolution_channel` / `support_group_message_id` columns: init_db()
+    must ALTER the existing table rather than leave it stuck on the old
+    schema (create_all alone is CREATE TABLE IF NOT EXISTS and never
+    touches a table that already exists).
+    """
+    db_file = tmp_path / "legacy.db"
+    test_engine = create_async_engine(f"sqlite+aiosqlite:///{db_file}", echo=False)
+
+    # Build the *old* tickets table by hand, without the two new columns.
+    async with test_engine.begin() as conn:
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE tickets (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    user_handle VARCHAR(255),
+                    question TEXT NOT NULL,
+                    status VARCHAR(50) NOT NULL,
+                    automated_answer TEXT,
+                    solution TEXT,
+                    resolved_by VARCHAR(255),
+                    created_at DATETIME NOT NULL,
+                    resolved_at DATETIME
+                )
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                "INSERT INTO tickets (user_id, question, status, created_at) "
+                "VALUES (42, 'Pre-existing ticket', 'OPEN', '2026-01-01 00:00:00')"
+            )
+        )
+
+    # Upgrading the app now runs init_db() against this pre-existing database.
+    await init_db(db_engine=test_engine)
+
+    async with test_engine.connect() as conn:
+        columns = await conn.run_sync(
+            lambda sync_conn: {c["name"] for c in inspect(sync_conn).get_columns("tickets")}
+        )
+    assert "resolution_channel" in columns
+    assert "support_group_message_id" in columns
+
+    test_session_maker = async_sessionmaker(bind=test_engine, class_=AsyncSession, expire_on_commit=False)
+    async with test_session_maker() as session:
+        # The query that used to 500 with "no such column" now succeeds and
+        # the pre-existing row survives with the new columns defaulting to NULL.
+        result = await session.execute(select(Ticket).where(Ticket.user_id == 42))
+        ticket = result.scalars().first()
+        assert ticket is not None
+        assert ticket.resolution_channel is None
+        assert ticket.support_group_message_id is None
 
     await test_engine.dispose()

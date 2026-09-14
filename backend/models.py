@@ -33,12 +33,17 @@ class Ticket(Base):
     automated_answer: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     solution: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     resolved_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    resolution_channel: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), default=utc_now, nullable=False
     )
     resolved_at: Mapped[Optional[datetime]] = mapped_column(
         DateTime(timezone=True), nullable=True
     )
+    # Telegram message id of the ticket card posted to the Support Group, used
+    # to resolve an agent's reply by message identity rather than by parsing
+    # the card's text (see openspec change harden-support-reply-ticket-lookup).
+    support_group_message_id: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
 
 
 class KnowledgeArticle(Base):

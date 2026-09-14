@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional
 from pydantic import BaseModel, ConfigDict
 
 
@@ -28,6 +28,7 @@ class TicketCreateRequest(BaseModel):
 class TicketResolveRequest(BaseModel):
     solution: str
     resolved_by: Optional[str] = None
+    resolution_channel: Optional[str] = "TELEGRAM"
     add_to_knowledge_base: bool = True
 
 
@@ -42,8 +43,35 @@ class TicketResponse(BaseModel):
     automated_answer: Optional[str] = None
     solution: Optional[str] = None
     resolved_by: Optional[str] = None
+    resolution_channel: Optional[str] = None
     created_at: datetime
     resolved_at: Optional[datetime] = None
+    support_group_message_id: Optional[int] = None
+
+
+class TicketSupportCardRequest(BaseModel):
+    message_id: int
+
+
+class InboundEmailWebhookRequest(BaseModel):
+    sender: str
+    subject: str
+    body: str
+
+
+class BrevoInboundFrom(BaseModel):
+    Address: str
+
+
+class BrevoInboundItem(BaseModel):
+    From: BrevoInboundFrom
+    Subject: str
+    RawTextBody: Optional[str] = None
+    ExtractedMarkdownMessage: Optional[str] = None
+
+
+class BrevoInboundWebhookRequest(BaseModel):
+    items: List[BrevoInboundItem]
 
 
 class KnowledgeIngestRequest(BaseModel):

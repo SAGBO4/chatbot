@@ -2,7 +2,7 @@ import re
 import math
 from collections import Counter
 from typing import List, Tuple, Optional, Set
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import KnowledgeArticle
 
@@ -115,6 +115,33 @@ class KnowledgeBaseService:
         result = await session.execute(select(KnowledgeArticle))
         return list(result.scalars().all())
 
+    @staticmethod
+    async def get_article_by_question(session: AsyncSession, question: str) -> Optional[KnowledgeArticle]:
+        result = await session.execute(
+            select(KnowledgeArticle).where(KnowledgeArticle.question == question)
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def update_article(
+        session: AsyncSession,
+        article: KnowledgeArticle,
+        solution: Optional[str] = None,
+        keywords: Optional[str] = None,
+    ) -> KnowledgeArticle:
+        if solution is not None:
+            article.solution = solution.strip()
+        if keywords is not None:
+            article.keywords = keywords.strip()
+        await session.commit()
+        await session.refresh(article)
+        return article
+
+    @staticmethod
+    async def delete_article(session: AsyncSession, article: KnowledgeArticle) -> None:
+        await session.delete(article)
+        await session.commit()
+
     @classmethod
     async def search(
         cls,
@@ -128,12 +155,23 @@ class KnowledgeBaseService:
         if not query_text:
             return []
 
-        articles = await cls.get_all_articles(session)
-        if not articles:
-            return []
-
         query_tokens = tokenize(query_text, remove_stopwords=True)
         query_vec = compute_tf_vector(query_tokens)
+
+        stmt = select(KnowledgeArticle)
+        if query_tokens:
+            conditions = []
+            for token in query_tokens:
+                term = f"%{token}%"
+                conditions.append(KnowledgeArticle.question.ilike(term))
+                conditions.append(KnowledgeArticle.keywords.ilike(term))
+            stmt = stmt.where(or_(*conditions))
+            
+        result = await session.execute(stmt)
+        articles = list(result.scalars().all())
+
+        if not articles:
+            return []
 
         scored: List[Tuple[KnowledgeArticle, float]] = []
 
