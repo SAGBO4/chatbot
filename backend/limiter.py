@@ -22,8 +22,14 @@ except ImportError:  # pragma: no cover - fallback when slowapi not installed
             content={"detail": detail},
         )
 
-    def get_remote_address(request: Request) -> str:
-        if request.client and request.client.host:
+    def get_remote_address(*args, **kwargs) -> str:
+        request = kwargs.get("request")
+        if not request and args:
+            for arg in args:
+                if hasattr(arg, "client"):
+                    request = arg
+                    break
+        if request and getattr(request, "client", None) and getattr(request.client, "host", None):
             return request.client.host
         return "127.0.0.1"
 

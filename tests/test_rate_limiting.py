@@ -117,7 +117,7 @@ async def test_throttling_non_message_event():
 def test_fastapi_rate_limiter():
     """Verify FastAPI RateLimiter returns 429 when threshold is reached."""
     app = FastAPI()
-    custom_limiter = Limiter(key_func=lambda req: "test_client")
+    custom_limiter = Limiter(key_func=lambda *args, **kwargs: "test_client")
     app.state.limiter = custom_limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
