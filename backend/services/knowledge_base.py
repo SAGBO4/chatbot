@@ -16,13 +16,28 @@ FRENCH_STOPWORDS = {
     "faire", "pas", "du", "tout", "ne", "j", "d", "l", "m", "t", "s", "c", "n", "y"
 }
 
+ENGLISH_STOPWORDS = {
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "to", "at", "in", "for",
+    "on", "by", "with", "about", "against", "between", "into", "through",
+    "during", "before", "after", "above", "below", "from", "up", "down",
+    "of", "off", "over", "under", "again", "further", "then", "once",
+    "here", "there", "when", "where", "why", "how", "all", "any", "both",
+    "each", "few", "more", "most", "other", "some", "such", "no", "nor",
+    "not", "only", "own", "same", "so", "than", "too", "very", "can",
+    "will", "just", "should", "now", "my", "your", "his", "her",
+    "its", "our", "their", "what", "which", "who", "whom", "this", "that"
+}
+
+BILINGUAL_STOPWORDS = FRENCH_STOPWORDS | ENGLISH_STOPWORDS
+
 
 def tokenize(text: str, remove_stopwords: bool = True) -> List[str]:
-    """Tokenize text into lowercased words, optionally filtering stopwords."""
+    """Tokenize text into lowercased words, optionally filtering bilingual stopwords."""
     text = text.lower()
     words = re.findall(r"\b\w{2,}\b", text)
     if remove_stopwords:
-        filtered = [w for w in words if w not in FRENCH_STOPWORDS]
+        filtered = [w for w in words if w not in BILINGUAL_STOPWORDS]
         return filtered if filtered else words
     return words
 
@@ -99,6 +114,23 @@ class KnowledgeBaseService:
     ) -> KnowledgeArticle:
         # If no keywords provided, automatically extract from the question
         computed_keywords = keywords or extract_keywords_from_text(question)
+
+        # If an article was already created for this ticket, update it rather than duplicating
+        if source_ticket_id is not None:
+            existing_stmt = select(KnowledgeArticle).where(KnowledgeArticle.source_ticket_id == source_ticket_id)
+            existing_res = await session.execute(existing_stmt)
+            existing = existing_res.scalars().first()
+            if existing:
+                existing.question = question.strip()
+                existing.solution = solution.strip()
+                if computed_keywords:
+                    existing.keywords = computed_keywords.strip()
+                if auto_commit:
+                    await session.commit()
+                    await session.refresh(existing)
+                else:
+                    await session.flush()
+                return existing
 
         article = KnowledgeArticle(
             question=question.strip(),

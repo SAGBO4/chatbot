@@ -1,12 +1,16 @@
 import hashlib
 import hmac
 import re
+import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, Depends, Header, HTTPException, Request, status, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from backend.config import settings
 from backend.database import get_db, init_db
@@ -150,8 +154,16 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "ok", "service": "support-bot-backend"}
+async def health_check(session: AsyncSession = Depends(get_db)):
+    try:
+        await session.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected", "service": "support-bot-backend"}
+    except Exception as exc:
+        logger.error("Health check database connectivity failure: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connectivity error",
+        )
 
 
 @app.post("/api/query", response_model=QueryResponse, dependencies=[Depends(verify_api_key)])

@@ -144,8 +144,9 @@ async def handle_support_agent_reply(
         transcribed = await _transcribe_voice_message(message, bot)
         if transcribed:
             solution_text = transcribed
+            safe_transcribed = escape_telegram_markdown(solution_text)
             await message.reply(
-                f"🎙️ Message vocal transcrit automatiquement :\n\n_{solution_text}_",
+                f"🎙️ Message vocal transcrit automatiquement :\n\n_{safe_transcribed}_",
                 parse_mode="Markdown",
             )
 

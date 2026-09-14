@@ -1,9 +1,15 @@
 import asyncio
+import logging
+from pathlib import Path
 from typing import AsyncGenerator, Optional
+from alembic.config import Config
+from alembic import command
 from sqlalchemy import inspect, text, event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from backend.config import settings
 from backend.models import Base
+
+logger = logging.getLogger(__name__)
 
 engine = create_async_engine(
     settings.DATABASE_URL,
@@ -59,15 +65,6 @@ def _add_missing_columns(sync_conn) -> None:
             sync_conn.execute(
                 text(f'ALTER TABLE {table.name} ADD COLUMN {column.name} {ddl_type}')
             )
-
-
-import os
-import logging
-from pathlib import Path
-from alembic.config import Config
-from alembic import command
-
-logger = logging.getLogger(__name__)
 
 
 def run_alembic_upgrade(connection_url: Optional[str] = None) -> None:

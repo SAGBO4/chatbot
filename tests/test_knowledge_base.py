@@ -80,3 +80,48 @@ async def test_dynamic_ingestion_and_immediate_retrieval(async_session):
     assert len(results) >= 1
     assert results[0][0].id == new_article.id
     assert "cache" in results[0][0].solution
+
+
+@pytest.mark.asyncio
+async def test_knowledge_base_deduplication_by_source_ticket_id(async_session):
+    art1 = await KnowledgeBaseService.add_article(
+        session=async_session,
+        question="First question",
+        solution="First solution",
+        source_ticket_id=101,
+    )
+    assert art1.id is not None
+    initial_id = art1.id
+
+    # Re-ingest with the same source_ticket_id
+    art2 = await KnowledgeBaseService.add_article(
+        session=async_session,
+        question="Updated question",
+        solution="Updated solution",
+        source_ticket_id=101,
+    )
+    assert art2.id == initial_id
+    assert art2.solution == "Updated solution"
+
+    all_arts = await KnowledgeBaseService.get_all_articles(async_session)
+    matching = [a for a in all_arts if a.source_ticket_id == 101]
+    assert len(matching) == 1
+
+
+def test_bilingual_tokenization():
+    from backend.services.knowledge_base import tokenize
+    # English stopwords like 'how', 'can', 'my' must be filtered
+    tokens_en = tokenize("How can I reset my password?")
+    assert "how" not in tokens_en
+    assert "can" not in tokens_en
+    assert "my" not in tokens_en
+    assert "reset" in tokens_en
+    assert "password" in tokens_en
+
+    # French stopwords like 'comment', 'faire', 'mon' must be filtered
+    tokens_fr = tokenize("Comment faire pour modifier mon compte ?")
+    assert "comment" not in tokens_fr
+    assert "faire" not in tokens_fr
+    assert "mon" not in tokens_fr
+    assert "modifier" in tokens_fr
+    assert "compte" in tokens_fr

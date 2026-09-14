@@ -285,3 +285,14 @@ async def test_support_card_lookup_unknown_message_returns_404(test_client):
 
     resp = await client.get("/api/tickets/by-support-message/999999")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_health_check_endpoint(test_client):
+    client, _ = test_client
+    resp = await client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["database"] == "connected"
+    assert data["service"] == "support-bot-backend"
