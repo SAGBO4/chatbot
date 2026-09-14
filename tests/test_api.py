@@ -17,6 +17,7 @@ TEST_API_KEY = "test-api-key"
 @pytest_asyncio.fixture
 async def test_client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "API_KEY", TEST_API_KEY)
+    monkeypatch.setattr(settings, "AI_ENABLED", False)
 
     db_file = tmp_path / "api_test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_file}", echo=False)

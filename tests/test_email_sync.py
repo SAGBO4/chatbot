@@ -95,6 +95,32 @@ def test_clean_email_reply_body_outlook():
     assert clean_email_reply_body(raw_email) == "Configurez les DNS 1.1.1.1 et réessayez."
 
 
+def test_clean_email_reply_body_french_prefix_and_dashes():
+    raw_email = (
+        "--- Solution détaillée ci-dessous ---\n"
+        "De : notre équipe support, nous avons réactivé votre compte.\n\n"
+        "-----Message d'origine-----\n"
+        "De : user@example.com\n"
+        "Objet : Compte bloqué"
+    )
+    cleaned = clean_email_reply_body(raw_email)
+    assert "--- Solution détaillée ci-dessous ---" in cleaned
+    assert "De : notre équipe support, nous avons réactivé votre compte." in cleaned
+    assert "user@example.com" not in cleaned
+
+
+def test_clean_email_reply_body_gmail_forwarded_message():
+    raw_email = (
+        "Veuillez trouver la réponse ci-jointe.\n\n"
+        "---------- Forwarded message ---------\n"
+        "From: tech@partner.com\n"
+        "Date: Mon, Sep 14, 2026 at 10:00 AM\n"
+        "Subject: Fwd: [Ticket #10] Problème résolu"
+    )
+    cleaned = clean_email_reply_body(raw_email)
+    assert cleaned == "Veuillez trouver la réponse ci-jointe."
+
+
 def test_escape_telegram_markdown():
     assert escape_telegram_markdown("expert_network@company.com") == "expert\\_network@company.com"
     assert escape_telegram_markdown("a*b`c[d") == "a\\*b\\`c\\[d"

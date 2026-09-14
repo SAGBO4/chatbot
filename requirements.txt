@@ -10,3 +10,6 @@ pytest>=8.0.0
 pytest-asyncio>=0.23.0
 python-dotenv>=1.0.1
 alembic>=1.13.0
+slowapi>=0.1.9
+asyncpg>=0.29.0
+sentry-sdk[fastapi,aiohttp]>=2.0.0

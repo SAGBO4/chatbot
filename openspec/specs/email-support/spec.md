@@ -33,3 +33,10 @@ When a ticket is resolved on one channel, the system SHALL notify the other chan
 #### Scenario: Ticket resolved via Email
 - **WHEN** an agent resolves a ticket via email
 - **THEN** a notification is posted to the Telegram support group indicating the ticket was resolved via email
+
+### Requirement: Inbound webhook secret logging protection
+The system and deployment documentation SHALL ensure that reverse proxies and gateway access logs do not expose sensitive webhook query tokens (such as `BREVO_INBOUND_SECRET` transmitted via URL parameters).
+
+#### Scenario: Request routed through reverse proxy
+- **WHEN** Brevo delivers an inbound email webhook payload to `/api/webhooks/email-inbound/brevo?token=...`
+- **THEN** reverse proxy configurations (Nginx/Caddy) strip or redact the token from standard access log outputs while passing the request intact to the backend service

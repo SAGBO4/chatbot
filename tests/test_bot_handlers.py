@@ -782,4 +782,62 @@ async def test_support_agent_reply_with_excessively_long_solution_caps_user_noti
     assert "...(tronqué)" in delivered_text
 
 
+@pytest.mark.asyncio
+async def test_support_agent_reply_truncates_solution_exceeding_backend_limit(monkeypatch):
+    """When an agent sends a solution > 5000 chars, it is truncated before calling backend resolve_ticket."""
+    support_group_id = -100999888
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_verbose", first_name="Agent")
+    group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+
+    card = MagicMock(spec=Message, message_id=123)
+    card.text = "TICKET SUPPORT #42"
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 124
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "X" * 6000
+    agent_message.reply_to_message = card
+    agent_message.reply = AsyncMock()
+
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {"id": 42, "user_id": 999}
+    mock_client.resolve_ticket.return_value = {
+        "id": 42,
+        "user_id": 999,
+        "status": "RESOLVED",
+        "solution": "capped",
+        "is_newly_resolved": True,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    mock_client.resolve_ticket.assert_called_once()
+    passed_solution = mock_client.resolve_ticket.call_args.kwargs["solution"]
+    assert len(passed_solution) <= 5000
+    assert "...(tronqué)" in passed_solution
+
+
+@pytest.mark.asyncio
+async def test_handle_user_query_rejects_questions_exceeding_telegram_limit():
+    """Questions > 4096 characters are caught and warned before querying backend."""
+    user = MagicMock(spec=User, id=123, username="user_alice", first_name="Alice")
+    message = MagicMock(spec=Message)
+    message.from_user = user
+    message.text = "Q" * 4500
+    message.answer = AsyncMock()
+
+    state = AsyncMock()
+    mock_client = AsyncMock()
+
+    await handle_user_query(message, state=state, backend_client=mock_client)
+
+    mock_client.query.assert_not_called()
+    message.answer.assert_called_once()
+    assert "trop longue" in message.answer.call_args[0][0]
+
+
 

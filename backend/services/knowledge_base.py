@@ -199,29 +199,47 @@ class KnowledgeBaseService:
             return []
 
         query_tokens = tokenize(query_text, remove_stopwords=True)
+        if not query_tokens:
+            return []
+
         query_vec = compute_tf_vector(query_tokens)
 
         stmt = select(KnowledgeArticle)
-        if query_tokens:
-            conditions = []
-            # Bound the number of tokens to 12 to prevent SQL clause explosion on long queries
-            for token in query_tokens[:12]:
-                term = f"%{token}%"
-                conditions.append(KnowledgeArticle.question.ilike(term))
-                conditions.append(KnowledgeArticle.keywords.ilike(term))
-                if len(token) >= 4:
-                    prefix_term = f"%{token[:4]}%"
-                    conditions.append(KnowledgeArticle.question.ilike(prefix_term))
-                    conditions.append(KnowledgeArticle.keywords.ilike(prefix_term))
-            stmt = stmt.where(or_(*conditions))
+        conditions = []
+        # Bound the number of tokens to 12 to prevent SQL clause explosion on long queries
+        for token in query_tokens[:12]:
+            term = f"%{token}%"
+            conditions.append(KnowledgeArticle.question.ilike(term))
+            conditions.append(KnowledgeArticle.keywords.ilike(term))
+            if len(token) >= 4:
+                prefix_term = f"%{token[:4]}%"
+                conditions.append(KnowledgeArticle.question.ilike(prefix_term))
+                conditions.append(KnowledgeArticle.keywords.ilike(prefix_term))
+        stmt = stmt.where(or_(*conditions))
             
         result = await session.execute(stmt)
         articles = list(result.scalars().all())
 
         if not articles:
             # Fallback: if SQL filtering found no exact token/prefix matches (e.g. typos or fuzzy variations),
-            # load candidate articles to allow character n-gram and fuzzy scoring to evaluate them.
-            fallback_stmt = select(KnowledgeArticle).order_by(KnowledgeArticle.id.desc()).limit(200)
+            # extract character 3-grams to search candidate articles via SQL, capped to 200 rows.
+            trigrams = set()
+            for token in query_tokens[:6]:
+                if len(token) >= 3:
+                    for i in range(len(token) - 2):
+                        trigrams.add(token[i : i + 3])
+
+            fallback_conditions = []
+            for tri in list(trigrams)[:15]:
+                term = f"%{tri}%"
+                fallback_conditions.append(KnowledgeArticle.question.ilike(term))
+                fallback_conditions.append(KnowledgeArticle.keywords.ilike(term))
+
+            if fallback_conditions:
+                fallback_stmt = select(KnowledgeArticle).where(or_(*fallback_conditions)).limit(200)
+            else:
+                fallback_stmt = select(KnowledgeArticle).order_by(KnowledgeArticle.id.desc()).limit(200)
+
             fallback_res = await session.execute(fallback_stmt)
             articles = list(fallback_res.scalars().all())
             if not articles:

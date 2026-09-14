@@ -75,24 +75,36 @@ générique (recherche du ticket, notification Telegram, mise à jour base de co
   (nécessite que le backend soit exposé publiquement — impossible à tester en local sans un tunnel
   type ngrok/Cloudflare Tunnel).
 - [ ] Si un reverse proxy est devant le backend, désactiver le logging des query strings pour ce
-  chemin (le secret voyage dans l'URL, faute de mécanisme de signature côté Brevo).
+  chemin (le secret voyage dans l'URL, faute de mécanisme de signature côté Brevo). Des modèles prêts à l'emploi sont fournis :
+  - Nginx : `deploy/nginx.conf` (utilise un format de log sans query string sur la route webhook)
+  - Caddy : `deploy/Caddyfile` (filtre et masque le paramètre `token` dans les logs)
 
 **Tant que le webhook Brevo n'est pas configuré côté dashboard (avec une URL publique), une
 réponse d'agent par email ne peut pas résoudre automatiquement un ticket** — seule la résolution
 via Telegram (groupe support) fonctionne en local.
 
-## 6. Si tu déploies avec `docker-compose.yml`
+## 6. Déploiement Production & Base de Données (PostgreSQL / SQLite)
  
- - [x] **Corrigé** : Le montage monte désormais le répertoire `./data:/app/data` au lieu d'un fichier direct, évitant le piège de création d'un dossier `chatbot.db` vide. Un `.gitkeep` a été ajouté au dossier `data/`.
+- [x] **SQLite WAL (Dev / Petit VPS)** : `docker-compose.yml` monte `./data:/app/data` et active le mode WAL automatiquement.
+- [x] **PostgreSQL 16 (Gros volumes & Multi-agents)** : `docker-compose.prod.yml` prêt à l'emploi avec conteneur Postgres 16 dédié, volume persistant `postgres_data` et pool de connexions (`asyncpg`).
+  - Lancement : `docker compose -f docker-compose.prod.yml up -d`
+  - Migration : `DATABASE_URL=postgresql+asyncpg://... alembic upgrade head`
 
-## 7. Si tu as déjà un `chatbot.db` local avec des tickets dedans
+## 7. Monitoring, Alerting & Télémétrie (Sentry)
+
+- [ ] (Optionnel) Si tu disposes d'un compte Sentry, renseigne `SENTRY_DSN=https://...` dans ton `.env`. Le backend FastAPI et le bot Telegram captureront automatiquement toutes les exceptions non gérées avec tracebacks complets.
+- [x] Le endpoint `/health` effectue désormais un ping actif (`SELECT 1`) sur la base de données et renvoie un HTTP 503 en cas de perte de connectivité.
+
+## 8. Protection Anti-Spam & Rate Limiting
+
+- [x] **Bot Telegram** : Throttling middleware in-memory actif (`bot/middlewares/throttling.py`), plafonné à 5 requêtes par fenêtre de 10 secondes par `user_id`.
+- [x] **Backend API** : Rate limiting SlowAPI actif sur `/api/query` (30/min) et `/api/tickets` (10/min), répondant en HTTP 429 Too Many Requests.
+
+## 9. Si tu as déjà un `chatbot.db` local avec des tickets dedans
 
 - [x] **Rien à faire** : `init_db()` détecte maintenant lui-même les colonnes manquantes sur une
       table déjà existante (`resolution_channel`, `support_group_message_id`) et les ajoute via
-      `ALTER TABLE` au démarrage du backend — plus besoin de supprimer `chatbot.db`. C'était la
-      faille critique remontée par l'ultrareview (toute base pré-existante plantait en 500 sur
-      `/api/tickets` après mise à jour) ; corrigée dans `backend/database.py`, testée dans
-      `tests/test_database.py`.
+      `ALTER TABLE` au démarrage du backend — plus besoin de supprimer `chatbot.db`.
 
 ---
 

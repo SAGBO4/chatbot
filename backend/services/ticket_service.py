@@ -77,12 +77,14 @@ class TicketService:
         resolved_by: Optional[str] = None,
         resolution_channel: str = "TELEGRAM",
         add_to_knowledge_base: bool = True,
+        auto_commit: bool = True,
+        preloaded_ticket: Optional[Ticket] = None,
     ) -> Tuple[Optional[Ticket], bool]:
         """
         Resolve a ticket. Returns (ticket, is_newly_resolved).
         If already resolved, returns (ticket, False) to prevent duplicate actions.
         """
-        ticket = await TicketService.get_ticket(session, ticket_id)
+        ticket = preloaded_ticket or await TicketService.get_ticket(session, ticket_id)
         if not ticket:
             return None, False
 
@@ -106,6 +108,7 @@ class TicketService:
                 auto_commit=False,
             )
 
-        await session.commit()
-        await session.refresh(ticket)
+        if auto_commit:
+            await session.commit()
+            await session.refresh(ticket)
         return ticket, True

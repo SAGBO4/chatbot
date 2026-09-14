@@ -5,11 +5,10 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-
 from backend.config import settings
 from bot.keyboards import get_resolution_keyboard
 from bot.api_client import BackendClient
-from bot.utils import escape_telegram_markdown
+from bot.utils import escape_telegram_markdown, truncate_telegram_text, TELEGRAM_MAX_MESSAGE_LENGTH
 
 logger = logging.getLogger(__name__)
 user_router = Router()
@@ -54,6 +53,13 @@ async def handle_user_query(
 ):
     client = backend_client or BackendClient()
     user_query = message.text.strip()
+    if len(user_query) > TELEGRAM_MAX_MESSAGE_LENGTH:
+        await message.answer(
+            f"⚠️ Votre question est trop longue (maximum {TELEGRAM_MAX_MESSAGE_LENGTH} caractères). "
+            "Veuillez raccourcir votre message et réessayer."
+        )
+        return
+
     user_id = message.from_user.id
     user_handle = message.from_user.username or message.from_user.first_name
 
@@ -72,8 +78,7 @@ async def handle_user_query(
             f"━━━━━━━━━━━━━━━━━━━\n"
             f"❓ **Votre problème est-il résolu ?**"
         )
-        if len(reply_text) > 4000:
-            reply_text = reply_text[:4000] + "...(tronqué)"
+        reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix="...(tronqué)")
         try:
             await message.answer(reply_text, reply_markup=get_resolution_keyboard(), parse_mode="Markdown")
         except Exception as send_err:
@@ -83,8 +88,7 @@ async def handle_user_query(
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"❓ Votre problème est-il résolu ?"
             )
-            if len(plain_reply) > 4000:
-                plain_reply = plain_reply[:4000] + "...(tronqué)"
+            plain_reply = truncate_telegram_text(plain_reply, max_length=4000, suffix="...(tronqué)")
             await message.answer(plain_reply, reply_markup=get_resolution_keyboard())
         await state.set_state(UserQueryState.waiting_for_resolution)
 
@@ -100,9 +104,7 @@ async def handle_user_query(
 async def handle_resolve_yes(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Merci pour votre retour !")
-    base_text = callback.message.text or ""
-    if len(base_text) > 3700:
-        base_text = base_text[:3700] + "...(tronqué)"
+    base_text = truncate_telegram_text(callback.message.text or "", max_length=3700, suffix="...(tronqué)")
     resolved_notice = (
         f"{base_text}\n\n"
         f"✅ **Statut : Problème résolu.**\n"
@@ -191,8 +193,8 @@ async def handle_resolve_no(
         support_group_id = settings.TELEGRAM_SUPPORT_GROUP_ID
         if settings.support_group_is_configured():
             # Truncate fields if excessively long to ensure group card never overflows Telegram 4096 limit
-            card_question = last_question if len(last_question) <= 1000 else last_question[:990] + "..."
-            card_answer = last_answer if len(last_answer) <= 1800 else last_answer[:1790] + "..."
+            card_question = truncate_telegram_text(last_question, max_length=1000, suffix="...")
+            card_answer = truncate_telegram_text(last_answer, max_length=1800, suffix="...")
 
             safe_handle = escape_telegram_markdown(user_handle)
             safe_question = escape_telegram_markdown(card_question)

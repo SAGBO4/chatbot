@@ -4,7 +4,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 
 class QueryRequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=1000)
+    query: str = Field(..., min_length=1, max_length=4096)
     user_id: Optional[int] = None
     user_handle: Optional[str] = None
 
@@ -21,7 +21,7 @@ class QueryResponse(BaseModel):
 class TicketCreateRequest(BaseModel):
     user_id: int
     user_handle: Optional[str] = None
-    question: str = Field(..., min_length=1, max_length=2000)
+    question: str = Field(..., min_length=1, max_length=4096)
     automated_answer: Optional[str] = Field(default=None, max_length=5000)
 
 
@@ -76,7 +76,7 @@ class BrevoInboundWebhookRequest(BaseModel):
 
 
 class KnowledgeIngestRequest(BaseModel):
-    question: str = Field(..., min_length=1, max_length=2000)
+    question: str = Field(..., min_length=1, max_length=4096)
     solution: str = Field(..., min_length=1, max_length=5000)
     keywords: Optional[str] = Field(default=None, max_length=1000)
     source_ticket_id: Optional[int] = None

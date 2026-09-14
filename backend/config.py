@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/chatbot.db"
 
+    # Monitoring & Telemetry
+    SENTRY_DSN: Optional[str] = None
+
     # AI & Knowledge Base configuration
     AI_ENABLED: bool = False
     AI_API_KEY: Optional[str] = None

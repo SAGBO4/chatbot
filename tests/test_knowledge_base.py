@@ -149,3 +149,45 @@ async def test_knowledge_base_pagination(async_session):
     page2_ids = {a.id for a in page2}
     assert page1_ids.isdisjoint(page2_ids)
 
+
+@pytest.mark.asyncio
+async def test_search_with_tokenless_or_punctuation_query_returns_empty(async_session):
+    await KnowledgeBaseService.add_article(
+        session=async_session,
+        question="Comment faire ?",
+        solution="Voici la solution.",
+    )
+    # Query with punctuation only or empty tokens
+    results = await KnowledgeBaseService.search(
+        session=async_session,
+        query="??? !!! ...",
+    )
+    assert results == []
+
+
+@pytest.mark.asyncio
+async def test_fuzzy_search_finds_article_beyond_200(async_session):
+    # Insert old target article (id = 1)
+    old_art = await KnowledgeBaseService.add_article(
+        session=async_session,
+        question="Configuration spécifique kubernetes ingress",
+        solution="Configurez les annotations ingress-nginx.",
+    )
+
+    # Insert 205 filler articles so old_art is outside the top 200 most recent articles
+    for i in range(205):
+        await KnowledgeBaseService.add_article(
+            session=async_session,
+            question=f"Autre question unrelated {i}",
+            solution=f"Autre solution {i}",
+        )
+
+    # Query with fuzzy variations / typos that won't match the 4-char prefix SQL LIKE but match n-gram
+    results = await KnowledgeBaseService.search(
+        session=async_session,
+        query="xkuberneetes xingress",
+        threshold=0.2,
+    )
+    assert len(results) >= 1
+    assert results[0][0].id == old_art.id
+

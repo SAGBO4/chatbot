@@ -154,16 +154,38 @@ uvicorn backend.main:app --reload --port 8000
 python -m bot.main
 ```
 
-#### Docker Compose Mode:
+#### Docker Compose Mode (Default SQLite WAL):
 ```bash
 docker compose up --build -d
 ```
+
+#### Docker Compose Mode (Production PostgreSQL 16):
+For high-volume production deployments with multiple concurrent support agents, use the dedicated PostgreSQL stack:
+```bash
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+### 6. Production Reverse Proxy & Webhook Hardening
+
+When deploying behind a reverse proxy (Nginx or Caddy), sensitive URL query parameters (such as `?token=` on Brevo inbound webhooks) should be redacted from access logs to prevent token leakage:
+- **Nginx**: Use the template provided in [deploy/nginx.conf](deploy/nginx.conf) with custom log format `redacted_combined`.
+- **Caddy**: Use the template provided in [deploy/Caddyfile](deploy/Caddyfile) with the `format filter` log directive.
+
+### 7. Production Monitoring & Anti-Spam Rate Limiting
+
+- **Rate Limiting**:
+  - Telegram Bot messages are throttled via an in-memory sliding window (5 messages / 10s per `user_id`).
+  - FastAPI endpoints `/api/query` (30 req/min) and `/api/tickets` (10 req/min) are protected against floods.
+- **Diagnostics & Health**:
+  - Endpoint `GET /health` runs an active `SELECT 1` ping against the database and returns HTTP 503 if unreachable.
+- **Sentry Integration**:
+  - Set `SENTRY_DSN=https://...` in `.env` to automatically capture unhandled exceptions with full tracebacks.
 
 ---
 
 ## Testing & Verification
 
-The automated test suite covers unit tests, database migrations, API endpoints, LLM resilience, and the full end-to-end (E2E) lifecycle loop:
+The automated test suite covers unit tests, database migrations, API endpoints, rate limiting, LLM resilience, and the full end-to-end (E2E) lifecycle loop:
 
 ```bash
 pytest -v

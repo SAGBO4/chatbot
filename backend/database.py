@@ -11,11 +11,20 @@ from backend.models import Base
 
 logger = logging.getLogger(__name__)
 
+engine_kwargs = {
+    "echo": False,
+    "future": True,
+    "pool_pre_ping": True,
+}
+if "sqlite" not in settings.DATABASE_URL:
+    engine_kwargs.update({
+        "pool_size": 10,
+        "max_overflow": 20,
+    })
+
 engine = create_async_engine(
     settings.DATABASE_URL,
-    echo=False,
-    future=True,
-    pool_pre_ping=True,
+    **engine_kwargs,
 )
 
 

@@ -49,3 +49,14 @@ The Telegram Bot SHALL post escalated support tickets to the designated Telegram
 #### Scenario: Reply received outside the support group is ignored
 - **WHEN** a message reproducing the ticket card pattern (ticket ID and user ID markers) is replied to in a chat that is not the configured Telegram Support Group, such as a private conversation with the bot
 - **THEN** the bot takes no action: it does not resolve the ticket, does not send any message to the referenced user, and does not update the knowledge base
+
+### Requirement: User query rate limiting and flood protection
+The Telegram Bot and backend API SHALL throttle incoming user messages and queries to prevent denial-of-service, abuse, and excessive LLM API quota consumption. The system SHALL enforce per-user rate limits on the bot interface and rate limits on backend query endpoints.
+
+#### Scenario: User sends queries within allowed rate limit
+- **WHEN** a user submits queries within the configured rate threshold (e.g. at most 5 requests per 10 seconds)
+- **THEN** the bot processes each query normally and returns responses
+
+#### Scenario: User exceeds message rate threshold
+- **WHEN** a user sends queries exceeding the rate threshold in a short window
+- **THEN** the bot rejects the excess messages with a friendly throttling notification ("Veuillez patienter quelques secondes avant d'envoyer un nouveau message") and suppresses backend API calls

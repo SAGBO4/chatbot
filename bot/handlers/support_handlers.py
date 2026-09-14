@@ -6,7 +6,7 @@ from aiogram import Router, F, Bot
 from aiogram.types import Message
 from backend.config import settings
 from bot.api_client import BackendClient
-from bot.utils import escape_telegram_markdown
+from bot.utils import escape_telegram_markdown, truncate_telegram_text
 
 logger = logging.getLogger(__name__)
 support_router = Router()
@@ -165,10 +165,11 @@ async def handle_support_agent_reply(
     )
 
     try:
-        # Resolve ticket and trigger KB ingestion
+        # Resolve ticket and trigger KB ingestion (strictly capped to 5000 chars matching backend schema)
+        api_solution = truncate_telegram_text(solution_text, max_length=5000)
         resolved_ticket = await client.resolve_ticket(
             ticket_id=ticket_id,
-            solution=solution_text,
+            solution=api_solution,
             resolved_by=agent_name,
             add_to_knowledge_base=True,
         )
@@ -187,7 +188,7 @@ async def handle_support_agent_reply(
 
         # 1. Forward the solution to the user via Telegram
         if user_id:
-            capped_solution = solution_text if len(solution_text) <= 3500 else solution_text[:3490] + "\n...(tronqué)"
+            capped_solution = truncate_telegram_text(solution_text, max_length=3500)
             safe_solution = escape_telegram_markdown(capped_solution)
             safe_agent = escape_telegram_markdown(agent_name)
             user_notification = (
