@@ -1,0 +1,18 @@
+target-version = "py313"
+line-length = 120
+exclude = [
+    ".venv",
+    "venv",
+    "alembic",
+    "data",
+    "scripts",
+    "openspec",
+]
+
+[lint]
+select = ["E", "F"]
+ignore = [
+    "E501", # line too long
+    "E402", # module level import not at top of file
+    "F401", # imported but unused
+]

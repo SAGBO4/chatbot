@@ -2,7 +2,7 @@ import re
 import math
 from collections import Counter
 from typing import List, Tuple, Optional, Set
-from sqlalchemy import select
+from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from backend.models import KnowledgeArticle
 
@@ -16,13 +16,28 @@ FRENCH_STOPWORDS = {
     "faire", "pas", "du", "tout", "ne", "j", "d", "l", "m", "t", "s", "c", "n", "y"
 }
 
+ENGLISH_STOPWORDS = {
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "to", "at", "in", "for",
+    "on", "by", "with", "about", "against", "between", "into", "through",
+    "during", "before", "after", "above", "below", "from", "up", "down",
+    "of", "off", "over", "under", "again", "further", "then", "once",
+    "here", "there", "when", "where", "why", "how", "all", "any", "both",
+    "each", "few", "more", "most", "other", "some", "such", "no", "nor",
+    "not", "only", "own", "same", "so", "than", "too", "very", "can",
+    "will", "just", "should", "now", "my", "your", "his", "her",
+    "its", "our", "their", "what", "which", "who", "whom", "this", "that"
+}
+
+BILINGUAL_STOPWORDS = FRENCH_STOPWORDS | ENGLISH_STOPWORDS
+
 
 def tokenize(text: str, remove_stopwords: bool = True) -> List[str]:
-    """Tokenize text into lowercased words, optionally filtering stopwords."""
+    """Tokenize text into lowercased words, optionally filtering bilingual stopwords."""
     text = text.lower()
     words = re.findall(r"\b\w{2,}\b", text)
     if remove_stopwords:
-        filtered = [w for w in words if w not in FRENCH_STOPWORDS]
+        filtered = [w for w in words if w not in BILINGUAL_STOPWORDS]
         return filtered if filtered else words
     return words
 
@@ -95,9 +110,27 @@ class KnowledgeBaseService:
         solution: str,
         keywords: Optional[str] = None,
         source_ticket_id: Optional[int] = None,
+        auto_commit: bool = True,
     ) -> KnowledgeArticle:
         # If no keywords provided, automatically extract from the question
         computed_keywords = keywords or extract_keywords_from_text(question)
+
+        # If an article was already created for this ticket, update it rather than duplicating
+        if source_ticket_id is not None:
+            existing_stmt = select(KnowledgeArticle).where(KnowledgeArticle.source_ticket_id == source_ticket_id)
+            existing_res = await session.execute(existing_stmt)
+            existing = existing_res.scalars().first()
+            if existing:
+                existing.question = question.strip()
+                existing.solution = solution.strip()
+                if computed_keywords:
+                    existing.keywords = computed_keywords.strip()
+                if auto_commit:
+                    await session.commit()
+                    await session.refresh(existing)
+                else:
+                    await session.flush()
+                return existing
 
         article = KnowledgeArticle(
             question=question.strip(),
@@ -106,14 +139,51 @@ class KnowledgeBaseService:
             source_ticket_id=source_ticket_id,
         )
         session.add(article)
+        if auto_commit:
+            await session.commit()
+            await session.refresh(article)
+        else:
+            await session.flush()
+        return article
+
+    @staticmethod
+    async def get_all_articles(
+        session: AsyncSession, limit: int = 50, offset: int = 0
+    ) -> List[KnowledgeArticle]:
+        result = await session.execute(
+            select(KnowledgeArticle)
+            .order_by(KnowledgeArticle.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
+        return list(result.scalars().all())
+
+    @staticmethod
+    async def get_article_by_question(session: AsyncSession, question: str) -> Optional[KnowledgeArticle]:
+        result = await session.execute(
+            select(KnowledgeArticle).where(KnowledgeArticle.question == question)
+        )
+        return result.scalars().first()
+
+    @staticmethod
+    async def update_article(
+        session: AsyncSession,
+        article: KnowledgeArticle,
+        solution: Optional[str] = None,
+        keywords: Optional[str] = None,
+    ) -> KnowledgeArticle:
+        if solution is not None:
+            article.solution = solution.strip()
+        if keywords is not None:
+            article.keywords = keywords.strip()
         await session.commit()
         await session.refresh(article)
         return article
 
     @staticmethod
-    async def get_all_articles(session: AsyncSession) -> List[KnowledgeArticle]:
-        result = await session.execute(select(KnowledgeArticle))
-        return list(result.scalars().all())
+    async def delete_article(session: AsyncSession, article: KnowledgeArticle) -> None:
+        await session.delete(article)
+        await session.commit()
 
     @classmethod
     async def search(
@@ -128,12 +198,52 @@ class KnowledgeBaseService:
         if not query_text:
             return []
 
-        articles = await cls.get_all_articles(session)
-        if not articles:
+        query_tokens = tokenize(query_text, remove_stopwords=True)
+        if not query_tokens:
             return []
 
-        query_tokens = tokenize(query_text, remove_stopwords=True)
         query_vec = compute_tf_vector(query_tokens)
+
+        stmt = select(KnowledgeArticle)
+        conditions = []
+        # Bound the number of tokens to 12 to prevent SQL clause explosion on long queries
+        for token in query_tokens[:12]:
+            term = f"%{token}%"
+            conditions.append(KnowledgeArticle.question.ilike(term))
+            conditions.append(KnowledgeArticle.keywords.ilike(term))
+            if len(token) >= 4:
+                prefix_term = f"%{token[:4]}%"
+                conditions.append(KnowledgeArticle.question.ilike(prefix_term))
+                conditions.append(KnowledgeArticle.keywords.ilike(prefix_term))
+        stmt = stmt.where(or_(*conditions))
+            
+        result = await session.execute(stmt)
+        articles = list(result.scalars().all())
+
+        if not articles:
+            # Fallback: if SQL filtering found no exact token/prefix matches (e.g. typos or fuzzy variations),
+            # extract character 3-grams to search candidate articles via SQL, capped to 200 rows.
+            trigrams = set()
+            for token in query_tokens[:6]:
+                if len(token) >= 3:
+                    for i in range(len(token) - 2):
+                        trigrams.add(token[i : i + 3])
+
+            fallback_conditions = []
+            for tri in list(trigrams)[:15]:
+                term = f"%{tri}%"
+                fallback_conditions.append(KnowledgeArticle.question.ilike(term))
+                fallback_conditions.append(KnowledgeArticle.keywords.ilike(term))
+
+            if fallback_conditions:
+                fallback_stmt = select(KnowledgeArticle).where(or_(*fallback_conditions)).limit(200)
+            else:
+                fallback_stmt = select(KnowledgeArticle).order_by(KnowledgeArticle.id.desc()).limit(200)
+
+            fallback_res = await session.execute(fallback_stmt)
+            articles = list(fallback_res.scalars().all())
+            if not articles:
+                return []
 
         scored: List[Tuple[KnowledgeArticle, float]] = []
 
@@ -157,9 +267,11 @@ class KnowledgeBaseService:
                         kw_bonus += 0.2
             kw_bonus = min(0.4, kw_bonus)
 
-            # Substring / exact match bonus
+            # Substring / exact match bonus (require minimum length to avoid matching single common letters)
             exact_bonus = 0.0
-            if query_text.lower() in article.question.lower() or article.question.lower() in query_text.lower():
+            if len(query_text) >= 4 and (
+                query_text.lower() in article.question.lower() or article.question.lower() in query_text.lower()
+            ):
                 exact_bonus = 0.25
 
             # Combined score capped at 1.0

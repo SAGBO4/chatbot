@@ -1,10 +1,10 @@
 from datetime import datetime
-from typing import Optional
-from pydantic import BaseModel, ConfigDict
+from typing import List, Optional
+from pydantic import BaseModel, ConfigDict, Field
 
 
 class QueryRequest(BaseModel):
-    query: str
+    query: str = Field(..., min_length=1, max_length=4096)
     user_id: Optional[int] = None
     user_handle: Optional[str] = None
 
@@ -21,13 +21,14 @@ class QueryResponse(BaseModel):
 class TicketCreateRequest(BaseModel):
     user_id: int
     user_handle: Optional[str] = None
-    question: str
-    automated_answer: Optional[str] = None
+    question: str = Field(..., min_length=1, max_length=4096)
+    automated_answer: Optional[str] = Field(default=None, max_length=5000)
 
 
 class TicketResolveRequest(BaseModel):
-    solution: str
+    solution: str = Field(..., min_length=1, max_length=5000)
     resolved_by: Optional[str] = None
+    resolution_channel: Optional[str] = "TELEGRAM"
     add_to_knowledge_base: bool = True
 
 
@@ -42,14 +43,42 @@ class TicketResponse(BaseModel):
     automated_answer: Optional[str] = None
     solution: Optional[str] = None
     resolved_by: Optional[str] = None
+    resolution_channel: Optional[str] = None
     created_at: datetime
     resolved_at: Optional[datetime] = None
+    support_group_message_id: Optional[int] = None
+    is_newly_resolved: Optional[bool] = None
+
+
+class TicketSupportCardRequest(BaseModel):
+    message_id: int
+
+
+class InboundEmailWebhookRequest(BaseModel):
+    sender: str
+    subject: str
+    body: str
+
+
+class BrevoInboundFrom(BaseModel):
+    Address: str
+
+
+class BrevoInboundItem(BaseModel):
+    From: BrevoInboundFrom
+    Subject: str
+    RawTextBody: Optional[str] = None
+    ExtractedMarkdownMessage: Optional[str] = None
+
+
+class BrevoInboundWebhookRequest(BaseModel):
+    items: List[BrevoInboundItem]
 
 
 class KnowledgeIngestRequest(BaseModel):
-    question: str
-    solution: str
-    keywords: Optional[str] = None
+    question: str = Field(..., min_length=1, max_length=4096)
+    solution: str = Field(..., min_length=1, max_length=5000)
+    keywords: Optional[str] = Field(default=None, max_length=1000)
     source_ticket_id: Optional[int] = None
 
 

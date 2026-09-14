@@ -11,8 +11,13 @@ services:
       - "8000:8000"
     volumes:
       - ./data:/app/data
-      - ./chatbot.db:/app/chatbot.db
     command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
 
   bot:
     build: .
@@ -21,7 +26,8 @@ services:
     env_file:
       - .env
     depends_on:
-      - backend
+      backend:
+        condition: service_healthy
     environment:
       - BACKEND_URL=http://backend:8000
     command: python -m bot.main

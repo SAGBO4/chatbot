@@ -33,14 +33,41 @@ class TicketService:
 
     @staticmethod
     async def get_all_tickets(
-        session: AsyncSession, status: Optional[str] = None
+        session: AsyncSession, status: Optional[str] = None, limit: int = 50, offset: int = 0
     ) -> List[Ticket]:
         query = select(Ticket)
         if status:
             query = query.where(Ticket.status == status)
-        query = query.order_by(Ticket.id.desc())
+        query = query.order_by(Ticket.id.desc()).limit(limit).offset(offset)
         result = await session.execute(query)
         return list(result.scalars().all())
+
+    @staticmethod
+    async def attach_support_card(
+        session: AsyncSession, ticket_id: int, message_id: int
+    ) -> Optional[Ticket]:
+        """
+        Records the Telegram message id of the ticket card posted to the
+        Support Group, so a later reply can be matched by message identity
+        rather than by parsing the card's text.
+        """
+        ticket = await TicketService.get_ticket(session, ticket_id)
+        if not ticket:
+            return None
+
+        ticket.support_group_message_id = message_id
+        await session.commit()
+        await session.refresh(ticket)
+        return ticket
+
+    @staticmethod
+    async def get_ticket_by_support_message_id(
+        session: AsyncSession, message_id: int
+    ) -> Optional[Ticket]:
+        result = await session.execute(
+            select(Ticket).where(Ticket.support_group_message_id == message_id)
+        )
+        return result.scalars().first()
 
     @staticmethod
     async def resolve_ticket(
@@ -48,13 +75,16 @@ class TicketService:
         ticket_id: int,
         solution: str,
         resolved_by: Optional[str] = None,
+        resolution_channel: str = "TELEGRAM",
         add_to_knowledge_base: bool = True,
+        auto_commit: bool = True,
+        preloaded_ticket: Optional[Ticket] = None,
     ) -> Tuple[Optional[Ticket], bool]:
         """
         Resolve a ticket. Returns (ticket, is_newly_resolved).
         If already resolved, returns (ticket, False) to prevent duplicate actions.
         """
-        ticket = await TicketService.get_ticket(session, ticket_id)
+        ticket = preloaded_ticket or await TicketService.get_ticket(session, ticket_id)
         if not ticket:
             return None, False
 
@@ -64,6 +94,7 @@ class TicketService:
         ticket.status = TicketStatus.RESOLVED.value
         ticket.solution = solution.strip()
         ticket.resolved_by = resolved_by
+        ticket.resolution_channel = resolution_channel
         ticket.resolved_at = utc_now()
 
         # Feedback loop: dynamically ingest new solution into Knowledge Base
@@ -74,8 +105,10 @@ class TicketService:
                 solution=ticket.solution,
                 keywords=None,
                 source_ticket_id=ticket.id,
+                auto_commit=False,
             )
 
-        await session.commit()
-        await session.refresh(ticket)
+        if auto_commit:
+            await session.commit()
+            await session.refresh(ticket)
         return ticket, True
