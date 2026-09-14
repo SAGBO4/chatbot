@@ -176,4 +176,12 @@ via Telegram (groupe support) fonctionne en local.
   - **RES-01 (Singleton HTTP dans le bot)** : Injection du `BackendClient` singleton dans le Dispatcher (`bot/main.py`) et fermeture propre dans le `finally` de l'application.
   - **OBS-01 (Logs TelegramRelay)** : Log explicite du code HTTP et du corps de rejet Telegram en cas d'échec d'envoi.
   - **TEST-01 & CI-01 (Tests & CI)** : Isolation hermétique des tests E2E (`AI_ENABLED=False`) et ajout de l'installation de `ruff` dans le workflow GitHub Actions.
-  - **58/58 tests passent**.
+  - **SEC-03 (Validation expéditeur email entrant)** : Vérification de l'expéditeur via `ALLOWED_SUPPORT_EMAIL_SENDERS` et `Settings.is_authorized_email_sender` pour prévenir l'empoisonnement de la base de connaissances et de l'assistance.
+  - **RACE-01 (Prévention double-clic utilisateur)** : Consommation et vidage immédiat de l'état FSM dans `handle_resolve_no` avant l'appel API, évitant la duplication de tickets.
+  - **RACE-02 (Alerte collision multi-agents)** : Ajout de `is_newly_resolved` dans `TicketResponse` et avertissement explicite dans le groupe Telegram si un collègue a déjà résolu le ticket.
+  - **SEC-04 (Validation stricte des entrées)** : Bornes `min_length` et `max_length` via Pydantic `Field` sur toutes les chaînes d'entrée (`query`, `question`, `solution`).
+  - **DB-02 (SQLite WAL mode)** : Activation automatique de `PRAGMA journal_mode=WAL` et `PRAGMA synchronous=NORMAL` sur l'engine pour éliminer les erreurs `database is locked`.
+  - **ARCH-01 (Atomicité transactionnelle)** : Paramètre `auto_commit=False` dans `KnowledgeBaseService.add_article` lors de la résolution de ticket pour garantir un commit atomique unique.
+  - **DB-03 (Pagination bornée)** : Paramètres `limit` (1-100) et `offset` (>=0) bornés via `Query` sur `/api/tickets`.
+  - **SEC-05 (En-tête API Gemini)** : Utilisation de l'en-tête officiel `x-goog-api-key` au lieu de la query string dans l'URL.
+  - **61/61 tests passent**.

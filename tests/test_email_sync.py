@@ -268,3 +268,30 @@ async def test_email_inbound_rejected_with_invalid_signature(email_test_client, 
     }
     resp = await post_signed_webhook(client, payload, signature="deadbeef" * 8)
     assert resp.status_code == 401
+
+
+@pytest.mark.asyncio
+async def test_email_inbound_sender_authorization_check(email_test_client, monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", TEST_WEBHOOK_SECRET)
+    monkeypatch.setattr(settings, "ALLOWED_SUPPORT_EMAIL_SENDERS", "@stackwallet.com, support@company.org")
+    client, session_maker = email_test_client
+
+    # 1. Unauthorized sender is rejected with 403
+    unauth_payload = {
+        "sender": "attacker@evil.com",
+        "subject": "Re: [Ticket #1] Help",
+        "body": "Malicious answer",
+    }
+    resp_unauth = await post_signed_webhook(client, unauth_payload)
+    assert resp_unauth.status_code == 403
+    assert "not authorized" in resp_unauth.json()["detail"]
+
+    # 2. Authorized domain sender is accepted (returns 404 for unknown ticket, proving it passed auth)
+    auth_payload = {
+        "sender": "agent_alice@stackwallet.com",
+        "subject": "Re: [Ticket #999] Help",
+        "body": "Legitimate answer",
+    }
+    resp_auth = await post_signed_webhook(client, auth_payload)
+    assert resp_auth.status_code == 404
+

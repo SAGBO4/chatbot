@@ -56,6 +56,10 @@ class Settings(BaseSettings):
     # token vs. a body HMAC) with different exposure risks.
     BREVO_INBOUND_SECRET: Optional[str] = None
 
+    # Comma-separated list of email addresses or domains (@domain.com) authorized to resolve
+    # tickets via inbound email webhooks. If empty, all senders presenting valid webhook secrets are accepted.
+    ALLOWED_SUPPORT_EMAIL_SENDERS: str = ""
+
     # Backend API authentication
     # Shared secret the Telegram bot (and any other trusted caller) must send
     # in the X-API-Key header on every request to the backend API (except
@@ -84,6 +88,24 @@ class Settings(BaseSettings):
         drifting out of sync.
         """
         return bool(self.TELEGRAM_SUPPORT_GROUP_ID) and str(self.TELEGRAM_SUPPORT_GROUP_ID) != "0"
+
+    def is_authorized_email_sender(self, sender: str) -> bool:
+        """
+        Validates if an inbound email sender is authorized to resolve tickets.
+        If ALLOWED_SUPPORT_EMAIL_SENDERS is set, checks against the comma-separated
+        list of allowed emails or domains (e.g. '@stackwallet.com, support@stackwallet.com').
+        If empty, all senders with valid webhook secrets are accepted.
+        """
+        if not self.ALLOWED_SUPPORT_EMAIL_SENDERS:
+            return True
+        allowed = [s.strip().lower() for s in self.ALLOWED_SUPPORT_EMAIL_SENDERS.split(",") if s.strip()]
+        sender_lower = sender.strip().lower()
+        for item in allowed:
+            if item.startswith("@") and sender_lower.endswith(item):
+                return True
+            if sender_lower == item:
+                return True
+        return False
 
 
 settings = Settings()

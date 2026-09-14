@@ -118,7 +118,13 @@ async def handle_resolve_no(
 ):
     client = backend_client or BackendClient()
     user_data = await state.get_data()
-    last_question = user_data.get("last_question", "Question non spécifiée")
+    last_question = user_data.get("last_question")
+    if not last_question:
+        await callback.answer("Cette demande a déjà été prise en compte.", show_alert=False)
+        return
+
+    # Clear context upfront to prevent concurrent double-click ticket creation
+    await state.clear()
     last_answer = user_data.get("last_answer", "Aucune réponse")
 
     user_id = callback.from_user.id
@@ -134,7 +140,6 @@ async def handle_resolve_no(
         )
         ticket_id = ticket["id"]
 
-        await state.clear()
         await callback.answer("Ticket créé !")
         await callback.message.edit_text(
             f"{callback.message.text}\n\n"

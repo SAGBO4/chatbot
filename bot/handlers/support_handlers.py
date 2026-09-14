@@ -172,6 +172,16 @@ async def handle_support_agent_reply(
             add_to_knowledge_base=True,
         )
 
+        if resolved_ticket.get("is_newly_resolved") is False:
+            already_by = escape_telegram_markdown(resolved_ticket.get("resolved_by") or "un autre agent")
+            await message.reply(
+                f"ℹ️ **Ticket #{ticket_id} déjà résolu !**\n"
+                f"Ce ticket a déjà été résolu par *{already_by}*.\n"
+                f"Votre réponse n'a pas été renvoyée à l'utilisateur pour éviter les doublons.",
+                parse_mode="Markdown",
+            )
+            return
+
         user_id = target_user_id or resolved_ticket.get("user_id")
 
         # 1. Forward the solution to the user via Telegram

@@ -95,6 +95,7 @@ class KnowledgeBaseService:
         solution: str,
         keywords: Optional[str] = None,
         source_ticket_id: Optional[int] = None,
+        auto_commit: bool = True,
     ) -> KnowledgeArticle:
         # If no keywords provided, automatically extract from the question
         computed_keywords = keywords or extract_keywords_from_text(question)
@@ -106,8 +107,11 @@ class KnowledgeBaseService:
             source_ticket_id=source_ticket_id,
         )
         session.add(article)
-        await session.commit()
-        await session.refresh(article)
+        if auto_commit:
+            await session.commit()
+            await session.refresh(article)
+        else:
+            await session.flush()
         return article
 
     @staticmethod

@@ -103,6 +103,7 @@ class TicketService:
                 solution=ticket.solution,
                 keywords=None,
                 source_ticket_id=ticket.id,
+                auto_commit=False,
             )
 
         await session.commit()
