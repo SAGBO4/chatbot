@@ -111,8 +111,8 @@ cp .env.example .env
 
 Edit the `.env` file with your Telegram bot credentials:
 ```ini
-TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRstuVWXyz
-TELEGRAM_SUPPORT_GROUP_ID=-1001234567890
+TELEGRAM_BOT_TOKEN=
+TELEGRAM_SUPPORT_GROUP_ID=
 
 # Optional: Enable AI Module
 AI_ENABLED=false
