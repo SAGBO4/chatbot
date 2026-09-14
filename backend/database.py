@@ -1,5 +1,5 @@
 from typing import AsyncGenerator, Optional
-from sqlalchemy import inspect, text
+from sqlalchemy import inspect, text, event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from backend.config import settings
 from backend.models import Base
@@ -9,6 +9,18 @@ engine = create_async_engine(
     echo=False,
     future=True,
 )
+
+
+@event.listens_for(engine.sync_engine, "connect")
+def set_sqlite_pragma(dbapi_connection, connection_record):
+    """Enables WAL mode and foreign keys for high concurrency on SQLite."""
+    if "sqlite" in settings.DATABASE_URL:
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA journal_mode=WAL")
+        cursor.execute("PRAGMA synchronous=NORMAL")
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
+
 
 async_session_maker = async_sessionmaker(
     bind=engine,
@@ -69,6 +81,10 @@ async def init_db(db_engine=None) -> None:
     target_engine = db_engine or engine
     # For standard application startup on the configured database, run Alembic migrations
     if db_engine is None:
+        if "sqlite" in settings.DATABASE_URL:
+            db_path_str = settings.DATABASE_URL.split(":///")[-1]
+            if db_path_str:
+                Path(db_path_str).resolve().parent.mkdir(parents=True, exist_ok=True)
         try:
             run_alembic_upgrade()
             logger.info("Alembic migrations applied successfully.")

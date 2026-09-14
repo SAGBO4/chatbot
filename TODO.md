@@ -168,3 +168,20 @@ via Telegram (groupe support) fonctionne en local.
   - **Tests de résilience LLM (`tests/test_ai_assistant_resilience.py`)** : Couverture complète des pannes externes (timeouts `ReadTimeout`/`ConnectTimeout`, code 429 Rate Limit, code 500, réponses JSON malformées ou vides) garantissant la dégradation gracieuse sans crash.
   - **Optimisation de la base de connaissances** : Pré-filtrage SQL `LIKE`/`ilike` avant le calcul de similarité, éliminant le chargement exhaustif de la table en mémoire.
   - **Docker & CI/CD** : Conteneur s'exécutant avec l'utilisateur non privilégié `appuser`, montage Docker Compose sécurisé (`./data:/app/data`), et workflow GitHub Actions (`.github/workflows/ci.yml`) ajouté.
+- **Correctifs de l'Ultra-Review (branche `feat/ultra-review-fixes`)** :
+  - **SEC-01 (Markdown & fallback Telegram)** : Échappement Markdown systématique des données utilisateur/agent (`bot/utils.py`, `support_handlers.py`, `user_handlers.py`) et fallback automatique en texte brut en cas d'erreur de parsing Telegram.
+  - **OPS-01 (Permissions conteneur & persistance SQLite)** : `COPY --chown=appuser:appuser` et création de `/app/data` dans le `Dockerfile` ; `DATABASE_URL` par défaut aligné sur `./data/chatbot.db` pour garantir la persistance via le volume docker-compose.
+  - **DB-01 (Telegram IDs 64-bit)** : Migration de `user_id` et `support_group_message_id` en `BigInteger` dans `backend/models.py` et dans la révision Alembic initiale pour compatibilité complète PostgreSQL.
+  - **PERF-01 (Moteur de recherche hybride & fuzzy)** : Ajout des préfixes de stems dans le filtre SQL et fallback vers l'analyse n-grammes/floue en mémoire si aucun mot-clé exact n'est trouvé.
+  - **RES-01 (Singleton HTTP dans le bot)** : Injection du `BackendClient` singleton dans le Dispatcher (`bot/main.py`) et fermeture propre dans le `finally` de l'application.
+  - **OBS-01 (Logs TelegramRelay)** : Log explicite du code HTTP et du corps de rejet Telegram en cas d'échec d'envoi.
+  - **TEST-01 & CI-01 (Tests & CI)** : Isolation hermétique des tests E2E (`AI_ENABLED=False`) et ajout de l'installation de `ruff` dans le workflow GitHub Actions.
+  - **SEC-03 (Validation expéditeur email entrant)** : Vérification de l'expéditeur via `ALLOWED_SUPPORT_EMAIL_SENDERS` et `Settings.is_authorized_email_sender` pour prévenir l'empoisonnement de la base de connaissances et de l'assistance.
+  - **RACE-01 (Prévention double-clic utilisateur)** : Consommation et vidage immédiat de l'état FSM dans `handle_resolve_no` avant l'appel API, évitant la duplication de tickets.
+  - **RACE-02 (Alerte collision multi-agents)** : Ajout de `is_newly_resolved` dans `TicketResponse` et avertissement explicite dans le groupe Telegram si un collègue a déjà résolu le ticket.
+  - **SEC-04 (Validation stricte des entrées)** : Bornes `min_length` et `max_length` via Pydantic `Field` sur toutes les chaînes d'entrée (`query`, `question`, `solution`).
+  - **DB-02 (SQLite WAL mode)** : Activation automatique de `PRAGMA journal_mode=WAL` et `PRAGMA synchronous=NORMAL` sur l'engine pour éliminer les erreurs `database is locked`.
+  - **ARCH-01 (Atomicité transactionnelle)** : Paramètre `auto_commit=False` dans `KnowledgeBaseService.add_article` lors de la résolution de ticket pour garantir un commit atomique unique.
+  - **DB-03 (Pagination bornée)** : Paramètres `limit` (1-100) et `offset` (>=0) bornés via `Query` sur `/api/tickets`.
+  - **SEC-05 (En-tête API Gemini)** : Utilisation de l'en-tête officiel `x-goog-api-key` au lieu de la query string dans l'URL.
+  - **61/61 tests passent**.

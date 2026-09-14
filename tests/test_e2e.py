@@ -26,6 +26,7 @@ TEST_API_KEY = "test-api-key"
 @pytest_asyncio.fixture
 async def e2e_environment(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "API_KEY", TEST_API_KEY)
+    monkeypatch.setattr(settings, "AI_ENABLED", False)
 
     # 1. Setup in-memory / temporary database
     db_file = tmp_path / "e2e_test.db"
@@ -158,7 +159,7 @@ async def test_full_support_lifecycle_loop(e2e_environment, monkeypatch):
     mock_bot.send_message.assert_called_once()
     group_card = mock_bot.send_message.call_args.kwargs["text"]
     assert "NOUVEAU TICKET SUPPORT #1" in group_card
-    assert "David" in group_card or "david_user" in group_card
+    assert "David" in group_card or "david_user" in group_card or "david\\_user" in group_card
     assert initial_question in group_card
 
     # Verifies the card's Telegram message id was persisted against the ticket

@@ -137,11 +137,14 @@ class AIAssistantService:
         # See _call_openai_compatible: only close a client we created ourselves.
         owns_client = client is None
         session = client or httpx.AsyncClient(timeout=10.0)
+        headers = {
+            "Content-Type": "application/json",
+            "x-goog-api-key": settings.AI_API_KEY or "",
+        }
         try:
             response = await session.post(
                 url,
-                params={"key": settings.AI_API_KEY},
-                headers={"Content-Type": "application/json"},
+                headers=headers,
                 json={
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {

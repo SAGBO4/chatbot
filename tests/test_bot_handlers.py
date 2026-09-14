@@ -518,3 +518,148 @@ async def test_support_agent_reply_ignored_when_support_group_unconfigured(monke
     mock_client.resolve_ticket.assert_not_called()
     mock_bot.send_message.assert_not_called()
     message.reply.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_escapes_markdown_in_solution_and_agent_name(monkeypatch):
+    support_group_id = -100999888777
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+
+    agent_user = MagicMock(spec=User, id=999, username="agent_007", first_name="Agent_007", last_name=None)
+    chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+
+    card = MagicMock(spec=Message, message_id=4001)
+    message = MagicMock(
+        spec=Message,
+        message_id=4002,
+        chat=chat,
+        from_user=agent_user,
+        text="Voici le lien: https://stackwallet.com/help_v2_faq et test *bold*.",
+        reply_to_message=card,
+    )
+    message.reply = AsyncMock()
+
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 15,
+        "user_id": 888888,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 15,
+        "user_id": 888888,
+        "solution": "Voici le lien: https://stackwallet.com/help_v2_faq et test *bold*.",
+    }
+
+    await handle_support_agent_reply(message, bot=mock_bot, backend_client=mock_client)
+
+    mock_bot.send_message.assert_called_once()
+    sent_text = mock_bot.send_message.call_args.kwargs["text"]
+    assert "agent\\_007" in sent_text
+    assert "help\\_v2\\_faq" in sent_text
+    assert "\\*bold\\*" in sent_text
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_falls_back_to_plain_text_on_send_error(monkeypatch):
+    support_group_id = -100999888777
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+
+    agent_user = MagicMock(spec=User, id=999, username="agent_bob", first_name="Bob", last_name=None)
+    chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+
+    card = MagicMock(spec=Message, message_id=4001)
+    message = MagicMock(
+        spec=Message,
+        message_id=4002,
+        chat=chat,
+        from_user=agent_user,
+        text="Solution text here",
+        reply_to_message=card,
+    )
+    message.reply = AsyncMock()
+
+    mock_bot = AsyncMock()
+    mock_bot.send_message.side_effect = [Exception("Bad Request: can't parse entities"), MagicMock()]
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 20,
+        "user_id": 55555,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 20,
+        "user_id": 55555,
+        "solution": "Solution text here",
+    }
+
+    await handle_support_agent_reply(message, bot=mock_bot, backend_client=mock_client)
+
+    assert mock_bot.send_message.call_count == 2
+    second_call_kwargs = mock_bot.send_message.call_args_list[1].kwargs
+    assert "parse_mode" not in second_call_kwargs or second_call_kwargs["parse_mode"] is None
+    assert "Solution text here" in second_call_kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_handle_resolve_no_double_click_prevention(memory_storage):
+    user = MagicMock(spec=User, id=444, username="clicker", first_name="Clicker")
+    state = make_fsm_context(memory_storage, 444, 444)
+    # State has no last_question (simulating second rapid click after first cleared it)
+    await state.clear()
+
+    cb_msg = MagicMock(spec=Message, text="Previous question answer")
+    callback = MagicMock(spec=CallbackQuery, id="cb_double", from_user=user, data="resolve:no", message=cb_msg)
+    callback.answer = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_bot = AsyncMock()
+
+    await handle_resolve_no(callback, state, bot=mock_bot, backend_client=mock_client)
+
+    # Verifies early return without creating ticket
+    callback.answer.assert_called_once_with("Cette demande a déjà été prise en compte.", show_alert=False)
+    mock_client.create_ticket.assert_not_called()
+    mock_bot.send_message.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_already_resolved_collision(monkeypatch):
+    support_group_id = -100999888777
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+
+    agent_user = MagicMock(spec=User, id=999, username="agent_late", first_name="Agent Late")
+    chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+
+    card = MagicMock(spec=Message, message_id=5001)
+    message = MagicMock(
+        spec=Message,
+        message_id=5002,
+        chat=chat,
+        from_user=agent_user,
+        text="Voici ma solution tardive.",
+        reply_to_message=card,
+    )
+    message.reply = AsyncMock()
+
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {"id": 33, "user_id": 1234}
+    # Backend returns ticket with is_newly_resolved=False
+    mock_client.resolve_ticket.return_value = {
+        "id": 33,
+        "user_id": 1234,
+        "resolved_by": "first_agent",
+        "is_newly_resolved": False,
+    }
+
+    await handle_support_agent_reply(message, bot=mock_bot, backend_client=mock_client)
+
+    # Solution is NOT forwarded to user
+    mock_bot.send_message.assert_not_called()
+    # Agent receives explicit notice that ticket was already resolved
+    message.reply.assert_called_once()
+    reply_text = message.reply.call_args[0][0]
+    assert "déjà résolu" in reply_text
+    assert "first\\_agent" in reply_text
+
+

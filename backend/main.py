@@ -3,7 +3,7 @@ import hmac
 import re
 from contextlib import asynccontextmanager
 from typing import List, Optional, Dict, Any
-from fastapi import FastAPI, Depends, Header, HTTPException, Request, status, BackgroundTasks
+from fastapi import FastAPI, Depends, Header, HTTPException, Request, status, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -199,8 +199,8 @@ async def create_ticket(
 @app.get("/api/tickets", response_model=List[TicketResponse], dependencies=[Depends(verify_api_key)])
 async def list_tickets(
     status_filter: Optional[str] = None,
-    limit: int = 50,
-    offset: int = 0,
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
     return await TicketService.get_all_tickets(session=session, status=status_filter, limit=limit, offset=offset)
@@ -298,7 +298,9 @@ async def resolve_ticket(
             solution=ticket.solution,
         )
 
-    return ticket
+    res = TicketResponse.model_validate(ticket)
+    res.is_newly_resolved = newly_resolved
+    return res
 
 
 async def _resolve_inbound_email(
@@ -321,6 +323,13 @@ async def _resolve_inbound_email(
     with a single-item contract (the generic endpoint) can still translate
     these into its existing HTTPException responses.
     """
+    if not settings.is_authorized_email_sender(sender):
+        return {
+            "status": "unauthorized_sender",
+            "ticket_id": None,
+            "message": f"Sender '{sender}' is not authorized to resolve tickets via email.",
+        }
+
     match = TICKET_SUBJECT_REGEX.search(subject)
     if not match:
         return {
@@ -469,6 +478,8 @@ async def handle_inbound_email(
         body=payload.body,
     )
 
+    if result["status"] == "unauthorized_sender":
+        raise HTTPException(status_code=403, detail=result["message"])
     if result["status"] == "no_ticket_reference":
         raise HTTPException(status_code=400, detail=result["message"])
     if result["status"] == "ticket_not_found":

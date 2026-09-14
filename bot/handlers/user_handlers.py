@@ -9,6 +9,7 @@ from aiogram.fsm.state import State, StatesGroup
 from backend.config import settings
 from bot.keyboards import get_resolution_keyboard
 from bot.api_client import BackendClient
+from bot.utils import escape_telegram_markdown
 
 logger = logging.getLogger(__name__)
 user_router = Router()
@@ -73,7 +74,18 @@ async def handle_user_query(
         )
         if len(reply_text) > 4000:
             reply_text = reply_text[:4000] + "...(tronqué)"
-        await message.answer(reply_text, reply_markup=get_resolution_keyboard(), parse_mode="Markdown")
+        try:
+            await message.answer(reply_text, reply_markup=get_resolution_keyboard(), parse_mode="Markdown")
+        except Exception as send_err:
+            logger.warning("Failed to send answer in markdown, falling back to plain text: %s", send_err)
+            plain_reply = (
+                f"🤖 Réponse :\n\n{answer}\n\n"
+                f"━━━━━━━━━━━━━━━━━━━\n"
+                f"❓ Votre problème est-il résolu ?"
+            )
+            if len(plain_reply) > 4000:
+                plain_reply = plain_reply[:4000] + "...(tronqué)"
+            await message.answer(plain_reply, reply_markup=get_resolution_keyboard())
         await state.set_state(UserQueryState.waiting_for_resolution)
 
     except Exception as exc:
@@ -106,7 +118,13 @@ async def handle_resolve_no(
 ):
     client = backend_client or BackendClient()
     user_data = await state.get_data()
-    last_question = user_data.get("last_question", "Question non spécifiée")
+    last_question = user_data.get("last_question")
+    if not last_question:
+        await callback.answer("Cette demande a déjà été prise en compte.", show_alert=False)
+        return
+
+    # Clear context upfront to prevent concurrent double-click ticket creation
+    await state.clear()
     last_answer = user_data.get("last_answer", "Aucune réponse")
 
     user_id = callback.from_user.id
@@ -122,7 +140,6 @@ async def handle_resolve_no(
         )
         ticket_id = ticket["id"]
 
-        await state.clear()
         await callback.answer("Ticket créé !")
         await callback.message.edit_text(
             f"{callback.message.text}\n\n"
@@ -135,20 +152,39 @@ async def handle_resolve_no(
         # Notify Telegram Support Group
         support_group_id = settings.TELEGRAM_SUPPORT_GROUP_ID
         if settings.support_group_is_configured():
+            safe_handle = escape_telegram_markdown(user_handle)
+            safe_question = escape_telegram_markdown(last_question)
+            safe_answer = escape_telegram_markdown(last_answer)
             group_card = (
                 f"🚨 **NOUVEAU TICKET SUPPORT #{ticket_id}**\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
-                f"👤 **Utilisateur :** @{user_handle} (`ID: {user_id}`)\n"
-                f"❓ **Question :**\n{last_question}\n\n"
-                f"🤖 **Réponse automatique :**\n{last_answer}\n"
+                f"👤 **Utilisateur :** @{safe_handle} (`ID: {user_id}`)\n"
+                f"❓ **Question :**\n{safe_question}\n\n"
+                f"🤖 **Réponse automatique :**\n{safe_answer}\n\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"👉 *Pour répondre, répondez directement à ce message avec votre solution.*"
             )
-            sent_card = await bot.send_message(
-                chat_id=support_group_id,
-                text=group_card,
-                parse_mode="Markdown",
-            )
+            try:
+                sent_card = await bot.send_message(
+                    chat_id=support_group_id,
+                    text=group_card,
+                    parse_mode="Markdown",
+                )
+            except Exception as send_err:
+                logger.warning("Failed to send markdown group card, falling back to plain text: %s", send_err)
+                plain_card = (
+                    f"🚨 NOUVEAU TICKET SUPPORT #{ticket_id}\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"👤 Utilisateur : @{user_handle} (ID: {user_id})\n"
+                    f"❓ Question :\n{last_question}\n\n"
+                    f"🤖 Réponse automatique :\n{last_answer}\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"👉 Pour répondre, répondez directement à ce message avec votre solution."
+                )
+                sent_card = await bot.send_message(
+                    chat_id=support_group_id,
+                    text=plain_card,
+                )
 
             # Best-effort: record the card's message id so a reply can later
             # be matched by message identity rather than by parsing its text.

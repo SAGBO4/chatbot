@@ -6,6 +6,7 @@ from aiogram import Router, F, Bot
 from aiogram.types import Message
 from backend.config import settings
 from bot.api_client import BackendClient
+from bot.utils import escape_telegram_markdown
 
 logger = logging.getLogger(__name__)
 support_router = Router()
@@ -171,22 +172,48 @@ async def handle_support_agent_reply(
             add_to_knowledge_base=True,
         )
 
+        if resolved_ticket.get("is_newly_resolved") is False:
+            already_by = escape_telegram_markdown(resolved_ticket.get("resolved_by") or "un autre agent")
+            await message.reply(
+                f"ℹ️ **Ticket #{ticket_id} déjà résolu !**\n"
+                f"Ce ticket a déjà été résolu par *{already_by}*.\n"
+                f"Votre réponse n'a pas été renvoyée à l'utilisateur pour éviter les doublons.",
+                parse_mode="Markdown",
+            )
+            return
+
         user_id = target_user_id or resolved_ticket.get("user_id")
 
         # 1. Forward the solution to the user via Telegram
         if user_id:
+            safe_solution = escape_telegram_markdown(solution_text)
+            safe_agent = escape_telegram_markdown(agent_name)
             user_notification = (
                 f"📬 **Réponse de l'équipe support (Ticket #{ticket_id})**\n\n"
-                f"{solution_text}\n\n"
+                f"{safe_solution}\n\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
-                f"Traité par : *{agent_name}*\n"
+                f"Traité par : *{safe_agent}*\n"
                 f"Merci de votre confiance ! 👋"
             )
-            await bot.send_message(
-                chat_id=user_id,
-                text=user_notification,
-                parse_mode="Markdown",
-            )
+            try:
+                await bot.send_message(
+                    chat_id=user_id,
+                    text=user_notification,
+                    parse_mode="Markdown",
+                )
+            except Exception as send_err:
+                logger.warning("Markdown send failed for user %s, retrying in plain text: %s", user_id, send_err)
+                plain_notification = (
+                    f"📬 Réponse de l'équipe support (Ticket #{ticket_id})\n\n"
+                    f"{solution_text}\n\n"
+                    f"━━━━━━━━━━━━━━━━━━━\n"
+                    f"Traité par : {agent_name}\n"
+                    f"Merci de votre confiance ! 👋"
+                )
+                await bot.send_message(
+                    chat_id=user_id,
+                    text=plain_notification,
+                )
 
         # 2. Confirm to the support team in group
         await message.reply(

@@ -95,6 +95,7 @@ class KnowledgeBaseService:
         solution: str,
         keywords: Optional[str] = None,
         source_ticket_id: Optional[int] = None,
+        auto_commit: bool = True,
     ) -> KnowledgeArticle:
         # If no keywords provided, automatically extract from the question
         computed_keywords = keywords or extract_keywords_from_text(question)
@@ -106,8 +107,11 @@ class KnowledgeBaseService:
             source_ticket_id=source_ticket_id,
         )
         session.add(article)
-        await session.commit()
-        await session.refresh(article)
+        if auto_commit:
+            await session.commit()
+            await session.refresh(article)
+        else:
+            await session.flush()
         return article
 
     @staticmethod
@@ -165,13 +169,23 @@ class KnowledgeBaseService:
                 term = f"%{token}%"
                 conditions.append(KnowledgeArticle.question.ilike(term))
                 conditions.append(KnowledgeArticle.keywords.ilike(term))
+                if len(token) >= 4:
+                    prefix_term = f"%{token[:4]}%"
+                    conditions.append(KnowledgeArticle.question.ilike(prefix_term))
+                    conditions.append(KnowledgeArticle.keywords.ilike(prefix_term))
             stmt = stmt.where(or_(*conditions))
             
         result = await session.execute(stmt)
         articles = list(result.scalars().all())
 
         if not articles:
-            return []
+            # Fallback: if SQL filtering found no exact token/prefix matches (e.g. typos or fuzzy variations),
+            # load candidate articles to allow character n-gram and fuzzy scoring to evaluate them.
+            fallback_stmt = select(KnowledgeArticle).limit(200)
+            fallback_res = await session.execute(fallback_stmt)
+            articles = list(fallback_res.scalars().all())
+            if not articles:
+                return []
 
         scored: List[Tuple[KnowledgeArticle, float]] = []
 
