@@ -15,6 +15,16 @@ class TicketStatus(str, enum.Enum):
     RESOLVED = "RESOLVED"
     CLOSED = "CLOSED"
 
+    @classmethod
+    def _missing_(cls, value):
+        if isinstance(value, str):
+            upper = value.upper()
+            for member in cls:
+                if member.value == upper:
+                    return member
+        return None
+
+
 
 def utc_now() -> datetime:
     return datetime.now(timezone.utc)

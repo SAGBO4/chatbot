@@ -14,6 +14,7 @@ logger = logging.getLogger(__name__)
 
 from backend.config import settings
 from backend.database import get_db, init_db
+from backend.models import TicketStatus
 from backend.schemas import (
     QueryRequest,
     QueryResponse,
@@ -213,12 +214,13 @@ async def create_ticket(
 
 @app.get("/api/tickets", response_model=List[TicketResponse], dependencies=[Depends(verify_api_key)])
 async def list_tickets(
-    status_filter: Optional[str] = None,
+    status_filter: Optional[TicketStatus] = None,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
-    return await TicketService.get_all_tickets(session=session, status=status_filter, limit=limit, offset=offset)
+    status_val = status_filter.value if status_filter else None
+    return await TicketService.get_all_tickets(session=session, status=status_val, limit=limit, offset=offset)
 
 
 @app.get(
@@ -580,6 +582,8 @@ async def ingest_knowledge(
     dependencies=[Depends(verify_api_key)],
 )
 async def list_knowledge(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
-    return await KnowledgeBaseService.get_all_articles(session=session)
+    return await KnowledgeBaseService.get_all_articles(session=session, limit=limit, offset=offset)

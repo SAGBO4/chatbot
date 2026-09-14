@@ -125,3 +125,27 @@ def test_bilingual_tokenization():
     assert "mon" not in tokens_fr
     assert "modifier" in tokens_fr
     assert "compte" in tokens_fr
+
+
+@pytest.mark.asyncio
+async def test_knowledge_base_pagination(async_session):
+    for i in range(15):
+        await KnowledgeBaseService.add_article(
+            session=async_session,
+            question=f"Question #{i}",
+            solution=f"Solution #{i}",
+        )
+
+    # Page 1: limit 5, offset 0
+    page1 = await KnowledgeBaseService.get_all_articles(async_session, limit=5, offset=0)
+    assert len(page1) == 5
+
+    # Page 2: limit 5, offset 5
+    page2 = await KnowledgeBaseService.get_all_articles(async_session, limit=5, offset=5)
+    assert len(page2) == 5
+
+    # Verify no overlap between page 1 and page 2
+    page1_ids = {a.id for a in page1}
+    page2_ids = {a.id for a in page2}
+    assert page1_ids.isdisjoint(page2_ids)
+

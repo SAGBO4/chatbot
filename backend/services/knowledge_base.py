@@ -147,8 +147,15 @@ class KnowledgeBaseService:
         return article
 
     @staticmethod
-    async def get_all_articles(session: AsyncSession) -> List[KnowledgeArticle]:
-        result = await session.execute(select(KnowledgeArticle))
+    async def get_all_articles(
+        session: AsyncSession, limit: int = 50, offset: int = 0
+    ) -> List[KnowledgeArticle]:
+        result = await session.execute(
+            select(KnowledgeArticle)
+            .order_by(KnowledgeArticle.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         return list(result.scalars().all())
 
     @staticmethod
