@@ -118,7 +118,13 @@ class AIAssistantService:
             )
             if response.status_code == 200:
                 data = response.json()
-                return data["choices"][0]["message"]["content"].strip()
+                choices = data.get("choices") or []
+                if not choices:
+                    logger.warning("AI provider returned no choices: %s", data)
+                    return None
+                message = choices[0].get("message") or {}
+                content = message.get("content")
+                return content.strip() if content else None
             else:
                 logger.warning("AI provider error %s: %s", response.status_code, response.text)
                 return None

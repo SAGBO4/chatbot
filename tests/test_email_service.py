@@ -8,8 +8,8 @@ from backend.services.email_service import EmailService
 
 
 @pytest.mark.asyncio
-async def test_email_service_disabled():
-    settings.EMAIL_ENABLED = False
+async def test_email_service_disabled(monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_ENABLED", False)
     result = await EmailService.send_ticket_created_notification(
         ticket_id=42,
         user_handle="alice",
@@ -20,9 +20,9 @@ async def test_email_service_disabled():
 
 
 @pytest.mark.asyncio
-async def test_email_service_ticket_created_and_resolved():
-    settings.EMAIL_ENABLED = True
-    settings.SUPPORT_EMAIL_RECIPIENT = "support@test.org"
+async def test_email_service_ticket_created_and_resolved(monkeypatch):
+    monkeypatch.setattr(settings, "EMAIL_ENABLED", True)
+    monkeypatch.setattr(settings, "SUPPORT_EMAIL_RECIPIENT", "support@test.org")
     captured_messages = []
 
     def mock_sender(msg):
@@ -58,8 +58,6 @@ async def test_email_service_ticket_created_and_resolved():
     m2 = captured_messages[1]
     assert m2["Subject"] == "[Ticket #55] Résolu via TELEGRAM"
     assert "agent_claire" in m2.get_content()
-
-    settings.EMAIL_ENABLED = False
 
 
 def _mock_smtp_context_manager():

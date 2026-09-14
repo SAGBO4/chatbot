@@ -100,13 +100,31 @@ async def handle_user_query(
 async def handle_resolve_yes(callback: CallbackQuery, state: FSMContext):
     await state.clear()
     await callback.answer("Merci pour votre retour !")
-    await callback.message.edit_text(
-        f"{callback.message.text}\n\n"
+    base_text = callback.message.text or ""
+    if len(base_text) > 3700:
+        base_text = base_text[:3700] + "...(tronqué)"
+    resolved_notice = (
+        f"{base_text}\n\n"
         f"✅ **Statut : Problème résolu.**\n"
-        f"Merci d'avoir utilisé notre service support ! N'hésitez pas si vous avez d'autres questions. 👋",
-        reply_markup=None,
-        parse_mode="Markdown",
+        f"Merci d'avoir utilisé notre service support ! N'hésitez pas si vous avez d'autres questions. 👋"
     )
+    try:
+        await callback.message.edit_text(
+            resolved_notice,
+            reply_markup=None,
+            parse_mode="Markdown",
+        )
+    except Exception as edit_err:
+        logger.warning("Markdown edit_text failed in resolve_yes, falling back to plain text: %s", edit_err)
+        plain_notice = (
+            f"{base_text}\n\n"
+            f"✅ Statut : Problème résolu.\n"
+            f"Merci d'avoir utilisé notre service support ! N'hésitez pas si vous avez d'autres questions. 👋"
+        )
+        try:
+            await callback.message.edit_text(plain_notice, reply_markup=None)
+        except Exception as e:
+            logger.warning("Failed to edit user message in resolve_yes: %s", e)
 
 
 @user_router.callback_query(F.data.startswith("resolve:no"))
@@ -141,20 +159,44 @@ async def handle_resolve_no(
         ticket_id = ticket["id"]
 
         await callback.answer("Ticket créé !")
-        await callback.message.edit_text(
-            f"{callback.message.text}\n\n"
+
+        # Isolate message editing so that any display/markdown error never prevents group escalation
+        base_text = callback.message.text or ""
+        if len(base_text) > 3700:
+            base_text = base_text[:3700] + "...(tronqué)"
+        confirmation_text = (
+            f"{base_text}\n\n"
             f"🎟️ **Ticket #{ticket_id} créé et escaladé.**\n"
-            f"Notre équipe support a été notifiée et vous répondra directement ici dès qu'un agent aura pris en charge votre demande.",
-            reply_markup=None,
-            parse_mode="Markdown",
+            f"Notre équipe support a été notifiée et vous répondra directement ici dès qu'un agent aura pris en charge votre demande."
         )
+        try:
+            await callback.message.edit_text(
+                confirmation_text,
+                reply_markup=None,
+                parse_mode="Markdown",
+            )
+        except Exception as edit_err:
+            logger.warning("Markdown edit_text failed in resolve_no, retrying in plain text: %s", edit_err)
+            plain_confirmation = (
+                f"{base_text}\n\n"
+                f"🎟️ Ticket #{ticket_id} créé et escaladé.\n"
+                f"Notre équipe support a été notifiée et vous répondra directement ici dès qu'un agent aura pris en charge votre demande."
+            )
+            try:
+                await callback.message.edit_text(plain_confirmation, reply_markup=None)
+            except Exception as e:
+                logger.warning("Failed to edit user message in resolve_no: %s", e)
 
         # Notify Telegram Support Group
         support_group_id = settings.TELEGRAM_SUPPORT_GROUP_ID
         if settings.support_group_is_configured():
+            # Truncate fields if excessively long to ensure group card never overflows Telegram 4096 limit
+            card_question = last_question if len(last_question) <= 1000 else last_question[:990] + "..."
+            card_answer = last_answer if len(last_answer) <= 1800 else last_answer[:1790] + "..."
+
             safe_handle = escape_telegram_markdown(user_handle)
-            safe_question = escape_telegram_markdown(last_question)
-            safe_answer = escape_telegram_markdown(last_answer)
+            safe_question = escape_telegram_markdown(card_question)
+            safe_answer = escape_telegram_markdown(card_answer)
             group_card = (
                 f"🚨 **NOUVEAU TICKET SUPPORT #{ticket_id}**\n"
                 f"━━━━━━━━━━━━━━━━━━━\n"
@@ -164,6 +206,7 @@ async def handle_resolve_no(
                 f"━━━━━━━━━━━━━━━━━━━\n"
                 f"👉 *Pour répondre, répondez directement à ce message avec votre solution.*"
             )
+            sent_card = None
             try:
                 sent_card = await bot.send_message(
                     chat_id=support_group_id,
@@ -176,29 +219,31 @@ async def handle_resolve_no(
                     f"🚨 NOUVEAU TICKET SUPPORT #{ticket_id}\n"
                     f"━━━━━━━━━━━━━━━━━━━\n"
                     f"👤 Utilisateur : @{user_handle} (ID: {user_id})\n"
-                    f"❓ Question :\n{last_question}\n\n"
-                    f"🤖 Réponse automatique :\n{last_answer}\n\n"
+                    f"❓ Question :\n{card_question}\n\n"
+                    f"🤖 Réponse automatique :\n{card_answer}\n\n"
                     f"━━━━━━━━━━━━━━━━━━━\n"
                     f"👉 Pour répondre, répondez directement à ce message avec votre solution."
                 )
-                sent_card = await bot.send_message(
-                    chat_id=support_group_id,
-                    text=plain_card,
-                )
+                try:
+                    sent_card = await bot.send_message(
+                        chat_id=support_group_id,
+                        text=plain_card,
+                    )
+                except Exception as plain_err:
+                    logger.error("Failed to send plain text group card: %s", plain_err)
 
             # Best-effort: record the card's message id so a reply can later
             # be matched by message identity rather than by parsing its text.
-            # Failure here must not block the ticket/escalation flow - the
-            # regex-based fallback in support_handlers.py still covers it.
-            try:
-                await client.attach_support_card(
-                    ticket_id=ticket_id, message_id=sent_card.message_id
-                )
-            except Exception as attach_exc:
-                logger.warning(
-                    "Could not attach support card message id for ticket %s: %s",
-                    ticket_id, attach_exc,
-                )
+            if sent_card and hasattr(sent_card, "message_id"):
+                try:
+                    await client.attach_support_card(
+                        ticket_id=ticket_id, message_id=sent_card.message_id
+                    )
+                except Exception as attach_exc:
+                    logger.warning(
+                        "Could not attach support card message id for ticket %s: %s",
+                        ticket_id, attach_exc,
+                    )
     except Exception as exc:
         logger.error("Error creating or escalating ticket: %s", exc)
         await callback.answer("Erreur lors de la création du ticket", show_alert=True)

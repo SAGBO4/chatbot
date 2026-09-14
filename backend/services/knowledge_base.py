@@ -16,13 +16,28 @@ FRENCH_STOPWORDS = {
     "faire", "pas", "du", "tout", "ne", "j", "d", "l", "m", "t", "s", "c", "n", "y"
 }
 
+ENGLISH_STOPWORDS = {
+    "the", "a", "an", "is", "are", "was", "were", "be", "been", "being",
+    "have", "has", "had", "do", "does", "did", "to", "at", "in", "for",
+    "on", "by", "with", "about", "against", "between", "into", "through",
+    "during", "before", "after", "above", "below", "from", "up", "down",
+    "of", "off", "over", "under", "again", "further", "then", "once",
+    "here", "there", "when", "where", "why", "how", "all", "any", "both",
+    "each", "few", "more", "most", "other", "some", "such", "no", "nor",
+    "not", "only", "own", "same", "so", "than", "too", "very", "can",
+    "will", "just", "should", "now", "my", "your", "his", "her",
+    "its", "our", "their", "what", "which", "who", "whom", "this", "that"
+}
+
+BILINGUAL_STOPWORDS = FRENCH_STOPWORDS | ENGLISH_STOPWORDS
+
 
 def tokenize(text: str, remove_stopwords: bool = True) -> List[str]:
-    """Tokenize text into lowercased words, optionally filtering stopwords."""
+    """Tokenize text into lowercased words, optionally filtering bilingual stopwords."""
     text = text.lower()
     words = re.findall(r"\b\w{2,}\b", text)
     if remove_stopwords:
-        filtered = [w for w in words if w not in FRENCH_STOPWORDS]
+        filtered = [w for w in words if w not in BILINGUAL_STOPWORDS]
         return filtered if filtered else words
     return words
 
@@ -100,6 +115,23 @@ class KnowledgeBaseService:
         # If no keywords provided, automatically extract from the question
         computed_keywords = keywords or extract_keywords_from_text(question)
 
+        # If an article was already created for this ticket, update it rather than duplicating
+        if source_ticket_id is not None:
+            existing_stmt = select(KnowledgeArticle).where(KnowledgeArticle.source_ticket_id == source_ticket_id)
+            existing_res = await session.execute(existing_stmt)
+            existing = existing_res.scalars().first()
+            if existing:
+                existing.question = question.strip()
+                existing.solution = solution.strip()
+                if computed_keywords:
+                    existing.keywords = computed_keywords.strip()
+                if auto_commit:
+                    await session.commit()
+                    await session.refresh(existing)
+                else:
+                    await session.flush()
+                return existing
+
         article = KnowledgeArticle(
             question=question.strip(),
             solution=solution.strip(),
@@ -115,8 +147,15 @@ class KnowledgeBaseService:
         return article
 
     @staticmethod
-    async def get_all_articles(session: AsyncSession) -> List[KnowledgeArticle]:
-        result = await session.execute(select(KnowledgeArticle))
+    async def get_all_articles(
+        session: AsyncSession, limit: int = 50, offset: int = 0
+    ) -> List[KnowledgeArticle]:
+        result = await session.execute(
+            select(KnowledgeArticle)
+            .order_by(KnowledgeArticle.id.desc())
+            .limit(limit)
+            .offset(offset)
+        )
         return list(result.scalars().all())
 
     @staticmethod
@@ -165,7 +204,8 @@ class KnowledgeBaseService:
         stmt = select(KnowledgeArticle)
         if query_tokens:
             conditions = []
-            for token in query_tokens:
+            # Bound the number of tokens to 12 to prevent SQL clause explosion on long queries
+            for token in query_tokens[:12]:
                 term = f"%{token}%"
                 conditions.append(KnowledgeArticle.question.ilike(term))
                 conditions.append(KnowledgeArticle.keywords.ilike(term))
@@ -181,7 +221,7 @@ class KnowledgeBaseService:
         if not articles:
             # Fallback: if SQL filtering found no exact token/prefix matches (e.g. typos or fuzzy variations),
             # load candidate articles to allow character n-gram and fuzzy scoring to evaluate them.
-            fallback_stmt = select(KnowledgeArticle).limit(200)
+            fallback_stmt = select(KnowledgeArticle).order_by(KnowledgeArticle.id.desc()).limit(200)
             fallback_res = await session.execute(fallback_stmt)
             articles = list(fallback_res.scalars().all())
             if not articles:
@@ -209,9 +249,11 @@ class KnowledgeBaseService:
                         kw_bonus += 0.2
             kw_bonus = min(0.4, kw_bonus)
 
-            # Substring / exact match bonus
+            # Substring / exact match bonus (require minimum length to avoid matching single common letters)
             exact_bonus = 0.0
-            if query_text.lower() in article.question.lower() or article.question.lower() in query_text.lower():
+            if len(query_text) >= 4 and (
+                query_text.lower() in article.question.lower() or article.question.lower() in query_text.lower()
+            ):
                 exact_bonus = 0.25
 
             # Combined score capped at 1.0

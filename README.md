@@ -124,7 +124,26 @@ AI_PROVIDER=gemini
 > 1. Create a Telegram group for your support team and add your bot as a member.
 > 2. Send any message in the group, then call `https://api.telegram.org/bot<TOKEN>/getUpdates` to inspect `chat.id` (a negative integer starting with `-100`).
 
-### 3. Launch Services
+### 3. Database Migrations & Initial Data Seeding
+
+Apply database schema migrations using Alembic:
+```bash
+alembic upgrade head
+```
+
+Seed the knowledge base with initial Stack Wallet bilingual FAQs:
+```bash
+python -m scripts.seed_knowledge_base
+```
+
+### 4. Optional: Inbound Email Webhooks (Brevo & HMAC Relay)
+
+To resolve tickets via email replies:
+- **Brevo Inbound Parsing**: Point your Brevo inbound webhook to `https://your-domain.com/api/webhooks/email-inbound/brevo?token=YOUR_BREVO_SECRET` with `BREVO_INBOUND_SECRET` configured in `.env`.
+- **HMAC Email Relay**: Send signed payloads to `/api/webhooks/email-inbound` with `EMAIL_WEBHOOK_SECRET` and header `X-Webhook-Signature: <sha256_hex>`.
+- Optionally restrict accepted responder addresses via `ALLOWED_SUPPORT_EMAIL_SENDERS`.
+
+### 5. Launch Services
 
 #### Local Development Mode:
 ```bash
@@ -149,3 +168,4 @@ The automated test suite covers unit tests, database migrations, API endpoints, 
 ```bash
 pytest -v
 ```
+

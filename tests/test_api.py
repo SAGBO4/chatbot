@@ -285,3 +285,61 @@ async def test_support_card_lookup_unknown_message_returns_404(test_client):
 
     resp = await client.get("/api/tickets/by-support-message/999999")
     assert resp.status_code == 404
+
+
+@pytest.mark.asyncio
+async def test_health_check_endpoint(test_client):
+    client, _ = test_client
+    resp = await client.get("/health")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert data["status"] == "ok"
+    assert data["database"] == "connected"
+    assert data["service"] == "support-bot-backend"
+
+
+@pytest.mark.asyncio
+async def test_list_tickets_status_filter_and_validation(test_client):
+    client, _ = test_client
+    # Create an open ticket
+    await client.post(
+        "/api/tickets",
+        json={
+            "user_id": 999,
+            "user_handle": "alice",
+            "question": "Status filter test question",
+            "automated_answer": None,
+        },
+    )
+
+    # Valid filter: open (case-insensitive)
+    resp_open = await client.get("/api/tickets?status_filter=open")
+    assert resp_open.status_code == 200
+    assert len(resp_open.json()) >= 1
+    assert all(t["status"] == TicketStatus.OPEN.value for t in resp_open.json())
+
+    # Valid filter: OPEN (uppercase)
+    resp_open_upper = await client.get("/api/tickets?status_filter=OPEN")
+    assert resp_open_upper.status_code == 200
+    assert len(resp_open_upper.json()) >= 1
+
+    # Valid filter: resolved (should be empty for our new ticket)
+    resp_resolved = await client.get("/api/tickets?status_filter=resolved")
+    assert resp_resolved.status_code == 200
+
+
+    # Invalid filter: should be rejected by FastAPI / Pydantic with 422 Unprocessable Entity
+    resp_invalid = await client.get("/api/tickets?status_filter=non_existent_status")
+    assert resp_invalid.status_code == 422
+
+
+@pytest.mark.asyncio
+async def test_list_knowledge_pagination(test_client):
+    client, _ = test_client
+    # Query knowledge with pagination
+    resp = await client.get("/api/knowledge?limit=2&offset=0")
+    assert resp.status_code == 200
+    data = resp.json()
+    assert isinstance(data, list)
+    assert len(data) <= 2
+

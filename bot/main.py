@@ -22,9 +22,10 @@ def create_dispatcher(backend_client: Optional[BackendClient] = None) -> Dispatc
 
 async def main():
     if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":
-        logger.warning(
-            "TELEGRAM_BOT_TOKEN is not set or set to placeholder. Please configure your .env file."
+        logger.error(
+            "TELEGRAM_BOT_TOKEN is not configured or set to placeholder. Please configure your .env file."
         )
+        return
 
     backend_client = BackendClient()
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)

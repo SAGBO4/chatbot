@@ -83,6 +83,18 @@ def test_clean_email_reply_body_returns_empty_when_quote_is_first_line():
     assert clean_email_reply_body(raw_email) == ""
 
 
+def test_clean_email_reply_body_outlook():
+    raw_email = (
+        "Configurez les DNS 1.1.1.1 et réessayez.\n\n"
+        "________________________________\n"
+        "From: support@example.com\n"
+        "Sent: Monday, September 14, 2026 2:00 AM\n"
+        "To: user@example.com\n"
+        "Subject: [Ticket #10] Demande de support"
+    )
+    assert clean_email_reply_body(raw_email) == "Configurez les DNS 1.1.1.1 et réessayez."
+
+
 def test_escape_telegram_markdown():
     assert escape_telegram_markdown("expert_network@company.com") == "expert\\_network@company.com"
     assert escape_telegram_markdown("a*b`c[d") == "a\\*b\\`c\\[d"

@@ -1,15 +1,20 @@
 import hashlib
 import hmac
 import re
+import logging
 from contextlib import asynccontextmanager
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, Depends, Header, HTTPException, Request, status, BackgroundTasks, Query
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import ValidationError
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
+
+logger = logging.getLogger(__name__)
 
 from backend.config import settings
 from backend.database import get_db, init_db
+from backend.models import TicketStatus
 from backend.schemas import (
     QueryRequest,
     QueryResponse,
@@ -51,10 +56,13 @@ def verify_email_webhook_signature(raw_body: bytes, signature: Optional[str]) ->
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing X-Webhook-Signature header.",
         )
+    sig = signature.strip()
+    if sig.lower().startswith("sha256="):
+        sig = sig.split("=", 1)[1].strip()
     expected = hmac.new(
         settings.EMAIL_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256
     ).hexdigest()
-    if not hmac.compare_digest(expected, signature):
+    if not hmac.compare_digest(expected, sig.lower()):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid webhook signature.",
@@ -97,10 +105,10 @@ def clean_email_reply_body(body: str) -> str:
     clean_lines = []
     for line in lines:
         stripped = line.strip()
-        # Common email quote markers
-        if stripped.startswith(">") or stripped.startswith("---"):
+        # Common email quote markers (standard, dashes, and Outlook underscores)
+        if stripped.startswith(">") or stripped.startswith("---") or stripped.startswith("___"):
             break
-        if re.search(r"^(On\s+.+wrote:|Le\s+.+a écrit\s*:)", stripped, re.IGNORECASE):
+        if re.search(r"^(On\s+.+wrote:|Le\s+.+a écrit\s*:|(?:From|De)\s*:)", stripped, re.IGNORECASE):
             break
         clean_lines.append(line)
     return "\n".join(clean_lines).strip()
@@ -147,8 +155,16 @@ app.add_middleware(
 
 
 @app.get("/health")
-async def health_check():
-    return {"status": "ok", "service": "support-bot-backend"}
+async def health_check(session: AsyncSession = Depends(get_db)):
+    try:
+        await session.execute(text("SELECT 1"))
+        return {"status": "ok", "database": "connected", "service": "support-bot-backend"}
+    except Exception as exc:
+        logger.error("Health check database connectivity failure: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connectivity error",
+        )
 
 
 @app.post("/api/query", response_model=QueryResponse, dependencies=[Depends(verify_api_key)])
@@ -198,12 +214,13 @@ async def create_ticket(
 
 @app.get("/api/tickets", response_model=List[TicketResponse], dependencies=[Depends(verify_api_key)])
 async def list_tickets(
-    status_filter: Optional[str] = None,
+    status_filter: Optional[TicketStatus] = None,
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
-    return await TicketService.get_all_tickets(session=session, status=status_filter, limit=limit, offset=offset)
+    status_val = status_filter.value if status_filter else None
+    return await TicketService.get_all_tickets(session=session, status=status_val, limit=limit, offset=offset)
 
 
 @app.get(
@@ -350,6 +367,10 @@ async def _resolve_inbound_email(
                 "thread history was stripped; ticket left unresolved."
             ),
         }
+
+    # Cap solution to max 5000 chars matching TicketResolveRequest constraint
+    if len(clean_solution) > 5000:
+        clean_solution = clean_solution[:5000]
 
     ticket, newly_resolved = await TicketService.resolve_ticket(
         session=session,
@@ -561,6 +582,8 @@ async def ingest_knowledge(
     dependencies=[Depends(verify_api_key)],
 )
 async def list_knowledge(
+    limit: int = Query(default=50, ge=1, le=100),
+    offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
-    return await KnowledgeBaseService.get_all_articles(session=session)
+    return await KnowledgeBaseService.get_all_articles(session=session, limit=limit, offset=offset)

@@ -28,6 +28,7 @@ class TelegramRelay:
             logger.info("Telegram notification simulated (token not configured): %s to user %s", text, user_id)
             return True
 
+        safe_text = text if len(text) <= 4000 else text[:3990] + "\n...(tronqué)"
         url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
         client, owns_client = await cls._get_client()
         try:
@@ -35,13 +36,29 @@ class TelegramRelay:
                 url,
                 json={
                     "chat_id": user_id,
-                    "text": text,
+                    "text": safe_text,
                     "parse_mode": "Markdown",
                 },
             )
             if resp.status_code != 200:
-                logger.error("Failed to relay message to Telegram user %s (status %s): %s", user_id, resp.status_code, resp.text)
-                return False
+                logger.warning(
+                    "Markdown send failed for Telegram user %s (status %s: %s), retrying in plain text",
+                    user_id, resp.status_code, resp.text,
+                )
+                # Retry in plain text without parse_mode in case markdown parsing or entity failed
+                plain_resp = await client.post(
+                    url,
+                    json={
+                        "chat_id": user_id,
+                        "text": safe_text,
+                    },
+                )
+                if plain_resp.status_code != 200:
+                    logger.error(
+                        "Failed to relay message to Telegram user %s (status %s): %s",
+                        user_id, plain_resp.status_code, plain_resp.text,
+                    )
+                    return False
             return True
         except httpx.HTTPError as exc:
             logger.error("Failed to relay message to Telegram user %s: %s", user_id, exc)
@@ -65,6 +82,7 @@ class TelegramRelay:
             logger.info("Telegram group notification simulated (token not configured): %s", text)
             return True
 
+        safe_text = text if len(text) <= 4000 else text[:3990] + "\n...(tronqué)"
         url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendMessage"
         client, owns_client = await cls._get_client()
         try:
@@ -72,13 +90,28 @@ class TelegramRelay:
                 url,
                 json={
                     "chat_id": group_id,
-                    "text": text,
+                    "text": safe_text,
                     "parse_mode": "Markdown",
                 },
             )
             if resp.status_code != 200:
-                logger.error("Failed to notify Telegram support group (status %s): %s", resp.status_code, resp.text)
-                return False
+                logger.warning(
+                    "Markdown notify failed for support group (status %s: %s), retrying in plain text",
+                    resp.status_code, resp.text,
+                )
+                plain_resp = await client.post(
+                    url,
+                    json={
+                        "chat_id": group_id,
+                        "text": safe_text,
+                    },
+                )
+                if plain_resp.status_code != 200:
+                    logger.error(
+                        "Failed to notify Telegram support group (status %s): %s",
+                        plain_resp.status_code, plain_resp.text,
+                    )
+                    return False
             return True
         except httpx.HTTPError as exc:
             logger.error("Failed to notify Telegram support group: %s", exc)
