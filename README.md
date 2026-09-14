@@ -1,17 +1,17 @@
 # Telegram Support Bot with Knowledge Base & AI Feedback Loop
 
-Ce projet implémente un système complet de support automatisé sur Telegram, connecté à une API Backend FastAPI, une base de connaissances évolutive et un module IA configurable.
+This project implements a complete automated support system on Telegram, connected to a FastAPI backend API, an evolving knowledge base, and a configurable AI module.
 
 ---
 
-## Architecture du Système
+## System Architecture
 
 ```
                     TELEGRAM
                        │
                        ▼
                 ┌──────────────┐
-                │  Bot Telegram │
+                │ Telegram Bot │
                 └──────┬───────┘
                        │
                        ▼
@@ -21,126 +21,126 @@ Ce projet implémente un système complet de support automatisé sur Telegram, c
                        │
              ┌─────────┴─────────┐
              ▼                   ▼
-      Base de connaissances    IA (Optionnelle)
+       Knowledge Base     AI (Optional)
              │                   │
              └─────────┬─────────┘
                        ▼
-                Réponse utilisateur
+                 User response
                        │
-                 problème résolu ?
+                Issue resolved?
                     /       \
-                  OUI        NON
+                  YES        NO
                    │          │
                    ▼          ▼
-                 FIN       TICKET
+                  END       TICKET
                               │
                               ▼
-                         TEAM SUPPORT (Groupe Telegram)
+                         SUPPORT TEAM (Telegram Group)
                               │
                               ▼
-                       Nouvelle solution
+                         New solution
                               │
                               ▼
-                    Base de connaissances
+                        Knowledge Base
 ```
 
-### Fonctionnalités clés :
-1. **Support Telegram automatisé** : L'utilisateur pose sa question et reçoit une solution instantanée.
-2. **Double validation (OUI / NON)** : Boutons interactifs sous la réponse pour valider la résolution.
-3. **Escalade automatique (NON)** : Génération immédiate d'un ticket et notification dans un groupe Telegram support privé.
-4. **Résolution par citation Telegram** : L'équipe support répond simplement au message du ticket dans le groupe pour envoyer la solution à l'utilisateur.
-5. **Apprentissage continu (Feedback Loop)** : Chaque solution fournie par un agent support est automatiquement indexée dans la base de connaissances.
-6. **IA Débrayable / Sans surcoût** : Fonctionne de manière 100 % autonome sans IA via recherche par similarité lexicale/sémantique, ou avec un LLM (OpenAI, Gemini, etc.) si une clé API est configurée.
+### Key Features:
+1. **Automated Telegram Support**: Users ask questions and receive immediate solutions.
+2. **Two-step Confirmation (YES / NO)**: Interactive inline buttons below the response to confirm resolution.
+3. **Automatic Escalation (NO)**: Immediate ticket creation and notification in a private Telegram support group.
+4. **Resolution via Telegram Reply**: The support team simply replies to the ticket message in the group to send the solution back to the user.
+5. **Continuous Learning (Feedback Loop)**: Every solution provided by a support agent is automatically indexed into the knowledge base.
+6. **Pluggable AI / Zero Extra Cost**: Operates 100% autonomously without external AI using lexical/semantic similarity search, or integrates an LLM (OpenAI, Gemini, etc.) if an API key is configured.
 
 ---
 
-## Structure du Projet
+## Project Structure
 
 ```
 ├── backend/
-│   ├── config.py                 # Configuration Pydantic (variables d'environnement)
-│   ├── database.py               # Moteur de base de données SQLAlchemy asynchrone (SQLite)
-│   ├── models.py                 # Modèles (Tickets, Base de connaissances)
-│   ├── schemas.py                # Schémas Pydantic pour requêtes / réponses
-│   ├── main.py                   # Application FastAPI et routes REST
+│   ├── config.py                 # Pydantic configuration (environment variables)
+│   ├── database.py               # Asynchronous SQLAlchemy database engine (SQLite)
+│   ├── models.py                 # Models (Tickets, Knowledge Base)
+│   ├── schemas.py                # Pydantic schemas for requests / responses
+│   ├── main.py                   # FastAPI application and REST routes
 │   └── services/
-│       ├── knowledge_base.py     # Moteur de recherche et d'ingestion KB
-│       ├── query_orchestrator.py # Pipeline d'orchestration de requêtes
-│       ├── ai_assistant.py       # Module IA optionnel (LLM RAG)
-│       └── ticket_service.py     # Gestion du cycle de vie des tickets
+│       ├── knowledge_base.py     # KB search and ingestion engine
+│       ├── query_orchestrator.py # Query orchestration pipeline
+│       ├── ai_assistant.py       # Optional AI module (LLM RAG)
+│       └── ticket_service.py     # Ticket lifecycle management
 ├── bot/
-│   ├── api_client.py             # Client HTTP asynchrone vers le backend
-│   ├── keyboards.py              # Claviers inline Telegram (OUI / NON)
-│   ├── main.py                   # Point d'entrée du bot Telegram (aiogram 3)
+│   ├── api_client.py             # Asynchronous HTTP client to the backend
+│   ├── keyboards.py              # Telegram inline keyboards (YES / NO)
+│   ├── main.py                   # Telegram bot entry point (aiogram 3)
 │   └── handlers/
-│       ├── user_handlers.py      # Handlers pour les utilisateurs privés
-│       └── support_handlers.py   # Handlers pour le groupe de support
-├── tests/                        # Suite de tests unitaires et d'intégration E2E
-├── Dockerfile                    # Image Docker de production
-├── docker-compose.yml            # Déploiement multi-services (backend + bot)
-├── requirements.txt              # Dépendances Python
-└── .env.example                  # Exemple de variables d'environnement
+│       ├── user_handlers.py      # Handlers for private user chats
+│       └── support_handlers.py   # Handlers for the support group
+├── tests/                        # Unit and end-to-end (E2E) integration test suite
+├── Dockerfile                    # Production Docker image
+├── docker-compose.yml            # Multi-service deployment (backend + bot)
+├── requirements.txt              # Python dependencies
+└── .env.example                  # Environment variables example
 ```
 
 ---
 
-## Installation & Démarrage Rapide
+## Installation & Quick Start
 
-### 1. Cloner et configurer l'environnement
+### 1. Clone and Set Up the Environment
 
 ```bash
-# Cloner le dépôt
-git clone <url_du_repo>
+# Clone repository
+git clone <repo_url>
 cd chatbot
 
-# Créer un environnement virtuel
-virtualenv .venv
+# Create virtual environment
+python -m venv .venv
 source .venv/bin/activate
 
-# Installer les dépendances
+# Install dependencies
 pip install -r requirements.txt
 
-# Copier le fichier de configuration
+# Copy configuration file
 cp .env.example .env
 ```
 
-### 2. Configurer le fichier `.env`
+### 2. Configure the `.env` File
 
-Éditez le fichier `.env` avec vos identifiants Telegram :
+Edit the `.env` file with your Telegram credentials:
 ```ini
 TELEGRAM_BOT_TOKEN=123456789:ABCdefGhIJKlmNoPQRstuVWXyz
 TELEGRAM_SUPPORT_GROUP_ID=-1001234567890
 
-# Activer l'IA (Optionnel)
+# Enable AI (Optional)
 AI_ENABLED=false
 AI_API_KEY=
 ```
 
-> **Astuce pour obtenir votre `TELEGRAM_SUPPORT_GROUP_ID` :**
-> 1. Créez un groupe Telegram pour votre équipe support et ajoutez-y votre bot.
-> 2. Envoyez un message dans le groupe, puis appelez `https://api.telegram.org/bot<TOKEN>/getUpdates` pour lire le `chat.id` (nombre négatif commençant par `-100`).
+> **Tip to find your `TELEGRAM_SUPPORT_GROUP_ID`:**
+> 1. Create a Telegram group for your support team and add your bot.
+> 2. Send a message in the group, then call `https://api.telegram.org/bot<TOKEN>/getUpdates` to inspect the `chat.id` (negative number starting with `-100`).
 
-### 3. Lancer les services
+### 3. Run the Services
 
-#### Mode Développement local :
+#### Local Development Mode:
 ```bash
-# Terminal 1 : Lancer le backend
+# Terminal 1: Start backend
 uvicorn backend.main:app --reload --port 8000
 
-# Terminal 2 : Lancer le bot Telegram
+# Terminal 2: Start Telegram bot
 python -m bot.main
 ```
 
-#### Mode Docker Compose :
+#### Docker Compose Mode:
 ```bash
 docker compose up --build -d
 ```
 
 ---
 
-## Tests et Vérification
+## Testing & Verification
 
-La suite de tests automatisée couvre les tests unitaires, de base de données, d'API et le scénario complet de bout en bout (E2E) :
+The automated test suite covers unit tests, database interactions, API endpoints, and the full end-to-end (E2E) scenario:
 
 ```bash
 pytest -v
