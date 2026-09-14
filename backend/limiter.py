@@ -3,24 +3,34 @@ from typing import Callable, Optional, Dict, List
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
 
+def _rate_limit_exceeded_handler(request: Request, exc: Exception):
+    detail = getattr(exc, "detail", "Rate limit exceeded")
+    msg = f"Rate limit exceeded: {detail}" if "Rate limit exceeded" not in str(detail) else str(detail)
+    return JSONResponse(
+        status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+        content={"detail": msg, "error": msg},
+    )
+
 try:
-    from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.util import get_remote_address
+    from slowapi import Limiter
+    from slowapi.util import get_remote_address as slowapi_get_remote_address
     from slowapi.errors import RateLimitExceeded
     SLOWAPI_AVAILABLE = True
+
+    def get_remote_address(*args, **kwargs) -> str:
+        if args and hasattr(args[0], "client"):
+            return slowapi_get_remote_address(args[0])
+        request = kwargs.get("request")
+        if request and hasattr(request, "client"):
+            return slowapi_get_remote_address(request)
+        return "127.0.0.1"
+
 except ImportError:  # pragma: no cover - fallback when slowapi not installed
     SLOWAPI_AVAILABLE = False
 
     class RateLimitExceeded(HTTPException):
         def __init__(self, detail: str = "Rate limit exceeded"):
             super().__init__(status_code=status.HTTP_429_TOO_MANY_REQUESTS, detail=detail)
-
-    def _rate_limit_exceeded_handler(request: Request, exc: Exception):
-        detail = getattr(exc, "detail", "Rate limit exceeded")
-        return JSONResponse(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            content={"detail": detail},
-        )
 
     def get_remote_address(*args, **kwargs) -> str:
         request = kwargs.get("request")

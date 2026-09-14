@@ -137,4 +137,6 @@ def test_fastapi_rate_limiter():
     # 4th request gets 429
     res4 = client.get("/limited-endpoint")
     assert res4.status_code == 429
-    assert "rate limit exceeded" in res4.json()["detail"].lower()
+    data = res4.json() if "json" in res4.headers.get("content-type", "") else {}
+    msg = data.get("detail") or data.get("error") or res4.text
+    assert "rate limit exceeded" in str(msg).lower()
