@@ -11,7 +11,7 @@ from bot.utils import escape_telegram_markdown
 logger = logging.getLogger(__name__)
 support_router = Router()
 
-TICKET_ID_REGEX = re.compile(r"TICKET SUPPORT #(\d+)")
+TICKET_ID_REGEX = re.compile(r"TICKET\s*(?:SUPPORT\s*)?#(\d+)", re.IGNORECASE)
 USER_ID_REGEX = re.compile(r"ID:\s*(\d+)")
 
 # OpenAI's Whisper API rejects files above 25 MB.
@@ -186,7 +186,8 @@ async def handle_support_agent_reply(
 
         # 1. Forward the solution to the user via Telegram
         if user_id:
-            safe_solution = escape_telegram_markdown(solution_text)
+            capped_solution = solution_text if len(solution_text) <= 3500 else solution_text[:3490] + "\n...(tronqué)"
+            safe_solution = escape_telegram_markdown(capped_solution)
             safe_agent = escape_telegram_markdown(agent_name)
             user_notification = (
                 f"📬 **Réponse de l'équipe support (Ticket #{ticket_id})**\n\n"
@@ -205,15 +206,18 @@ async def handle_support_agent_reply(
                 logger.warning("Markdown send failed for user %s, retrying in plain text: %s", user_id, send_err)
                 plain_notification = (
                     f"📬 Réponse de l'équipe support (Ticket #{ticket_id})\n\n"
-                    f"{solution_text}\n\n"
+                    f"{capped_solution}\n\n"
                     f"━━━━━━━━━━━━━━━━━━━\n"
                     f"Traité par : {agent_name}\n"
                     f"Merci de votre confiance ! 👋"
                 )
-                await bot.send_message(
-                    chat_id=user_id,
-                    text=plain_notification,
-                )
+                try:
+                    await bot.send_message(
+                        chat_id=user_id,
+                        text=plain_notification,
+                    )
+                except Exception as plain_err:
+                    logger.error("Failed to send plain text user notification: %s", plain_err)
 
         # 2. Confirm to the support team in group
         await message.reply(

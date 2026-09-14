@@ -51,10 +51,13 @@ def verify_email_webhook_signature(raw_body: bytes, signature: Optional[str]) ->
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing X-Webhook-Signature header.",
         )
+    sig = signature.strip()
+    if sig.lower().startswith("sha256="):
+        sig = sig.split("=", 1)[1].strip()
     expected = hmac.new(
         settings.EMAIL_WEBHOOK_SECRET.encode("utf-8"), raw_body, hashlib.sha256
     ).hexdigest()
-    if not hmac.compare_digest(expected, signature):
+    if not hmac.compare_digest(expected, sig.lower()):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Invalid webhook signature.",
@@ -97,10 +100,10 @@ def clean_email_reply_body(body: str) -> str:
     clean_lines = []
     for line in lines:
         stripped = line.strip()
-        # Common email quote markers
-        if stripped.startswith(">") or stripped.startswith("---"):
+        # Common email quote markers (standard, dashes, and Outlook underscores)
+        if stripped.startswith(">") or stripped.startswith("---") or stripped.startswith("___"):
             break
-        if re.search(r"^(On\s+.+wrote:|Le\s+.+a écrit\s*:)", stripped, re.IGNORECASE):
+        if re.search(r"^(On\s+.+wrote:|Le\s+.+a écrit\s*:|(?:From|De)\s*:)", stripped, re.IGNORECASE):
             break
         clean_lines.append(line)
     return "\n".join(clean_lines).strip()
@@ -350,6 +353,10 @@ async def _resolve_inbound_email(
                 "thread history was stripped; ticket left unresolved."
             ),
         }
+
+    # Cap solution to max 5000 chars matching TicketResolveRequest constraint
+    if len(clean_solution) > 5000:
+        clean_solution = clean_solution[:5000]
 
     ticket, newly_resolved = await TicketService.resolve_ticket(
         session=session,

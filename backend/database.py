@@ -1,3 +1,4 @@
+import asyncio
 from typing import AsyncGenerator, Optional
 from sqlalchemy import inspect, text, event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
@@ -8,17 +9,19 @@ engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
     future=True,
+    pool_pre_ping=True,
 )
 
 
 @event.listens_for(engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
-    """Enables WAL mode and foreign keys for high concurrency on SQLite."""
+    """Enables WAL mode, busy timeout and foreign keys for high concurrency on SQLite."""
     if "sqlite" in settings.DATABASE_URL:
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
         cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.execute("PRAGMA busy_timeout=10000")
         cursor.close()
 
 
@@ -86,7 +89,7 @@ async def init_db(db_engine=None) -> None:
             if db_path_str:
                 Path(db_path_str).resolve().parent.mkdir(parents=True, exist_ok=True)
         try:
-            run_alembic_upgrade()
+            await asyncio.to_thread(run_alembic_upgrade)
             logger.info("Alembic migrations applied successfully.")
         except Exception as exc:
             logger.warning("Alembic upgrade encountered an issue, falling back to direct metadata sync: %s", exc)

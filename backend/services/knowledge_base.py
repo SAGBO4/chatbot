@@ -165,7 +165,8 @@ class KnowledgeBaseService:
         stmt = select(KnowledgeArticle)
         if query_tokens:
             conditions = []
-            for token in query_tokens:
+            # Bound the number of tokens to 12 to prevent SQL clause explosion on long queries
+            for token in query_tokens[:12]:
                 term = f"%{token}%"
                 conditions.append(KnowledgeArticle.question.ilike(term))
                 conditions.append(KnowledgeArticle.keywords.ilike(term))
@@ -181,7 +182,7 @@ class KnowledgeBaseService:
         if not articles:
             # Fallback: if SQL filtering found no exact token/prefix matches (e.g. typos or fuzzy variations),
             # load candidate articles to allow character n-gram and fuzzy scoring to evaluate them.
-            fallback_stmt = select(KnowledgeArticle).limit(200)
+            fallback_stmt = select(KnowledgeArticle).order_by(KnowledgeArticle.id.desc()).limit(200)
             fallback_res = await session.execute(fallback_stmt)
             articles = list(fallback_res.scalars().all())
             if not articles:
@@ -209,9 +210,11 @@ class KnowledgeBaseService:
                         kw_bonus += 0.2
             kw_bonus = min(0.4, kw_bonus)
 
-            # Substring / exact match bonus
+            # Substring / exact match bonus (require minimum length to avoid matching single common letters)
             exact_bonus = 0.0
-            if query_text.lower() in article.question.lower() or article.question.lower() in query_text.lower():
+            if len(query_text) >= 4 and (
+                query_text.lower() in article.question.lower() or article.question.lower() in query_text.lower()
+            ):
                 exact_bonus = 0.25
 
             # Combined score capped at 1.0

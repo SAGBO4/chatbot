@@ -663,3 +663,123 @@ async def test_support_agent_reply_already_resolved_collision(monkeypatch):
     assert "first\\_agent" in reply_text
 
 
+@pytest.mark.asyncio
+async def test_handle_resolve_no_with_excessively_long_text_does_not_overflow_telegram_limit(memory_storage, monkeypatch):
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    user = MagicMock(spec=User, id=888, username="long_user", first_name="Long")
+    state = make_fsm_context(memory_storage, 888, 888)
+    huge_question = "Q" * 1500
+    huge_answer = "A" * 3000
+    await state.update_data(
+        last_question=huge_question,
+        last_answer=huge_answer,
+    )
+
+    cb_message = MagicMock(spec=Message)
+    cb_message.text = "Réponse précédente..."
+    cb_message.edit_text = AsyncMock()
+
+    callback_no = MagicMock(spec=CallbackQuery)
+    callback_no.id = "cb_long"
+    callback_no.from_user = user
+    callback_no.data = "resolve:no:0"
+    callback_no.message = cb_message
+    callback_no.answer = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.create_ticket.return_value = {
+        "id": 999,
+        "user_id": 888,
+        "status": "OPEN",
+    }
+
+    mock_bot = AsyncMock()
+    mock_bot.send_message.return_value = MagicMock(message_id=777)
+
+    await handle_resolve_no(callback_no, state, bot=mock_bot, backend_client=mock_client)
+
+    mock_bot.send_message.assert_called_once()
+    group_card_text = mock_bot.send_message.call_args.kwargs["text"]
+    assert len(group_card_text) <= 4000
+    assert "NOUVEAU TICKET SUPPORT #999" in group_card_text
+
+
+@pytest.mark.asyncio
+async def test_handle_resolve_no_proceeds_to_escalate_when_user_edit_text_fails(memory_storage, monkeypatch):
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    user = MagicMock(spec=User, id=777, username="edit_fail_user", first_name="User")
+    state = make_fsm_context(memory_storage, 777, 777)
+    await state.update_data(
+        last_question="Question simple",
+        last_answer="Réponse",
+    )
+
+    cb_message = MagicMock(spec=Message)
+    cb_message.text = "Texte"
+    cb_message.edit_text = AsyncMock(side_effect=Exception("Telegram entity parse error"))
+
+    callback_no = MagicMock(spec=CallbackQuery)
+    callback_no.id = "cb_fail"
+    callback_no.from_user = user
+    callback_no.data = "resolve:no:0"
+    callback_no.message = cb_message
+    callback_no.answer = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.create_ticket.return_value = {
+        "id": 100,
+        "user_id": 777,
+        "status": "OPEN",
+    }
+
+    mock_bot = AsyncMock()
+    mock_bot.send_message.return_value = MagicMock(message_id=888)
+
+    await handle_resolve_no(callback_no, state, bot=mock_bot, backend_client=mock_client)
+
+    # Group card MUST be sent even if edit_text failed
+    mock_bot.send_message.assert_called_once()
+    assert "NOUVEAU TICKET SUPPORT #100" in mock_bot.send_message.call_args.kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_with_excessively_long_solution_caps_user_notification(monkeypatch):
+    support_group_id = -100999888
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_long", first_name="Agent")
+    group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+
+    card = MagicMock(spec=Message, message_id=123)
+    card.text = "TICKET SUPPORT #42"
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 124
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "S" * 4500
+    agent_message.reply_to_message = card
+    agent_message.reply = AsyncMock()
+
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {"id": 42, "user_id": 999}
+    mock_client.resolve_ticket.return_value = {
+        "id": 42,
+        "user_id": 999,
+        "status": "RESOLVED",
+        "solution": agent_message.text,
+        "is_newly_resolved": True,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    mock_bot.send_message.assert_called_once()
+    delivered_text = mock_bot.send_message.call_args.kwargs["text"]
+    assert len(delivered_text) <= 4000
+    assert "...(tronqué)" in delivered_text
+
+
+
