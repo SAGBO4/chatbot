@@ -45,10 +45,19 @@ except ImportError:  # pragma: no cover - fallback when slowapi not installed
         return count, window
 
     class FallbackLimiter:
-        def __init__(self, key_func: Callable[[Request], str] = get_remote_address, default_limits: Optional[List[str]] = None):
+        def __init__(
+            self,
+            key_func: Callable[[Request], str] = get_remote_address,
+            default_limits: Optional[List[str]] = None,
+            enabled: bool = True,
+        ):
             self.key_func = key_func
             self.default_limits = default_limits or []
+            self.enabled = enabled
             self._history: Dict[str, List[float]] = {}
+
+        def reset(self):
+            self._history.clear()
 
         def limit(self, limit_string: str):
             count, window = _parse_limit_string(limit_string)
@@ -60,6 +69,8 @@ except ImportError:  # pragma: no cover - fallback when slowapi not installed
                 if inspect.iscoroutinefunction(func):
                     @wraps(func)
                     async def async_wrapper(*args, **kwargs):
+                        if not getattr(self, "enabled", True):
+                            return await func(*args, **kwargs)
                         request = kwargs.get("request")
                         if not request:
                             for arg in args:
@@ -80,6 +91,8 @@ except ImportError:  # pragma: no cover - fallback when slowapi not installed
                 else:
                     @wraps(func)
                     def sync_wrapper(*args, **kwargs):
+                        if not getattr(self, "enabled", True):
+                            return func(*args, **kwargs)
                         request = kwargs.get("request")
                         if not request:
                             for arg in args:
