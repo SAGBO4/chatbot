@@ -27,17 +27,28 @@ class TicketService:
         return ticket
 
     @staticmethod
-    async def get_ticket(session: AsyncSession, ticket_id: int) -> Optional[Ticket]:
-        result = await session.execute(select(Ticket).where(Ticket.id == ticket_id))
+    async def get_ticket(
+        session: AsyncSession, ticket_id: int, user_id: Optional[int] = None
+    ) -> Optional[Ticket]:
+        query = select(Ticket).where(Ticket.id == ticket_id)
+        if user_id is not None:
+            query = query.where(Ticket.user_id == user_id)
+        result = await session.execute(query)
         return result.scalars().first()
 
     @staticmethod
     async def get_all_tickets(
-        session: AsyncSession, status: Optional[str] = None, limit: int = 50, offset: int = 0
+        session: AsyncSession,
+        status: Optional[str] = None,
+        user_id: Optional[int] = None,
+        limit: int = 50,
+        offset: int = 0,
     ) -> List[Ticket]:
         query = select(Ticket)
         if status:
             query = query.where(Ticket.status == status)
+        if user_id is not None:
+            query = query.where(Ticket.user_id == user_id)
         query = query.order_by(Ticket.id.desc()).limit(limit).offset(offset)
         result = await session.execute(query)
         return list(result.scalars().all())
