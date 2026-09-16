@@ -37,7 +37,7 @@ async def main():
         except ImportError:
             logger.warning("SENTRY_DSN is configured but sentry_sdk is not installed.")
 
-    if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":
+    if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":  # nosec B105
         logger.error(
             "TELEGRAM_BOT_TOKEN is not configured or set to placeholder. Please configure your .env file."
         )

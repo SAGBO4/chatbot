@@ -2,6 +2,7 @@ import hashlib
 import hmac
 import re
 import logging
+import inspect
 from contextlib import asynccontextmanager
 from typing import List, Optional, Dict, Any
 from fastapi import FastAPI, Depends, Header, HTTPException, Request, status, BackgroundTasks, Query
@@ -11,6 +12,66 @@ from sqlalchemy import text, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = logging.getLogger(__name__)
+
+
+def sanitize_url_query(url: str) -> str:
+    """
+    Redacts values of sensitive query parameters (such as token, secret, api_key)
+    from URL strings so they are never printed in access logs or debug traces.
+    """
+    return re.sub(
+        r"([?&](?:token|secret|api_key|password)=)[^&]+",
+        r"\1[REDACTED]",
+        url,
+        flags=re.IGNORECASE,
+    )
+
+
+class SensitiveDataFilter(logging.Filter):
+    """
+    Log filter that intercepts and redacts sensitive query parameters (e.g. ?token=...)
+    from log records and arguments, preventing credential leakage in log files.
+    """
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            record.msg = sanitize_url_query(record.msg)
+        if record.args:
+            if isinstance(record.args, tuple):
+                record.args = tuple(
+                    sanitize_url_query(arg) if isinstance(arg, str) else arg
+                    for arg in record.args
+                )
+            elif isinstance(record.args, dict):
+                record.args = {
+                    k: sanitize_url_query(v) if isinstance(v, str) else v
+                    for k, v in record.args.items()
+                }
+        return True
+
+
+logger.addFilter(SensitiveDataFilter())
+
+
+async def _safe_background_task(coro_fn, *args, **kwargs):
+    """
+    Executes a background task inside an isolated fault boundary so that any
+    unhandled exception (socket timeout, network drop, etc.) is logged with
+    full context and does not propagate to Starlette's ASGI response serialization loop.
+    """
+    try:
+        if inspect.iscoroutinefunction(coro_fn):
+            await coro_fn(*args, **kwargs)
+        else:
+            res = coro_fn(*args, **kwargs)
+            if inspect.isawaitable(res):
+                await res
+    except Exception as exc:
+        logger.error(
+            "Background task %s failed with exception: %s",
+            getattr(coro_fn, "__name__", str(coro_fn)),
+            exc,
+            exc_info=True,
+        )
 
 from backend.config import settings
 from backend.database import get_db, init_db
@@ -175,6 +236,20 @@ app.add_middleware(
 )
 
 
+# REVERSE PROXY ACCESS LOGGING GUIDANCE:
+# To prevent sensitive query tokens (?token=...) from leaking into server access logs:
+# - Nginx: log $uri instead of $request_uri, or configure map to redact query strings:
+#     log_format safe '$remote_addr - $remote_user [$time_local] "$request_method $uri" $status $body_bytes_sent';
+# - Caddy: configure log filtering or pass tokens via X-Webhook-Token header instead of URL queries.
+@app.middleware("http")
+async def sanitize_access_logging_middleware(request: Request, call_next):
+    sanitized_url = sanitize_url_query(str(request.url))
+    logger.debug("HTTP %s %s - incoming", request.method, sanitized_url)
+    response = await call_next(request)
+    logger.info("HTTP %s %s - status %d", request.method, sanitized_url, response.status_code)
+    return response
+
+
 @app.get("/health")
 async def health_check(session: AsyncSession = Depends(get_db)):
     try:
@@ -226,6 +301,7 @@ async def create_ticket(
 
     # Multi-channel alert: dispatch email notification to support team in the background
     background_tasks.add_task(
+        _safe_background_task,
         EmailService.send_ticket_created_notification,
         ticket_id=ticket.id,
         user_handle=ticket.user_handle,
@@ -240,12 +316,19 @@ async def create_ticket(
 @app.get("/api/tickets", response_model=List[TicketResponse], dependencies=[Depends(verify_api_key)])
 async def list_tickets(
     status_filter: Optional[TicketStatus] = None,
+    user_id: Optional[int] = Query(default=None, description="Filter tickets by user ID"),
     limit: int = Query(default=50, ge=1, le=100),
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
     status_val = status_filter.value if status_filter else None
-    return await TicketService.get_all_tickets(session=session, status=status_val, limit=limit, offset=offset)
+    return await TicketService.get_all_tickets(
+        session=session,
+        status=status_val,
+        user_id=user_id,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @app.get(
@@ -277,9 +360,10 @@ async def get_ticket_by_support_message(
 )
 async def get_ticket(
     ticket_id: int,
+    user_id: Optional[int] = Query(default=None, description="Optional user ID to enforce ownership scoping"),
     session: AsyncSession = Depends(get_db),
 ):
-    ticket = await TicketService.get_ticket(session=session, ticket_id=ticket_id)
+    ticket = await TicketService.get_ticket(session=session, ticket_id=ticket_id, user_id=user_id)
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return ticket
@@ -333,6 +417,7 @@ async def resolve_ticket(
     # If newly resolved on Telegram, inform the email channel
     if newly_resolved and channel.upper() == "TELEGRAM":
         background_tasks.add_task(
+            _safe_background_task,
             EmailService.send_ticket_resolved_notification,
             ticket_id=ticket.id,
             resolved_by=ticket.resolved_by,
@@ -439,7 +524,12 @@ async def _resolve_inbound_email(
         f"Merci de votre confiance ! 👋"
     )
     user_text = truncate_telegram_text(user_text, max_length=4000)
-    background_tasks.add_task(TelegramRelay.send_message_to_user, ticket.user_id, user_text)
+    background_tasks.add_task(
+        _safe_background_task,
+        TelegramRelay.send_message_to_user,
+        ticket.user_id,
+        user_text,
+    )
 
     # 2. Inform the Telegram Support Group that the ticket was resolved via email
     group_notification = (
@@ -448,7 +538,11 @@ async def _resolve_inbound_email(
         f"• La solution a été transmise à l'utilisateur (`ID: {ticket.user_id}`).\n"
         f"• La base de connaissances a été mise à jour automatiquement."
     )
-    background_tasks.add_task(TelegramRelay.notify_support_group, group_notification)
+    background_tasks.add_task(
+        _safe_background_task,
+        TelegramRelay.notify_support_group,
+        group_notification,
+    )
 
     return {
         "status": "resolved",
@@ -471,14 +565,18 @@ def _select_brevo_body(item: BrevoInboundItem) -> str:
     return item.RawTextBody or ""
 
 
-def verify_brevo_inbound_token(token: Optional[str]) -> None:
+def verify_brevo_inbound_token(
+    token: Optional[str] = None,
+    header_token: Optional[str] = None,
+) -> None:
     """
-    Verifies the shared secret Brevo sends back as a `?token=` query
-    parameter on every call to the Brevo inbound webhook.
+    Verifies the shared secret Brevo sends back either via an X-Webhook-Token /
+    X-Brevo-Token header or as a `?token=` query parameter on every call to the
+    Brevo inbound webhook.
 
-    Brevo does not sign its webhook requests or support a custom header, so a
-    secret embedded in the URL is the only practical authentication - see
-    openspec/changes/add-brevo-inbound-email-webhook/design.md.
+    Brevo does not sign its webhook requests natively. Authenticating via custom
+    headers (X-Webhook-Token or X-Brevo-Token) avoids leaking tokens in HTTP
+    access logs, while maintaining backward-compatible support for `?token=...`.
 
     Raises HTTPException if the secret is not configured (fail closed), the
     token is missing, or it does not match.
@@ -488,10 +586,11 @@ def verify_brevo_inbound_token(token: Optional[str]) -> None:
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
             detail="Brevo inbound webhook is not configured (BREVO_INBOUND_SECRET missing).",
         )
-    if not token or not hmac.compare_digest(token, settings.BREVO_INBOUND_SECRET):
+    candidate = header_token or token
+    if not candidate or not hmac.compare_digest(candidate, settings.BREVO_INBOUND_SECRET):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Missing or invalid token query parameter.",
+            detail="Missing or invalid token query parameter or header.",
         )
 
 
@@ -546,12 +645,14 @@ async def handle_brevo_inbound_email(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
     token: Optional[str] = None,
+    x_webhook_token: Optional[str] = Header(default=None),
+    x_brevo_token: Optional[str] = Header(default=None),
 ):
     """
     Handles Brevo's native Inbound Parsing webhook shape: a batch (`items[]`)
     of parsed emails, each authenticated collectively by a shared secret sent
-    as a `?token=` query parameter (Brevo signs nothing itself - see
-    verify_brevo_inbound_token).
+    either via `X-Webhook-Token` / `X-Brevo-Token` headers or as a `?token=`
+    query parameter.
 
     Every item is resolved independently via the same logic as the generic
     /api/webhooks/email-inbound endpoint (_resolve_inbound_email): one item's
@@ -564,7 +665,8 @@ async def handle_brevo_inbound_email(
     caller gets a plain 401 instead of a 422 disclosing the expected JSON
     shape.
     """
-    verify_brevo_inbound_token(token)
+    header_token = x_webhook_token or x_brevo_token
+    verify_brevo_inbound_token(token=token, header_token=header_token)
 
     raw_body = await request.body()
     try:

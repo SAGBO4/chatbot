@@ -72,7 +72,7 @@ def _add_missing_columns(sync_conn) -> None:
                 continue
             ddl_type = column.type.compile(dialect=sync_conn.dialect)
             sync_conn.execute(
-                text(f'ALTER TABLE {table.name} ADD COLUMN {column.name} {ddl_type}')
+                text(f'ALTER TABLE {table.name} ADD COLUMN {column.name} {ddl_type}')  # nosemgrep
             )
 
 

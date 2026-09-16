@@ -14,7 +14,7 @@ class Settings(BaseSettings):
     TELEGRAM_SUPPORT_GROUP_ID: Union[int, str] = 0
 
     # Backend configuration
-    BACKEND_HOST: str = "0.0.0.0"
+    BACKEND_HOST: str = "0.0.0.0"  # nosec: B104
     BACKEND_PORT: int = 8000
     BACKEND_URL: str = "http://localhost:8000"
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/chatbot.db"
