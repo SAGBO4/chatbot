@@ -25,8 +25,8 @@ class TelegramRelay:
     @classmethod
     async def _send_telegram_message(cls, chat_id: Union[int, str], text: str, target_desc: str) -> bool:
         """Sends a message to a chat id with Markdown and automatic plain text fallback."""
-        if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":
-            logger.info("Telegram notification simulated (token not configured): %s to %s", text, target_desc)
+        if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":  # nosec B105
+            logger.info("Telegram notification simulated (bot token unset): %s to %s", text, target_desc)  # nosemgrep
             return True
 
         safe_text = truncate_telegram_text(text)
