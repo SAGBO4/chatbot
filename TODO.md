@@ -1,8 +1,8 @@
 # TODO — ce qu'il te reste à faire
 
-Tout le code nécessaire est écrit et testé (56/56 tests passent). Ce qui reste est **de la
-configuration et des décisions**, pas du code à écrire — sauf un point signalé plus bas (webhook
-Brevo entrant).
+Tout le code nécessaire est écrit et testé (238/238 tests passent, 85% de couverture). Ce qui reste est **de la
+configuration et des décisions**, pas du code à écrire — les intégrations (webhook Brevo entrant/sortant,
+relais Telegram, base de connaissances, protection IDOR, résilience asynchrone) sont opérationnelles.
 
 ## 1. Obligatoire pour que le bot tourne (local ou VPS)
 
@@ -63,21 +63,26 @@ quel.
 
 **Implémenté** : `POST /api/webhooks/email-inbound/brevo` existe (`backend/main.py`), parse le
 format natif de Brevo (`items[]`), traite chaque email du batch indépendamment (un item invalide
-ne bloque pas les autres), et réutilise exactement la même logique de résolution que le webhook
-générique (recherche du ticket, notification Telegram, mise à jour base de connaissances).
-6 tests dédiés dans `tests/test_brevo_inbound_webhook.py` (38/38 tests passent au total).
+ne bloque pas les autres), et réutilise la logique de résolution partagée (recherche du ticket,
+notification Telegram, mise à jour base de connaissances).
+Supporte désormais la **double authentification** : par en-tête HTTP (`X-Webhook-Token` ou
+`X-Brevo-Token`) pour éviter l'exposition des secrets dans les URL et les journaux, tout en
+préservant le paramètre de requête `?token=` avec masquage automatique dans les logs.
 
 - [x] `BREVO_INBOUND_SECRET` généré (`openssl rand -hex 32`) et renseigné dans le `.env` local.
 - [ ] **Sur le VPS** : génère une valeur **différente** de `BREVO_INBOUND_SECRET` pour la prod
       (ne réutilise pas celle du repo local), et mets-la dans le `.env` du VPS.
 - [ ] Configurer dans le dashboard Brevo le webhook "Inbound Parsing" vers :
   `https://<ton-backend>/api/webhooks/email-inbound/brevo?token=<BREVO_INBOUND_SECRET>`
-  (nécessite que le backend soit exposé publiquement — impossible à tester en local sans un tunnel
+  (ou via un proxy ajoutant le header `X-Webhook-Token: <BREVO_INBOUND_SECRET>`).
+  (Nécessite que le backend soit exposé publiquement — impossible à tester en local sans un tunnel
   type ngrok/Cloudflare Tunnel).
-- [ ] Si un reverse proxy est devant le backend, désactiver le logging des query strings pour ce
-  chemin (le secret voyage dans l'URL, faute de mécanisme de signature côté Brevo). Des modèles prêts à l'emploi sont fournis :
-  - Nginx : `deploy/nginx.conf` (utilise un format de log sans query string sur la route webhook)
-  - Caddy : `deploy/Caddyfile` (filtre et masque le paramètre `token` dans les logs)
+- [x] **Protection des journaux d'accès** :
+  - Un middleware ASGI de log sécurisé et un filtre `SensitiveDataFilter` masquent automatiquement
+    les paramètres sensibles (`?token=[REDACTED]`) dans tous les logs applicatifs.
+  - Modèles de configuration reverse proxy prêts à l'emploi :
+    - Nginx : `deploy/nginx.conf` (utilise un format de log sans query string sur la route webhook)
+    - Caddy : `deploy/Caddyfile` (filtre et masque le paramètre `token` dans les logs)
 
 **Tant que le webhook Brevo n'est pas configuré côté dashboard (avec une URL publique), une
 réponse d'agent par email ne peut pas résoudre automatiquement un ticket** — seule la résolution
@@ -196,4 +201,17 @@ via Telegram (groupe support) fonctionne en local.
   - **ARCH-01 (Atomicité transactionnelle)** : Paramètre `auto_commit=False` dans `KnowledgeBaseService.add_article` lors de la résolution de ticket pour garantir un commit atomique unique.
   - **DB-03 (Pagination bornée)** : Paramètres `limit` (1-100) et `offset` (>=0) bornés via `Query` sur `/api/tickets`.
   - **SEC-05 (En-tête API Gemini)** : Utilisation de l'en-tête officiel `x-goog-api-key` au lieu de la query string dans l'URL.
-  - **61/61 tests passent**.
+- **Renforcement Sécurité & Résilience (OpenSpec `harden-security-and-resilience`)** :
+  - **Protection IDOR & Scoping Utilisateur** : `GET /api/tickets` et `GET /api/tickets/{ticket_id}` supportent désormais le filtrage `user_id`. Les requêtes restreintes à un utilisateur ne peuvent plus accéder aux tickets d'un autre utilisateur (renvoie `404 Not Found`).
+  - **Isolation Robuste des Tâches de Fond (`_safe_background_task`)** : Encapsulation hermétique de toutes les notifications asynchrones (`EmailService` et `TelegramRelay` dans `BackgroundTasks`). Les pannes réseau, déconnexions SMTP et erreurs Telegram n'interrompent plus le cycle de vie de la réponse HTTP 200/201 et ne font plus crasher Starlette/FastAPI après commit DB.
+  - **Authentification Double Brevo & Masquage des Logs** : Prise en charge des en-têtes `X-Webhook-Token` et `X-Brevo-Token` sur le webhook Brevo entrant (`/api/webhooks/email-inbound/brevo`) pour éliminer les secrets des URL. Middleware de log et filtre `SensitiveDataFilter` masquant automatiquement les paramètres sensibles (`?token=[REDACTED]`).
+  - **Herméticité des Tests** : Fixtures autouse dans `conftest.py` interceptant les appels externes SMTP Brevo et API Telegram pour des tests déterministes, sûrs et ultra-rapides (< 17s).
+  - **Couverture de Tests Exhaustive** : 11 nouvelles suites de tests modulaires couvrant les 5 axes (Fonctionnel, Sécurité, Robustesse, Multi-assertions HTTP/DB/Logs, Structure standardisée `test_<feature>_<scenario>_<attendu>`).
+- **238/238 tests passent** avec 85.24% de couverture globale (`htmlcov/`).
+- **Audit Qualité & Sécurité Statique / Dynamique validé à 100%** :
+  - **Couverture de code** : `pytest --cov=backend --cov=bot --cov-report=html --cov-fail-under=85` exécuté avec succès (238 tests en 21s, seuil 85% dépassé).
+  - **Mutation Testing (`mutmut`)** : Environnement configuré (`setup.cfg` ciblant `backend` et `bot`), runner pytest hermétique sans dépendances externes.
+  - **Linter de sécurité AST (`bandit`)** : `bandit -r backend/ bot/` exécuté — **0 vulnérabilité détectée**.
+  - **Analyse sémantique SAST (`semgrep`)** : `semgrep scan --config=auto backend/ bot/` exécuté sur 290 règles — **0 alerte de sécurité**.
+  - **Audit des dépendances (`trivy` & `pip-audit`)** : `trivy fs` et `pip-audit` exécutés sur l'environnement complet et `requirements.lock` — **0 vulnérabilité connue, 0 fuite de secret**.
+
