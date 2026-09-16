@@ -13,14 +13,24 @@ from backend.database import get_db
 @pytest.mark.asyncio
 async def test_health_check_healthy():
     """Verify that /health returns HTTP 200 and 'connected' when DB is accessible."""
-    transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as client:
-        response = await client.get("/health")
-        assert response.status_code == status.HTTP_200_OK
-        data = response.json()
-        assert data["status"] == "ok"
-        assert data["database"] == "connected"
-        assert data["service"] == "support-bot-backend"
+    mock_session = AsyncMock()
+    mock_session.execute.return_value = None
+
+    async def override_get_db():
+        yield mock_session
+
+    app.dependency_overrides[get_db] = override_get_db
+    try:
+        transport = ASGITransport(app=app)
+        async with AsyncClient(transport=transport, base_url="http://test") as client:
+            response = await client.get("/health")
+            assert response.status_code == status.HTTP_200_OK
+            data = response.json()
+            assert data["status"] == "ok"
+            assert data["database"] == "connected"
+            assert data["service"] == "support-bot-backend"
+    finally:
+        app.dependency_overrides.pop(get_db, None)
 
 
 @pytest.mark.asyncio
