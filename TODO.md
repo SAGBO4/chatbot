@@ -1,8 +1,9 @@
 # TODO — ce qu'il te reste à faire
 
-Tout le code nécessaire est écrit et testé (238/238 tests passent, 85% de couverture). Ce qui reste est **de la
+Tout le code nécessaire est écrit et testé (376/376 tests passent). Ce qui reste est **de la
 configuration et des décisions**, pas du code à écrire — les intégrations (webhook Brevo entrant/sortant,
-relais Telegram, base de connaissances, protection IDOR, résilience asynchrone) sont opérationnelles.
+relais Telegram, base de connaissances, protection IDOR, résilience asynchrone, groupe communautaire,
+modération, données crypto, bilinguisme FR/EN) sont opérationnelles.
 
 ## 1. Obligatoire pour que le bot tourne (local ou VPS)
 
@@ -17,6 +18,31 @@ Dans `.env` (déjà créé à la racine, avec secrets générés) :
 Sans ces deux valeurs, le bot Telegram ne peut pas fonctionner (token invalide = le bot ne se
 connecte pas ; groupe non configuré = les tickets ne sont jamais notifiés côté équipe support, et
 `support_handlers.py` ignore toute réponse puisqu'aucun groupe n'est reconnu comme légitime).
+
+- [ ] `BOT_OWNER_TELEGRAM_ID` : ton propre ID Telegram (nombre, pas ton `@username`) — message
+      **@userinfobot** sur Telegram pour l'obtenir. C'est toi qui pourras configurer le groupe
+      communautaire, gérer la liste blanche d'admins et changer la langue du bot (voir section 1bis).
+      Sans cette valeur, personne ne peut lancer `/setup_community`, `/whitelist` ou `/language`.
+
+## 1bis. Configurer le groupe communautaire (plus besoin de `.env`, se fait dans Telegram)
+
+Contrairement au groupe support (section 1, fixe dans `.env`), le **groupe communautaire** (là où
+les membres posent leurs questions avec `/ask`, où s'appliquent la modération et `/purge`) se
+configure désormais depuis Telegram, à tout moment, sans redéploiement :
+
+- [ ] Envoie `/start` en message privé au bot avec ton compte `BOT_OWNER_TELEGRAM_ID` → comme aucun
+      groupe communautaire n'est encore configuré, le bot répond avec un tutoriel de configuration.
+- [ ] Ajoute le bot comme **administrateur** du groupe Telegram que tu veux utiliser comme groupe
+      communautaire, avec les droits : restreindre les membres, bannir/débannir, supprimer des
+      messages (sinon `/mute`, `/ban`, `/kick` et `/purge` échoueront avec une erreur de permission
+      Telegram).
+- [ ] Dans ce groupe, envoie `/setup_community` — il devient immédiatement le groupe communautaire
+      actif (relançable à tout moment pour en changer).
+- [ ] (Optionnel) En tant que owner, `/whitelist add <user_id>` pour qu'un autre admin de confiance
+      puisse aussi lancer `/setup_community` et `/language` (il ne pourra pas gérer la liste
+      blanche lui-même, seul le owner le peut).
+- [ ] (Optionnel) `/language en` pour basculer tous les messages du bot en anglais (`/language fr`
+      pour revenir au français, qui est la langue par défaut).
 
 ## 2. Obligatoire si le backend est exposé sur internet (ton cas : VPS)
 
@@ -208,6 +234,36 @@ via Telegram (groupe support) fonctionne en local.
   - **Herméticité des Tests** : Fixtures autouse dans `conftest.py` interceptant les appels externes SMTP Brevo et API Telegram pour des tests déterministes, sûrs et ultra-rapides (< 17s).
   - **Couverture de Tests Exhaustive** : 11 nouvelles suites de tests modulaires couvrant les 5 axes (Fonctionnel, Sécurité, Robustesse, Multi-assertions HTTP/DB/Logs, Structure standardisée `test_<feature>_<scenario>_<attendu>`).
 - **238/238 tests passent** avec 85.24% de couverture globale (`htmlcov/`).
+- **Groupe communautaire, crypto et modération (OpenSpec `expand-bot-community-features`)** :
+  - `/ask <question>` dans le groupe communautaire : réponse publique taguant l'utilisateur, boutons
+    OUI/NON qui expirent après inactivité, escalade de ticket qui reste confinée au groupe
+    admin/email (jamais affichée dans le groupe communautaire).
+  - `/purge` : un admin du groupe communautaire peut supprimer les derniers messages du bot sans
+    avoir besoin d'accès au groupe admin.
+  - Modération `/mute`, `/unmute`, `/ban`, `/kick`, `/warn` réservée aux admins Telegram vérifiés en
+    direct via l'API Telegram (`bot/admin_check.py`), avec persistance des avertissements
+    (`community_warnings`).
+  - `/btc`, `/eth`, `/firo`, etc. : prix, variation 24h, capitalisation et volume via CoinGecko, en
+    DM comme en groupe, avec cache et dégradation propre en cas de panne du fournisseur.
+- **Configuration dynamique du groupe communautaire, contrôle d'accès & bilinguisme (OpenSpec
+  `add-dynamic-community-group-setup`)** :
+  - Le groupe communautaire n'est plus figé dans `.env` : `/setup_community`, lancé directement
+    dans le groupe cible par le owner (`BOT_OWNER_TELEGRAM_ID`) ou un admin whitelisté, le définit
+    (ou le change) à tout moment, sans redéploiement. Le groupe admin (`TELEGRAM_SUPPORT_GROUP_ID`)
+    reste volontairement fixe dans `.env` pour ne jamais pouvoir être détourné depuis Telegram.
+  - `/whitelist add|remove <user_id>` (réservé au owner) délègue le droit de configurer le groupe
+    communautaire et la langue à d'autres admins de confiance.
+  - Tutoriel de premier contact : `/start` en DM par un owner/admin autorisé sans groupe
+    communautaire configuré affiche les étapes de configuration.
+  - `TELEGRAM_COMMUNITY_GROUP_ID` devient une valeur d'amorçage unique (migration automatique au
+    premier démarrage si déjà configurée avant cette mise à jour), plus jamais relue ensuite.
+  - Bot bilingue FR/EN (`bot/i18n.py`) : `/language fr|en` bascule tous les messages du bot,
+    français par défaut.
+  - Bug corrigé en cours de route : `BOT_OWNER_TELEGRAM_ID` vide dans `.env` faisait planter le
+    démarrage entier (`Optional[int]` + pydantic-settings rejette une chaîne vide) — corrigé par un
+    validateur qui traite une valeur vide comme non configurée.
+- **376/376 tests passent** (46 fichiers de tests au total, dont de nombreux nouveaux depuis les deux
+  changements ci-dessus).
 - **Audit Qualité & Sécurité Statique / Dynamique validé à 100%** :
   - **Couverture de code** : `pytest --cov=backend --cov=bot --cov-report=html --cov-fail-under=85` exécuté avec succès (238 tests en 21s, seuil 85% dépassé).
   - **Mutation Testing (`mutmut`)** : Environnement configuré (`setup.cfg` ciblant `backend` et `bot`), runner pytest hermétique sans dépendances externes.
