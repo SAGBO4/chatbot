@@ -6,6 +6,8 @@ from aiogram import Router, F, Bot
 from aiogram.types import Message
 from backend.config import settings
 from bot.api_client import BackendClient
+from bot.language import get_active_language
+from bot.i18n import t
 from bot.utils import escape_telegram_markdown, truncate_telegram_text
 
 logger = logging.getLogger(__name__)
@@ -96,6 +98,7 @@ async def handle_support_agent_reply(
         return
 
     client = backend_client or BackendClient()
+    lang = await get_active_language(backend_client=client)
 
     # 1. Primary: resolve by the replied-to message's identity, so wording
     # changes to the card's text can never break matching.
@@ -127,10 +130,7 @@ async def handle_support_agent_reply(
     # 3. Neither the id-based lookup nor the text fallback found a ticket:
     # tell the agent explicitly instead of silently doing nothing.
     if ticket_id is None:
-        await message.reply(
-            "⚠️ Je n'ai pas pu associer ce message à un ticket. "
-            "Répondez directement au message de la carte du ticket pour le résoudre."
-        )
+        await message.reply(t("support_no_matching_ticket", lang))
         return
 
     # `message.text` is None for any non-text reply (photo, sticker, voice,
@@ -146,16 +146,12 @@ async def handle_support_agent_reply(
             solution_text = transcribed
             safe_transcribed = escape_telegram_markdown(solution_text)
             await message.reply(
-                f"🎙️ Message vocal transcrit automatiquement :\n\n_{safe_transcribed}_",
+                t("support_voice_transcribed", lang, transcribed=safe_transcribed),
                 parse_mode="Markdown",
             )
 
     if not solution_text:
-        await message.reply(
-            "⚠️ Je ne peux résoudre un ticket qu'à partir d'un texte (ou d'une légende, ou d'un "
-            "vocal transcrit automatiquement si l'IA OpenAI est configurée). Réécrivez votre "
-            "solution en texte, ou ajoutez-la en légende de votre média."
-        )
+        await message.reply(t("support_no_text_content", lang))
         return
 
     agent_name = (
@@ -177,9 +173,7 @@ async def handle_support_agent_reply(
         if resolved_ticket.get("is_newly_resolved") is False:
             already_by = escape_telegram_markdown(resolved_ticket.get("resolved_by") or "un autre agent")
             await message.reply(
-                f"ℹ️ **Ticket #{ticket_id} déjà résolu !**\n"
-                f"Ce ticket a déjà été résolu par *{already_by}*.\n"
-                f"Votre réponse n'a pas été renvoyée à l'utilisateur pour éviter les doublons.",
+                t("support_already_resolved", lang, ticket_id=ticket_id, resolved_by=already_by),
                 parse_mode="Markdown",
             )
             return
@@ -191,12 +185,8 @@ async def handle_support_agent_reply(
             capped_solution = truncate_telegram_text(solution_text, max_length=3500)
             safe_solution = escape_telegram_markdown(capped_solution)
             safe_agent = escape_telegram_markdown(agent_name)
-            user_notification = (
-                f"📬 **Réponse de l'équipe support (Ticket #{ticket_id})**\n\n"
-                f"{safe_solution}\n\n"
-                f"━━━━━━━━━━━━━━━━━━━\n"
-                f"Traité par : *{safe_agent}*\n"
-                f"Merci de votre confiance ! 👋"
+            user_notification = t(
+                "support_user_notification", lang, ticket_id=ticket_id, solution=safe_solution, agent=safe_agent
             )
             try:
                 await bot.send_message(
@@ -206,31 +196,20 @@ async def handle_support_agent_reply(
                 )
             except Exception as send_err:
                 logger.warning("Markdown send failed for user %s, retrying in plain text: %s", user_id, send_err)
-                plain_notification = (
-                    f"📬 Réponse de l'équipe support (Ticket #{ticket_id})\n\n"
-                    f"{capped_solution}\n\n"
-                    f"━━━━━━━━━━━━━━━━━━━\n"
-                    f"Traité par : {agent_name}\n"
-                    f"Merci de votre confiance ! 👋"
-                )
                 try:
                     await bot.send_message(
                         chat_id=user_id,
-                        text=plain_notification,
+                        text=user_notification,
                     )
                 except Exception as plain_err:
                     logger.error("Failed to send plain text user notification: %s", plain_err)
 
         # 2. Confirm to the support team in group
         await message.reply(
-            f"✅ **Ticket #{ticket_id} résolu !**\n"
-            f"• La réponse a été transmise à l'utilisateur (`ID: {user_id}`).\n"
-            f"• La solution a été automatiquement intégrée dans la base de connaissances.",
+            t("support_resolved_confirmation", lang, ticket_id=ticket_id, user_id=user_id),
             parse_mode="Markdown",
         )
 
     except Exception as exc:
         logger.error("Error resolving ticket %s via group reply: %s", ticket_id, exc)
-        await message.reply(
-            f"❌ **Erreur lors de la résolution du ticket #{ticket_id}** : {exc}"
-        )
+        await message.reply(t("support_resolution_error", lang, ticket_id=ticket_id, error=exc))
