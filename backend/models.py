@@ -56,6 +56,40 @@ class Ticket(Base):
     support_group_message_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
 
 
+class CommunityWarning(Base):
+    __tablename__ = "community_warnings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    user_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    group_id: Mapped[int] = mapped_column(BigInteger, nullable=False, index=True)
+    reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    warned_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+
+class BotSetting(Base):
+    __tablename__ = "bot_settings"
+
+    key: Mapped[str] = mapped_column(String(100), primary_key=True)
+    value: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    updated_by: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, onupdate=utc_now, nullable=False
+    )
+
+
+class BotAdminWhitelist(Base):
+    __tablename__ = "bot_admin_whitelist"
+
+    user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    added_by: Mapped[str] = mapped_column(String(255), nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), default=utc_now, nullable=False
+    )
+
+
 class KnowledgeArticle(Base):
     __tablename__ = "knowledge_articles"
 
