@@ -10,3 +10,20 @@ def get_resolution_keyboard(ticket_id: int = 0) -> InlineKeyboardMarkup:
         ]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_community_resolution_keyboard() -> InlineKeyboardMarkup:
+    """
+    Inline keyboard for the community-group Q&A resolution confirmation.
+
+    Uses a distinct callback_data prefix ("cresolve:") from the private-DM
+    keyboard so the two flows never collide when routed through the same
+    Dispatcher (see bot/handlers/community_handlers.py).
+    """
+    buttons = [
+        [
+            InlineKeyboardButton(text="✅ OUI", callback_data="cresolve:yes"),
+            InlineKeyboardButton(text="❌ NON", callback_data="cresolve:no"),
+        ]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
