@@ -54,6 +54,11 @@ This project implements a complete automated support system on Telegram, connect
 7. **Robust Background Isolation**: Asynchronous email dispatches and Telegram notifications run inside fault-isolated task wrappers, ensuring third-party network drops never crash the HTTP response lifecycle.
 8. **IDOR Access Control**: User-scoped ticket retrieval (`?user_id=`) prevents unauthorized cross-user inspection while preserving administrative master access.
 9. **Dual-Mode Webhook Security**: Brevo inbound emails authenticate via `X-Webhook-Token` / `X-Brevo-Token` headers or query parameters with automated access log token redaction.
+10. **Community Group Q&A**: Members ask questions directly in a public community group via `/ask <question>`; the bot answers publicly, tagging the asker, with YES/NO resolution buttons that auto-expire after inactivity. Escalated tickets and all resolution/agent traffic stay confined to the private admin/support group or email — never posted to the community group.
+11. **Crypto Market Data**: `/btc`, `/eth`, `/firo`, and other mapped asset commands return live price, 24h change, market cap, and 24h volume from CoinGecko, usable in DM or the community group.
+12. **Community Moderation**: Admin-only `/mute`, `/unmute`, `/ban`, `/kick`, and `/warn` commands scoped to the community group, with admin status verified live against the Telegram Bot API. `/purge` lets a community-group admin delete recent bot messages without needing admin-group access.
+13. **Dynamic Community Group Setup**: No redeploy needed to point the bot at a community — an env-defined owner (`BOT_OWNER_TELEGRAM_ID`) or an admin they whitelist runs `/setup_community` directly in the target group at any time. The admin/support group stays fixed via `.env` so ticket/moderation traffic can never be redirected by a chat command.
+14. **Bilingual Bot (FR/EN)**: All bot-authored messages are available in French (default) and English; the owner or a whitelisted admin switches with `/language fr` or `/language en`.
 
 ---
 
@@ -63,7 +68,7 @@ This project implements a complete automated support system on Telegram, connect
 ├── backend/
 │   ├── config.py                 # Pydantic configuration (environment variables)
 │   ├── database.py               # Asynchronous SQLAlchemy database engine (SQLite / PostgreSQL)
-│   ├── models.py                 # ORM Models (Tickets, Knowledge Base articles)
+│   ├── models.py                 # ORM Models (Tickets, Knowledge Base articles, Community Warnings)
 │   ├── schemas.py                # Pydantic request/response schemas
 │   ├── main.py                   # FastAPI application and REST endpoints
 │   └── services/
@@ -72,15 +77,28 @@ This project implements a complete automated support system on Telegram, connect
 │       ├── ai_assistant.py       # Optional AI module (LLM RAG)
 │       ├── email_service.py      # Multi-channel SMTP notifications
 │       ├── telegram_relay.py     # Backend-to-Telegram notification relay
-│       └── ticket_service.py     # Ticket lifecycle management
+│       ├── ticket_service.py     # Ticket lifecycle management
+│       ├── warning_service.py    # Community moderation warning persistence
+│       ├── crypto_service.py     # CoinGecko market data client (cached)
+│       └── bot_settings_service.py # Persisted community group id, language, admin whitelist
 ├── bot/
 │   ├── api_client.py             # Asynchronous HTTP client targeting the backend
 │   ├── keyboards.py              # Telegram inline keyboards (YES / NO)
 │   ├── main.py                   # Telegram bot entrypoint (aiogram 3)
 │   ├── utils.py                  # Markdown escaping and Telegram utilities
+│   ├── admin_check.py            # Live Telegram admin-role verification (cached)
+│   ├── group_scope.py            # Dynamic community-group chat-id resolution (cached)
+│   ├── access_control.py         # Bot owner + whitelist authorization checks (cached)
+│   ├── language.py                # Active bot language resolution (cached)
+│   ├── i18n.py                   # FR/EN translation table and t() helper
+│   ├── ticket_escalation.py      # Shared ticket-creation + admin-group card posting
 │   └── handlers/
 │       ├── user_handlers.py      # Handlers for private user chats
-│       └── support_handlers.py   # Handlers for the support team group
+│       ├── support_handlers.py   # Handlers for the support team group
+│       ├── community_handlers.py # Community-group /ask Q&A, expiring buttons, /purge
+│       ├── moderation_handlers.py # /mute, /unmute, /ban, /kick, /warn
+│       ├── crypto_handlers.py    # /btc, /eth, /firo, ... market data commands
+│       └── setup_handlers.py     # /setup_community, /whitelist, /language, setup tutorial
 ├── tests/                        # Unit, integration, resilience, and E2E test suite
 ├── Dockerfile                    # Production-ready Docker container image
 ├── docker-compose.yml            # Multi-service deployment (backend + bot)
@@ -117,15 +135,30 @@ Edit the `.env` file with your Telegram bot credentials:
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_SUPPORT_GROUP_ID=
 
+# Your own Telegram user id - message @userinfobot to find it
+BOT_OWNER_TELEGRAM_ID=
+
 # Optional: Enable AI Module
 AI_ENABLED=false
 AI_API_KEY=
 AI_PROVIDER=gemini
 ```
 
-> **Tip to find your `TELEGRAM_SUPPORT_GROUP_ID`:**
-> 1. Create a Telegram group for your support team and add your bot as a member.
+> **Tip to find `TELEGRAM_SUPPORT_GROUP_ID`:**
+> 1. Create the admin/support Telegram group and add your bot as a member.
 > 2. Send any message in the group, then call `https://api.telegram.org/bot<TOKEN>/getUpdates` to inspect `chat.id` (a negative integer starting with `-100`).
+
+**The community group is not set in `.env`.** Instead, configure it from inside Telegram, at any time, without a redeploy:
+
+1. Start a private chat with the bot as the configured `BOT_OWNER_TELEGRAM_ID` and send `/start` — since no community group is configured yet, the bot replies with a short setup tutorial.
+2. Add the bot as an **admin** to the Telegram group you want to use as the community group, with rights to restrict members, ban/unban users, and delete messages — otherwise `/mute`, `/ban`, `/kick`, and `/purge` will fail with a Telegram permission error.
+3. In that group, send `/setup_community`. It becomes the active community group immediately.
+4. Optionally, as the owner, run `/whitelist add <user_id>` (in DM or the admin group) to let another trusted admin also run `/setup_community` and `/language` — a whitelisted admin cannot manage the whitelist themselves, only the owner can.
+5. Optionally, switch the bot's messages to English at any time with `/language en` (or back to French with `/language fr`), run by the owner or a whitelisted admin.
+
+Run `/setup_community` again at any time to point the bot at a different group — it replaces the previous one immediately.
+
+> **Upgrading an existing deployment:** if you already had `TELEGRAM_COMMUNITY_GROUP_ID` set in `.env` before this feature existed, its value is copied into the new persisted setting automatically on first startup after upgrading (and only if no community group has been configured yet). After that one-time copy, the env var is never read again — use `/setup_community` for any further change.
 
 ### 3. Database Migrations & Initial Data Seeding
 
@@ -197,7 +230,7 @@ To safeguard credentials passed via webhooks:
 
 ## Testing & Verification
 
-The automated test suite contains **238 tests** across 11 modular suites covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), and multi-layer assertions (HTTP + Database + Logs).
+The automated test suite contains **376 tests** across 46 modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
 
 All tests run hermetically using isolated SQLite databases and mock external boundaries (Brevo SMTP and Telegram Bot API) to guarantee safety, zero external network leaks, and rapid execution (~16s):
 
