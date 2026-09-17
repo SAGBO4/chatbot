@@ -91,3 +91,66 @@ class KnowledgeArticleResponse(BaseModel):
     keywords: Optional[str] = None
     source_ticket_id: Optional[int] = None
     created_at: datetime
+
+
+class WarningCreateRequest(BaseModel):
+    user_id: int
+    group_id: int
+    warned_by: str = Field(..., min_length=1, max_length=255)
+    reason: Optional[str] = Field(default=None, max_length=1000)
+
+
+class WarningResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: int
+    user_id: int
+    group_id: int
+    reason: Optional[str] = None
+    warned_by: str
+    created_at: datetime
+
+
+class WarningListResponse(BaseModel):
+    count: int
+    warnings: List[WarningResponse]
+
+
+class CryptoPriceResponse(BaseModel):
+    symbol: str
+    price_usd: float
+    change_24h_pct: float
+    market_cap_usd: float
+    volume_24h_usd: float
+
+
+class BotSettingRequest(BaseModel):
+    value: Optional[str] = Field(default=None, max_length=1000)
+    updated_by: Optional[str] = Field(default=None, max_length=255)
+
+
+class BotSettingResponse(BaseModel):
+    key: str
+    value: Optional[str] = None
+
+
+class WhitelistAddRequest(BaseModel):
+    user_id: int
+    added_by: str = Field(..., min_length=1, max_length=255)
+
+
+class WhitelistEntryResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    user_id: int
+    added_by: str
+    created_at: datetime
+
+
+class WhitelistListResponse(BaseModel):
+    entries: List[WhitelistEntryResponse]
+
+
+class WhitelistCheckResponse(BaseModel):
+    user_id: int
+    is_whitelisted: bool
