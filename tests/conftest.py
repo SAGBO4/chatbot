@@ -34,6 +34,25 @@ def manage_rate_limiting_for_tests(request):
 
 
 @pytest.fixture(autouse=True)
+def reset_bot_process_caches():
+    """
+    Clears the bot process's short-TTL in-memory caches (active language,
+    active community group id, whitelist status) before and after every
+    test, so a test that configures one of these (e.g. sets the language to
+    "en") never leaks that cached value into an unrelated test running later
+    in the same pytest session.
+    """
+    from bot import language, group_scope, access_control
+    language.invalidate_language_cache()
+    group_scope.invalidate_community_group_cache()
+    access_control.invalidate_whitelist_cache()
+    yield
+    language.invalidate_language_cache()
+    group_scope.invalidate_community_group_cache()
+    access_control.invalidate_whitelist_cache()
+
+
+@pytest.fixture(autouse=True)
 def prevent_real_external_network_calls(request, monkeypatch):
     """
     Prevents background tasks from accidentally making real SMTP connections
