@@ -44,3 +44,44 @@ def test_support_group_is_configured():
 
     configured = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", TELEGRAM_SUPPORT_GROUP_ID=-100123456)
     assert configured.support_group_is_configured() is True
+
+
+def test_community_group_is_configured():
+    unconfigured_default = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
+    assert unconfigured_default.community_group_is_configured() is False
+
+    unconfigured_zero = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", TELEGRAM_COMMUNITY_GROUP_ID="0")
+    assert unconfigured_zero.community_group_is_configured() is False
+
+    configured = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", TELEGRAM_COMMUNITY_GROUP_ID=-100987654)
+    assert configured.community_group_is_configured() is True
+
+
+def test_community_feature_defaults():
+    s = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
+    assert s.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS == 600
+    assert s.CRYPTO_PROVIDER_TIMEOUT_SECONDS == 10.0
+    assert s.CRYPTO_CACHE_TTL_SECONDS == 45
+
+
+def test_is_bot_owner_unset_grants_no_one():
+    s = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
+    assert s.BOT_OWNER_TELEGRAM_ID is None
+    assert s.is_bot_owner(12345) is False
+
+
+def test_is_bot_owner_matches_configured_id():
+    s = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", BOT_OWNER_TELEGRAM_ID=999)
+    assert s.is_bot_owner(999) is True
+    assert s.is_bot_owner(1000) is False
+
+
+def test_blank_bot_owner_id_env_var_does_not_crash(monkeypatch):
+    # Regression: an empty BOT_OWNER_TELEGRAM_ID= line (the .env.example
+    # template's default before an operator fills it in) used to raise a
+    # pydantic ValidationError at Settings() construction time.
+    monkeypatch.setenv("BOT_OWNER_TELEGRAM_ID", "")
+    monkeypatch.setenv("TELEGRAM_BOT_TOKEN", "t")
+    s = Settings(_env_file=None)
+    assert s.BOT_OWNER_TELEGRAM_ID is None
+    assert s.is_bot_owner(1) is False

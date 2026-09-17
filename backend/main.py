@@ -74,7 +74,7 @@ async def _safe_background_task(coro_fn, *args, **kwargs):
         )
 
 from backend.config import settings
-from backend.database import get_db, init_db
+from backend.database import get_db, init_db, async_session_maker
 from backend.models import Ticket, TicketStatus
 from bot.utils import escape_telegram_markdown, truncate_telegram_text
 from backend.schemas import (
@@ -89,6 +89,16 @@ from backend.schemas import (
     InboundEmailWebhookRequest,
     BrevoInboundWebhookRequest,
     BrevoInboundItem,
+    WarningCreateRequest,
+    WarningResponse,
+    WarningListResponse,
+    CryptoPriceResponse,
+    BotSettingRequest,
+    BotSettingResponse,
+    WhitelistAddRequest,
+    WhitelistEntryResponse,
+    WhitelistListResponse,
+    WhitelistCheckResponse,
 )
 from backend.services.query_orchestrator import QueryOrchestrator
 from backend.services.ticket_service import TicketService
@@ -96,6 +106,9 @@ from backend.services.knowledge_base import KnowledgeBaseService
 from backend.services.email_service import EmailService
 from backend.services.telegram_relay import TelegramRelay
 from backend.services.ai_assistant import AIAssistantService
+from backend.services.warning_service import WarningService
+from backend.services.crypto_service import CryptoService
+from backend.services.bot_settings_service import BotSettingsService, WhitelistService
 from backend.limiter import limiter, RateLimitExceeded, _rate_limit_exceeded_handler
 import httpx
 
@@ -152,7 +165,54 @@ def verify_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
         )
 
 
-def clean_email_reply_body(body: str) -> str:
+# Zero-width / invisible formatting characters that must never be able to
+# mask a quote marker (e.g. a zero-width space slipped in front of '>' -
+# accidentally by a mail client, or deliberately - would otherwise defeat
+# every check below and leak quoted thread history into the ticket solution
+# and the knowledge base). Stripped only for marker *detection*; the
+# original line text is what actually gets kept in clean_lines, so this
+# never alters real content.
+_INVISIBLE_CHARS_RE = re.compile("[​‌‍⁠﻿]")
+
+# Quoted email header line, e.g. "From: support@example.com" or
+# "De : Jean <jean@example.com>".
+_FROM_PREFIX_RE = re.compile(r"^(?:From|De)\s*:\s*(.*)$", re.IGNORECASE)
+
+
+def _is_quoted_header_line(text: str) -> bool:
+    """
+    True if `text` is (only) a "From:"/"De :" header whose value ends in an
+    email address, bare or bracketed - not merely a sentence that starts
+    that way and happens to mention an address mid-sentence, e.g. "De :
+    notre point de vue technique <support@example.com>, le souci vient du
+    DNS." must NOT match.
+
+    Deliberately implemented with plain string operations instead of a
+    single regex: an earlier version used `.*(?:<...@...>|\\S+@\\S+)\\s*$`,
+    which has two unbounded, overlapping quantifiers (`.*` and `\\S+`) and
+    is vulnerable to catastrophic backtracking (confirmed by a dedicated
+    ReDoS test - a ~200KB non-matching line took 100+ seconds). This
+    formulation only ever does bounded, linear work.
+    """
+    match = _FROM_PREFIX_RE.match(text)
+    if not match:
+        return False
+    remainder = match.group(1).strip()
+    if not remainder:
+        return False
+
+    if remainder.endswith(">"):
+        open_idx = remainder.rfind("<")
+        if open_idx == -1:
+            return False
+        inner = remainder[open_idx + 1 : -1]
+        return "@" in inner and "<" not in inner and ">" not in inner
+
+    last_token = remainder.split()[-1]
+    return "@" in last_token and not last_token.startswith("@") and not last_token.endswith("@")
+
+
+def clean_email_reply_body(body: Optional[str]) -> str:
     """
     Strips email thread history and quote lines.
 
@@ -163,29 +223,51 @@ def clean_email_reply_body(body: str) -> str:
     treat an empty result as "nothing to resolve with" rather than falling
     back to the untouched body, which would leak the quoted thread history
     back into the ticket solution and the knowledge base.
+
+    `body` is normally a str (guaranteed by the Pydantic request schemas of
+    every current caller), but this is a small reusable text helper, not a
+    request handler, so it validates its own input rather than trusting
+    every future caller: None is treated as "no content" (returns "",
+    consistent with the "nothing to resolve" contract above), and any other
+    non-str type raises TypeError immediately instead of failing later with
+    a confusing AttributeError/TypeError deep inside the loop.
     """
-    lines = body.splitlines()
+    if body is None:
+        return ""
+    if not isinstance(body, str):
+        raise TypeError(f"clean_email_reply_body expects a str or None, got {type(body).__name__!r}")
+
+    # Split strictly on real line breaks (\r\n, \r, \n) - NOT str.splitlines(),
+    # which also treats \x0b, \x0c, \x1c-\x1e, \x85 (NEL), U+2028 and U+2029
+    # as line boundaries and can fragment one legitimate sentence into
+    # multiple independently-matched "lines".
+    lines = body.replace("\r\n", "\n").replace("\r", "\n").split("\n")
+
     clean_lines = []
     for line in lines:
         stripped = line.strip()
+        # Marker detection is done on a copy with invisible characters
+        # stripped out, so they can't be used to smuggle a marker past these
+        # checks; `line` (unmodified) is still what gets appended below.
+        detection_text = _INVISIBLE_CHARS_RE.sub("", stripped)
+
         # Common email quote markers: standard email quote prefix '>'
-        if stripped.startswith(">"):
+        if detection_text.startswith(">"):
             break
         # Common email separator lines: 4+ dashes, underscores, or equals alone on a line
-        if re.match(r"^[-_=]{4,}\s*$", stripped):
+        if re.match(r"^[-_=]{4,}\s*$", detection_text):
             break
         # Standard "Original Message" / "Forwarded message" / French equivalents
-        if re.search(r"[-_]{2,}\s*(?:Original Message|Message d'origine|Forwarded message|Message transféré)\s*[-_]{2,}", stripped, re.IGNORECASE):
+        if re.search(r"[-_]{2,}\s*(?:Original Message|Message d'origine|Forwarded message|Message transféré)\s*[-_]{2,}", detection_text, re.IGNORECASE):
             break
         # Apple Mail / standard forwarded message headers
-        if re.search(r"^(?:Begin forwarded message|Début du message transféré)\s*:", stripped, re.IGNORECASE):
+        if re.search(r"^(?:Begin forwarded message|Début du message transféré)\s*:", detection_text, re.IGNORECASE):
             break
         # Quoted reply markers like "On ... wrote:" or "Le ... a écrit :"
-        if re.search(r"^(On\s+.+wrote:|Le\s+.+a écrit\s*:)", stripped, re.IGNORECASE):
+        if re.search(r"^(On\s+.+wrote:|Le\s+.+a écrit\s*:)", detection_text, re.IGNORECASE):
             break
         # Quoted email header lines like "From: support@..." or "De : Jean <...>"
-        # Requires an email address or angle brackets to avoid false matches on sentences like "De : notre côté..."
-        if re.search(r"^(?:From|De)\s*:\s*.+[@<]", stripped, re.IGNORECASE):
+        if _is_quoted_header_line(detection_text):
             break
         clean_lines.append(line)
     return "\n".join(clean_lines).strip()
@@ -201,15 +283,25 @@ async def lifespan(app: FastAPI):
         except ImportError:
             logger.warning("SENTRY_DSN is configured but sentry_sdk is not installed.")
     await init_db()
+    if settings.community_group_is_configured():
+        async with async_session_maker() as seed_session:
+            try:
+                await BotSettingsService.seed_legacy_community_group(
+                    seed_session, int(settings.TELEGRAM_COMMUNITY_GROUP_ID)
+                )
+            except Exception as exc:
+                logger.warning("Failed to seed legacy community group setting: %s", exc)
     client = httpx.AsyncClient(timeout=15.0)
     app.state.http_client = client
     TelegramRelay.set_shared_client(client)
     AIAssistantService.set_shared_client(client)
+    CryptoService.set_shared_client(client)
     try:
         yield
     finally:
         TelegramRelay.set_shared_client(None)
         AIAssistantService.set_shared_client(None)
+        CryptoService.set_shared_client(None)
         await client.aclose()
 
 
@@ -746,3 +838,122 @@ async def list_knowledge(
     session: AsyncSession = Depends(get_db),
 ):
     return await KnowledgeBaseService.get_all_articles(session=session, limit=limit, offset=offset)
+
+
+@app.post(
+    "/api/moderation/warnings",
+    response_model=WarningResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(verify_api_key)],
+)
+async def create_warning(
+    payload: WarningCreateRequest,
+    session: AsyncSession = Depends(get_db),
+):
+    return await WarningService.add_warning(
+        session=session,
+        user_id=payload.user_id,
+        group_id=payload.group_id,
+        warned_by=payload.warned_by,
+        reason=payload.reason,
+    )
+
+
+@app.get(
+    "/api/moderation/warnings",
+    response_model=WarningListResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+async def list_warnings(
+    user_id: int = Query(..., description="Telegram user id to look up warnings for"),
+    group_id: int = Query(..., description="Telegram group id the warnings were issued in"),
+    session: AsyncSession = Depends(get_db),
+):
+    warnings = await WarningService.list_warnings(session=session, user_id=user_id, group_id=group_id)
+    return WarningListResponse(count=len(warnings), warnings=warnings)
+
+
+@app.get(
+    "/api/crypto/{symbol}",
+    response_model=CryptoPriceResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+async def get_crypto_price(symbol: str):
+    if CryptoService.resolve_asset_id(symbol) is None:
+        raise HTTPException(status_code=404, detail=f"Unknown asset '{symbol}'")
+
+    data = await CryptoService.get_market_data(symbol)
+    if data is None:
+        raise HTTPException(status_code=503, detail="Crypto market data temporarily unavailable")
+
+    return CryptoPriceResponse(symbol=symbol.lower(), **data)
+
+
+@app.get(
+    "/api/admin/settings/{key}",
+    response_model=BotSettingResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+async def get_bot_setting(key: str, session: AsyncSession = Depends(get_db)):
+    value = await BotSettingsService.get_value(session=session, key=key)
+    return BotSettingResponse(key=key, value=value)
+
+
+@app.put(
+    "/api/admin/settings/{key}",
+    response_model=BotSettingResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+async def set_bot_setting(
+    key: str,
+    payload: BotSettingRequest,
+    session: AsyncSession = Depends(get_db),
+):
+    setting = await BotSettingsService.set_value(
+        session=session, key=key, value=payload.value, updated_by=payload.updated_by
+    )
+    return BotSettingResponse(key=setting.key, value=setting.value)
+
+
+@app.post(
+    "/api/admin/whitelist",
+    response_model=WhitelistEntryResponse,
+    status_code=status.HTTP_201_CREATED,
+    dependencies=[Depends(verify_api_key)],
+)
+async def add_whitelist_entry(
+    payload: WhitelistAddRequest,
+    session: AsyncSession = Depends(get_db),
+):
+    return await WhitelistService.add(session=session, user_id=payload.user_id, added_by=payload.added_by)
+
+
+@app.delete(
+    "/api/admin/whitelist/{user_id}",
+    dependencies=[Depends(verify_api_key)],
+)
+async def remove_whitelist_entry(user_id: int, session: AsyncSession = Depends(get_db)):
+    removed = await WhitelistService.remove(session=session, user_id=user_id)
+    if not removed:
+        raise HTTPException(status_code=404, detail="Whitelist entry not found")
+    return {"removed": True, "user_id": user_id}
+
+
+@app.get(
+    "/api/admin/whitelist",
+    response_model=WhitelistListResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+async def list_whitelist_entries(session: AsyncSession = Depends(get_db)):
+    entries = await WhitelistService.list(session=session)
+    return WhitelistListResponse(entries=entries)
+
+
+@app.get(
+    "/api/admin/whitelist/{user_id}/check",
+    response_model=WhitelistCheckResponse,
+    dependencies=[Depends(verify_api_key)],
+)
+async def check_whitelist_entry(user_id: int, session: AsyncSession = Depends(get_db)):
+    is_whitelisted = await WhitelistService.is_whitelisted(session=session, user_id=user_id)
+    return WhitelistCheckResponse(user_id=user_id, is_whitelisted=is_whitelisted)

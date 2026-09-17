@@ -114,3 +114,100 @@ class BackendClient:
             return None
         resp.raise_for_status()
         return resp.json()
+
+    async def create_warning(
+        self,
+        user_id: int,
+        group_id: int,
+        warned_by: str,
+        reason: Optional[str] = None,
+    ) -> Dict[str, Any]:
+        client = await self._get_client()
+        resp = await client.post(
+            f"{self.base_url}/api/moderation/warnings",
+            json={
+                "user_id": user_id,
+                "group_id": group_id,
+                "warned_by": warned_by,
+                "reason": reason,
+            },
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def list_warnings(self, user_id: int, group_id: int) -> Dict[str, Any]:
+        client = await self._get_client()
+        resp = await client.get(
+            f"{self.base_url}/api/moderation/warnings",
+            params={"user_id": user_id, "group_id": group_id},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def get_crypto_price(self, symbol: str) -> Dict[str, Any]:
+        """
+        Fetches market data for a crypto asset symbol.
+
+        Raises httpx.HTTPStatusError with response.status_code == 404 for an
+        unrecognized symbol, or 503 when the market-data provider is
+        temporarily unavailable - callers distinguish the two to match the
+        crypto-market-data spec's separate scenarios.
+        """
+        client = await self._get_client()
+        resp = await client.get(
+            f"{self.base_url}/api/crypto/{symbol}",
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def get_setting(self, key: str) -> Optional[str]:
+        client = await self._get_client()
+        resp = await client.get(
+            f"{self.base_url}/api/admin/settings/{key}",
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return resp.json().get("value")
+
+    async def set_setting(self, key: str, value: Optional[str], updated_by: Optional[str] = None) -> Dict[str, Any]:
+        client = await self._get_client()
+        resp = await client.put(
+            f"{self.base_url}/api/admin/settings/{key}",
+            json={"value": value, "updated_by": updated_by},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def whitelist_add(self, user_id: int, added_by: str) -> Dict[str, Any]:
+        client = await self._get_client()
+        resp = await client.post(
+            f"{self.base_url}/api/admin/whitelist",
+            json={"user_id": user_id, "added_by": added_by},
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return resp.json()
+
+    async def whitelist_remove(self, user_id: int) -> bool:
+        client = await self._get_client()
+        resp = await client.delete(
+            f"{self.base_url}/api/admin/whitelist/{user_id}",
+            headers=self._headers(),
+        )
+        if resp.status_code == 404:
+            return False
+        resp.raise_for_status()
+        return True
+
+    async def is_whitelisted(self, user_id: int) -> bool:
+        client = await self._get_client()
+        resp = await client.get(
+            f"{self.base_url}/api/admin/whitelist/{user_id}/check",
+            headers=self._headers(),
+        )
+        resp.raise_for_status()
+        return bool(resp.json().get("is_whitelisted"))

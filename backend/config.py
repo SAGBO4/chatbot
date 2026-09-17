@@ -1,4 +1,5 @@
 from typing import Optional, Union
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -12,6 +13,44 @@ class Settings(BaseSettings):
     # Telegram configuration
     TELEGRAM_BOT_TOKEN: str = "placeholder_token"
     TELEGRAM_SUPPORT_GROUP_ID: Union[int, str] = 0
+
+    # Telegram Community Group configuration
+    # Legacy static community group id. Used only as a one-time seed for the
+    # persisted `community_group_id` bot setting on first startup (see
+    # backend/services/bot_settings_service.py seed_legacy_community_group);
+    # ignored afterwards. New deployments configure the community group
+    # dynamically via /setup_community instead. Kept distinct from
+    # TELEGRAM_SUPPORT_GROUP_ID (the admin group, which stays env-fixed) so
+    # ticket internals and moderation logs never leak into the public group.
+    TELEGRAM_COMMUNITY_GROUP_ID: Union[int, str] = 0
+
+    # Bot owner: the Telegram user id always authorized to configure the
+    # community group, manage the admin whitelist, and change the bot
+    # language (see bot/access_control.py). Deliberately env-only (not
+    # editable from within Telegram) so this root authority can never be
+    # altered by whitelist data corruption or a compromised chat command.
+    BOT_OWNER_TELEGRAM_ID: Optional[int] = None
+
+    @field_validator("BOT_OWNER_TELEGRAM_ID", mode="before")
+    @classmethod
+    def _blank_owner_id_means_unset(cls, value):
+        """
+        An empty BOT_OWNER_TELEGRAM_ID= line in .env (the template's default,
+        until an operator fills it in) must mean "unset", not a parsing
+        error - without this, `Settings()` would raise at import time and
+        take the whole app down before it ever got a chance to log anything.
+        """
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
+
+    # Seconds a group-triggered answer's YES/NO resolution buttons stay active
+    # before being disabled.
+    COMMUNITY_RESOLUTION_TIMEOUT_SECONDS: int = 600
+
+    # Crypto market data configuration (CoinGecko)
+    CRYPTO_PROVIDER_TIMEOUT_SECONDS: float = 10.0
+    CRYPTO_CACHE_TTL_SECONDS: int = 45
 
     # Backend configuration
     BACKEND_HOST: str = "0.0.0.0"  # nosec: B104
@@ -91,6 +130,25 @@ class Settings(BaseSettings):
         drifting out of sync.
         """
         return bool(self.TELEGRAM_SUPPORT_GROUP_ID) and str(self.TELEGRAM_SUPPORT_GROUP_ID) != "0"
+
+    def community_group_is_configured(self) -> bool:
+        """
+        Whether TELEGRAM_COMMUNITY_GROUP_ID points to a real Telegram group.
+
+        Same "0 (or falsy) means not configured" convention as
+        support_group_is_configured(), kept as a single source of truth for
+        gating the community-group Q&A, /purge, crypto, and moderation
+        routers.
+        """
+        return bool(self.TELEGRAM_COMMUNITY_GROUP_ID) and str(self.TELEGRAM_COMMUNITY_GROUP_ID) != "0"
+
+    def is_bot_owner(self, user_id: int) -> bool:
+        """
+        Whether user_id is the configured bot owner. Returns False whenever
+        BOT_OWNER_TELEGRAM_ID is unset, so no user is ever granted owner
+        authorization by omission.
+        """
+        return self.BOT_OWNER_TELEGRAM_ID is not None and int(user_id) == int(self.BOT_OWNER_TELEGRAM_ID)
 
     def is_authorized_email_sender(self, sender: str) -> bool:
         """

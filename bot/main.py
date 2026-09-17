@@ -6,6 +6,10 @@ from backend.config import settings
 from bot.api_client import BackendClient
 from bot.handlers.user_handlers import user_router
 from bot.handlers.support_handlers import support_router
+from bot.handlers.community_handlers import community_router
+from bot.handlers.moderation_handlers import moderation_router
+from bot.handlers.crypto_handlers import crypto_router
+from bot.handlers.setup_handlers import setup_router
 from bot.middlewares.throttling import ThrottlingMiddleware
 
 logging.basicConfig(level=logging.INFO)
@@ -23,8 +27,16 @@ def create_dispatcher(
     throttler = throttling_middleware or ThrottlingMiddleware()
     dp.message.middleware(throttler)
 
-    dp.include_router(user_router)
+    # Command-specific routers are registered before user_router: its
+    # handle_user_query matches any text in a private chat (no command
+    # exclusion), so it would otherwise swallow "/btc", "/mute", etc. before
+    # a more specific router ever saw them.
+    dp.include_router(setup_router)
     dp.include_router(support_router)
+    dp.include_router(community_router)
+    dp.include_router(moderation_router)
+    dp.include_router(crypto_router)
+    dp.include_router(user_router)
     return dp
 
 
