@@ -1,0 +1,30 @@
+# Security Policy
+
+## Supported Versions
+
+There are no released versions — this project ships continuously from the `main` branch. Only the latest commit on `main` is supported; please make sure you're up to date before reporting an issue.
+
+## Reporting a Vulnerability
+
+**Please do not open a public GitHub issue for security vulnerabilities.**
+
+Instead, email either:
+- michael.sagbo@epitech.eu
+- kantegilchrist@gmail.com
+
+Include:
+- A description of the vulnerability and its potential impact.
+- Steps to reproduce it (endpoint, payload, Telegram command — whatever applies).
+- Any relevant logs, with secrets/tokens redacted.
+
+This is a small project maintained on a best-effort basis — there's no guaranteed response time, but we'll do our best to acknowledge reports promptly and keep you updated as we work on a fix.
+
+## What's already in place
+
+The backend is checked on every change with:
+- `bandit` — Python AST security linter
+- `semgrep` — semantic multi-rule security analysis
+- `trivy` — dependency vulnerability and secret scanning
+- `pip-audit` — PyPA advisory vulnerability scanner
+
+See [backend/README.md](backend/README.md#testing--verification) for how to run these locally. Application-level protections (IDOR access control, webhook signature verification, rate limiting, access log redaction) are documented in the same file.

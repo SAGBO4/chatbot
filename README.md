@@ -133,6 +133,10 @@ See [backend/README.md](backend/README.md) for: community group setup (`/setup_c
 
 ---
 
+## Contributing
+
+Contributions are welcome — see [CONTRIBUTING.md](CONTRIBUTING.md) for the dev workflow and PR process. This project follows the [Code of Conduct](CODE_OF_CONDUCT.md). Found a security issue? See [SECURITY.md](SECURITY.md) instead of opening a public issue.
+
 ## License
 
 Released under the [MIT License](LICENSE).
