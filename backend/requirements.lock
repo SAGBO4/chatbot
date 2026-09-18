@@ -1,5 +1,6 @@
-# Fully pinned resolution of requirements.txt (direct + transitive
-# dependencies only - no dev tooling). Regenerate with:
+# Fully pinned resolution of requirements.txt: direct and transitive dependencies. Note that
+# requirements.txt itself lists pytest and pytest-asyncio, so they are pinned here too.
+# Regenerate with:
 #   pip install --target=/tmp/lock_pkgs -r requirements.txt
 #   pip list --path=/tmp/lock_pkgs --format=freeze | sort > requirements.lock
 # then verify with a clean `pip install -r requirements.lock` + `pytest`

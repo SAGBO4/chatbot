@@ -46,16 +46,15 @@ Mobile-first web frontend for the [Telegram Support Bot](../README.md) and Knowl
    - Ticket list with user filter (`?user_id=`)
    - Direct agent ticket resolution modal (`POST /api/tickets/{id}/resolve`) with automatic knowledge base re-indexing
 3. **Knowledge Base Explorer & Ingestion (`/knowledge`)**:
-   - Database metrics dashboard (`/api/knowledge/stats`)
-   - Article directory search and pagination (`/api/knowledge/articles`)
-   - Manual knowledge ingestion modal (`POST /api/knowledge/ingest`)
+   - Article list with client-side search (`GET /api/knowledge`; admins see up to 100 articles, other users 10)
+   - Manual knowledge ingestion modal (`POST /api/knowledge/ingest`), admin only
 4. **Live Crypto Market Data (`/crypto`)**:
-   - Real-time prices, 24h change percentage, market cap, and volume (`/api/crypto/prices`)
-   - Real-time search filter across tracked cryptocurrencies (BTC, ETH, FIRO, etc.)
-5. **Bot Settings & Moderation (`/settings`)**:
-   - Dynamic community group setup inspection (`/api/settings`)
-   - Live admin whitelist verification (`/api/settings/whitelist/check/{user_id}`)
-   - User moderation warnings history lookup (`/api/moderation/warnings/{user_id}`)
+   - Price, 24h change, market cap, and volume per asset (`GET /api/crypto/{symbol}`, one call per tracked symbol: BTC, ETH, FIRO, SOL, LTC, DOGE, XRP)
+   - Client-side search filter across the tracked cryptocurrencies
+5. **Bot Settings & Moderation (`/settings`)** (admin):
+   - Current community group (`GET /api/admin/settings/community_group_id`)
+   - Admin whitelist: list, add, remove and check a user (`/api/admin/whitelist`)
+   - Moderation warnings lookup for a user in a group (`GET /api/moderation/warnings?user_id=&group_id=`)
 
 ---
 
