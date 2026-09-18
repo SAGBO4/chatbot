@@ -19,7 +19,7 @@ A Telegram support bot with a knowledge base and an AI feedback loop: it answers
 ## How it works
 
 ```mermaid
-flowchart TD
+flowchart LR
     Telegram["Telegram"] --> Bot["Telegram Bot"]
     Bot --> API["Backend API"]
     API --> KB["Knowledge Base"]
