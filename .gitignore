@@ -17,3 +17,5 @@ frontend/.next/
 frontend/out/
 backend/data/*.db*
 !backend/data/.gitkeep
+tutorial_vps.html
+*.pdf

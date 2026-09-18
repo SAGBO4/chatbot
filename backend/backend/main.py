@@ -122,6 +122,11 @@ def verify_email_webhook_signature(raw_body: bytes, signature: Optional[str]) ->
     Raises HTTPException if the webhook secret is not configured (fail closed),
     the signature header is missing, or the signature does not match.
     """
+    if not settings.EMAIL_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email support is disabled (EMAIL_ENABLED=False).",
+        )
     if not settings.EMAIL_WEBHOOK_SECRET:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
@@ -391,16 +396,17 @@ async def create_ticket(
         automated_answer=payload.automated_answer,
     )
 
-    # Multi-channel alert: dispatch email notification to support team in the background
-    background_tasks.add_task(
-        _safe_background_task,
-        EmailService.send_ticket_created_notification,
-        ticket_id=ticket.id,
-        user_handle=ticket.user_handle,
-        user_id=ticket.user_id,
-        question=ticket.question,
-        automated_answer=ticket.automated_answer,
-    )
+    # Multi-channel alert: dispatch email notification to support team in the background if email is configured
+    if settings.is_email_configured():
+        background_tasks.add_task(
+            _safe_background_task,
+            EmailService.send_ticket_created_notification,
+            ticket_id=ticket.id,
+            user_handle=ticket.user_handle,
+            user_id=ticket.user_id,
+            question=ticket.question,
+            automated_answer=ticket.automated_answer,
+        )
 
     return ticket
 
@@ -508,8 +514,8 @@ async def resolve_ticket(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
 
-    # If newly resolved on Telegram, inform the email channel
-    if newly_resolved and channel.upper() == "TELEGRAM":
+    # If newly resolved on Telegram, inform the email channel if configured
+    if newly_resolved and channel.upper() == "TELEGRAM" and settings.is_email_configured():
         background_tasks.add_task(
             _safe_background_task,
             EmailService.send_ticket_resolved_notification,
@@ -675,6 +681,11 @@ def verify_brevo_inbound_token(
     Raises HTTPException if the secret is not configured (fail closed), the
     token is missing, or it does not match.
     """
+    if not settings.EMAIL_ENABLED:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Email support is disabled (EMAIL_ENABLED=False).",
+        )
     if not settings.BREVO_INBOUND_SECRET:
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,

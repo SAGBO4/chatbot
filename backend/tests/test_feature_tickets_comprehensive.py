@@ -614,3 +614,40 @@ async def test_tickets_background_tasks_uncaught_exception_isolated_and_logged(a
     error_logs = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
     assert any("failed with exception: Fatal SMTP drop" in msg for msg in error_logs)
     assert any("failed with exception: Fatal SMTP timeout" in msg for msg in error_logs)
+
+
+@pytest.mark.asyncio
+async def test_ticket_creation_and_resolution_bypasses_email_tasks_when_disabled(
+    app_test_env, monkeypatch
+):
+    """
+    Vérifie que lorsque EMAIL_ENABLED est False, aucun tâche d'envoi d'email
+    n'est planifiée lors de la création ou de la résolution d'un ticket.
+    """
+    client, session_maker, _ = app_test_env
+    monkeypatch.setattr(settings, "EMAIL_ENABLED", False)
+
+    with patch(
+        "backend.services.email_service.EmailService.send_ticket_created_notification"
+    ) as mock_send_created, patch(
+        "backend.services.email_service.EmailService.send_ticket_resolved_notification"
+    ) as mock_send_resolved:
+        # 1. Création du ticket
+        resp_create = await client.post(
+            "/api/tickets",
+            json={"user_id": 777, "question": "Pure Telegram query"},
+        )
+        assert resp_create.status_code == 201
+        ticket_id = resp_create.json()["id"]
+
+        # 2. Résolution sur Telegram
+        resp_resolve = await client.post(
+            f"/api/tickets/{ticket_id}/resolve",
+            json={"solution": "Pure Telegram resolution", "resolution_channel": "TELEGRAM"},
+        )
+        assert resp_resolve.status_code == 200
+
+        # Vérifier qu'aucun envoi d'email n'a été appelé
+        mock_send_created.assert_not_called()
+        mock_send_resolved.assert_not_called()
+

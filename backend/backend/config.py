@@ -169,5 +169,24 @@ class Settings(BaseSettings):
                 return True
         return False
 
+    def is_email_configured(self) -> bool:
+        """
+        Whether outgoing email support is enabled.
+        Returns True when EMAIL_ENABLED is set to True in configuration, False otherwise.
+        """
+        return bool(self.EMAIL_ENABLED)
+
+    def is_email_inbound_configured(self) -> bool:
+        """
+        Whether inbound email support is enabled and configured with at least one secret.
+        """
+        if not self.EMAIL_ENABLED:
+            return False
+        return bool(
+            (self.EMAIL_WEBHOOK_SECRET and self.EMAIL_WEBHOOK_SECRET.strip())
+            or (self.BREVO_INBOUND_SECRET and self.BREVO_INBOUND_SECRET.strip())
+        )
+
+
 
 settings = Settings()

@@ -16,6 +16,7 @@ TEST_API_KEY = "test-api-key"
 @pytest_asyncio.fixture
 async def brevo_test_client(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "API_KEY", TEST_API_KEY)
+    monkeypatch.setattr(settings, "EMAIL_ENABLED", True)
 
     db_file = tmp_path / "brevo_inbound_test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_file}", echo=False)
@@ -291,3 +292,30 @@ async def test_brevo_item_with_raw_text_body_only_resolves(brevo_test_client, mo
     assert resp.status_code == 200
     data = resp.json()
     assert data["results"][0]["status"] == "resolved"
+
+
+@pytest.mark.asyncio
+async def test_brevo_webhook_rejected_when_email_disabled(brevo_test_client, monkeypatch):
+    """
+    Vérifie que lorsque EMAIL_ENABLED est False, l'endpoint Brevo retourne
+    immédiatement HTTP 503 Service Unavailable.
+    """
+    monkeypatch.setattr(settings, "EMAIL_ENABLED", False)
+    monkeypatch.setattr(settings, "BREVO_INBOUND_SECRET", TEST_BREVO_SECRET)
+    client, _ = brevo_test_client
+
+    payload = {
+        "items": [
+            {
+                "From": {"Address": "agent@company.com"},
+                "Subject": "Re: [Ticket #1] Test",
+                "RawTextBody": "Solution",
+            }
+        ]
+    }
+    resp = await client.post(
+        f"/api/webhooks/email-inbound/brevo?token={TEST_BREVO_SECRET}", json=payload
+    )
+    assert resp.status_code == 503
+    assert "Email support is disabled" in resp.json()["detail"]
+

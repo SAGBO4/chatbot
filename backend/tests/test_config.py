@@ -85,3 +85,36 @@ def test_blank_bot_owner_id_env_var_does_not_crash(monkeypatch):
     s = Settings(_env_file=None)
     assert s.BOT_OWNER_TELEGRAM_ID is None
     assert s.is_bot_owner(1) is False
+
+
+def test_is_email_configured():
+    # Disabled by default
+    s_default = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
+    assert s_default.is_email_configured() is False
+
+    # Disabled explicitly
+    s_disabled = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=False)
+    assert s_disabled.is_email_configured() is False
+
+    # Enabled
+    s_enabled = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=True)
+    assert s_enabled.is_email_configured() is True
+
+
+def test_is_email_inbound_configured():
+    # Disabled
+    s_default = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
+    assert s_default.is_email_inbound_configured() is False
+
+    # Enabled without secret
+    s_no_secret = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=True)
+    assert s_no_secret.is_email_inbound_configured() is False
+
+    # Enabled with EMAIL_WEBHOOK_SECRET
+    s_generic = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=True, EMAIL_WEBHOOK_SECRET="secret")
+    assert s_generic.is_email_inbound_configured() is True
+
+    # Enabled with BREVO_INBOUND_SECRET
+    s_brevo = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=True, BREVO_INBOUND_SECRET="secret")
+    assert s_brevo.is_email_inbound_configured() is True
+
