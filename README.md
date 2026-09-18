@@ -6,7 +6,7 @@
   </picture>
 </p>
 
-# Telegram Support Bot with Knowledge Base & AI Feedback Loop
+# 🤖 Telegram Support Bot with Knowledge Base & AI Feedback Loop
 
 This project implements a complete automated support system on Telegram, connected to a FastAPI Backend API, an evolving knowledge base, and a configurable AI module.
 
