@@ -104,22 +104,31 @@ git clone <repo_url>
 cd chatbot
 ```
 
-Minimal path to a running stack (see the linked READMEs for full details, configuration options, and production setup):
+Minimal path to a running stack (see the linked READMEs for full details, configuration options, and production setup). One-time setup:
 
 ```bash
-# 1. Backend API + Telegram bot
 cd backend
 pip install -r requirements.txt
-cp ../.env.example .env   # then fill in TELEGRAM_BOT_TOKEN, TELEGRAM_SUPPORT_GROUP_ID, BOT_OWNER_TELEGRAM_ID
+cp ../.env.example .env   # fill in TELEGRAM_BOT_TOKEN, TELEGRAM_SUPPORT_GROUP_ID, BOT_OWNER_TELEGRAM_ID
 alembic upgrade head
 python -m scripts.seed_knowledge_base
-uvicorn backend.main:app --reload --port 8000   # terminal 1
-python -m bot.main                              # terminal 2
+```
 
-# 2. Frontend
-cd ../frontend
-npm install
-npm run dev                                     # terminal 3
+Then start these three separately — each keeps running, so use three terminals (or tabs):
+
+**Backend API**
+```bash
+cd backend && uvicorn backend.main:app --reload --port 8000
+```
+
+**Telegram bot**
+```bash
+cd backend && python -m bot.main
+```
+
+**Frontend**
+```bash
+cd frontend && npm install && npm run dev
 ```
 
 See [backend/README.md](backend/README.md) for: community group setup (`/setup_community`), inbound email webhooks, Docker Compose (SQLite or production PostgreSQL), reverse proxy hardening, rate limiting, and the automated test suite.
