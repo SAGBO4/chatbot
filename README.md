@@ -11,8 +11,7 @@
 <h1 align="center">Stack Wallet Support Bot</h1>
 
 <p align="center">
-  <a href="https://github.com/SAGBO4/chatbot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SAGBO4/chatbot/actions/workflows/ci.yml/badge.svg?branch=main"></a>
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/SAGBO4/chatbot?color=blue"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.13-blue.svg">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18.18-339933.svg">
 </p>
