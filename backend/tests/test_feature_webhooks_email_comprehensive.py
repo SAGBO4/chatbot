@@ -550,3 +550,25 @@ async def test_webhooks_email_background_telegram_exception_isolated_and_logged(
     # Vérification que l'erreur a été loggée par _safe_background_task
     error_logs = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
     assert any("failed with exception" in msg for msg in error_logs)
+
+
+@pytest.mark.asyncio
+async def test_webhooks_email_disabled_returns_503(app_test_env, monkeypatch):
+    """
+    Vérifie que lorsque EMAIL_ENABLED est False, l'endpoint /api/webhooks/email-inbound
+    rejette immédiatement la requête avec HTTP 503 Service Unavailable.
+    """
+    client, _, _ = app_test_env
+    monkeypatch.setattr(settings, "EMAIL_ENABLED", False)
+
+    payload = {"sender": "support@example.com", "subject": "[Ticket #123]", "body": "Solution"}
+    raw_bytes, sig = sign_body(payload)
+
+    resp = await client.post(
+        "/api/webhooks/email-inbound",
+        content=raw_bytes,
+        headers={"Content-Type": "application/json", "X-Webhook-Signature": sig},
+    )
+    assert resp.status_code == 503
+    assert "Email support is disabled" in resp.json()["detail"]
+

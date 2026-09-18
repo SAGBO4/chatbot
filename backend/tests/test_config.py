@@ -85,3 +85,58 @@ def test_blank_bot_owner_id_env_var_does_not_crash(monkeypatch):
     s = Settings(_env_file=None)
     assert s.BOT_OWNER_TELEGRAM_ID is None
     assert s.is_bot_owner(1) is False
+
+
+def test_is_email_configured():
+    # Disabled by default
+    s_default = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
+    assert s_default.is_email_configured() is False
+
+    # Enabled but with placeholder host
+    s_placeholder = Settings(
+        _env_file=None,
+        TELEGRAM_BOT_TOKEN="t",
+        EMAIL_ENABLED=True,
+        SMTP_HOST="smtp.example.com",
+        SUPPORT_EMAIL_RECIPIENT="real@stackwallet.com",
+    )
+    assert s_placeholder.is_email_configured() is False
+
+    # Enabled but with placeholder recipient
+    s_placeholder_recip = Settings(
+        _env_file=None,
+        TELEGRAM_BOT_TOKEN="t",
+        EMAIL_ENABLED=True,
+        SMTP_HOST="smtp.mailgun.org",
+        SUPPORT_EMAIL_RECIPIENT="support-team@example.com",
+    )
+    assert s_placeholder_recip.is_email_configured() is False
+
+    # Fully configured
+    s_valid = Settings(
+        _env_file=None,
+        TELEGRAM_BOT_TOKEN="t",
+        EMAIL_ENABLED=True,
+        SMTP_HOST="smtp.brevo.com",
+        SUPPORT_EMAIL_RECIPIENT="support@stackwallet.com",
+    )
+    assert s_valid.is_email_configured() is True
+
+
+def test_is_email_inbound_configured():
+    # Disabled
+    s_default = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
+    assert s_default.is_email_inbound_configured() is False
+
+    # Enabled without secret
+    s_no_secret = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=True)
+    assert s_no_secret.is_email_inbound_configured() is False
+
+    # Enabled with EMAIL_WEBHOOK_SECRET
+    s_generic = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=True, EMAIL_WEBHOOK_SECRET="secret")
+    assert s_generic.is_email_inbound_configured() is True
+
+    # Enabled with BREVO_INBOUND_SECRET
+    s_brevo = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=True, BREVO_INBOUND_SECRET="secret")
+    assert s_brevo.is_email_inbound_configured() is True
+

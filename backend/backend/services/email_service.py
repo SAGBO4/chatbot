@@ -50,6 +50,10 @@ class EmailService:
             logger.debug("Email dispatch bypassed (EMAIL_ENABLED=False).")
             return True
 
+        if not custom_sender and not settings.is_email_configured():
+            logger.debug("Email dispatch bypassed (email is not fully configured).")
+            return True
+
         recipient = to_email or settings.SUPPORT_EMAIL_RECIPIENT
         msg = EmailMessage()
         msg["Subject"] = subject

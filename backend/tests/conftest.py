@@ -75,6 +75,7 @@ async def app_test_env(tmp_path, monkeypatch):
     Yields (client, session_maker, engine).
     """
     monkeypatch.setattr(settings, "API_KEY", TEST_API_KEY)
+    monkeypatch.setattr(settings, "EMAIL_ENABLED", True)
     monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", TEST_EMAIL_WEBHOOK_SECRET)
     monkeypatch.setattr(settings, "BREVO_INBOUND_SECRET", TEST_BREVO_INBOUND_SECRET)
     monkeypatch.setattr(settings, "AI_ENABLED", False)

@@ -169,5 +169,31 @@ class Settings(BaseSettings):
                 return True
         return False
 
+    def is_email_configured(self) -> bool:
+        """
+        Whether outgoing email support is enabled and minimally configured with valid parameters.
+        Returns False if EMAIL_ENABLED is False, or if SMTP_HOST or SUPPORT_EMAIL_RECIPIENT
+        are unset or match default example placeholders.
+        """
+        if not self.EMAIL_ENABLED:
+            return False
+        if not self.SMTP_HOST or self.SMTP_HOST.strip() in ("", "smtp.example.com"):
+            return False
+        if not self.SUPPORT_EMAIL_RECIPIENT or self.SUPPORT_EMAIL_RECIPIENT.strip() in ("", "support-team@example.com"):
+            return False
+        return True
+
+    def is_email_inbound_configured(self) -> bool:
+        """
+        Whether inbound email support is enabled and configured with at least one secret.
+        """
+        if not self.EMAIL_ENABLED:
+            return False
+        return bool(
+            (self.EMAIL_WEBHOOK_SECRET and self.EMAIL_WEBHOOK_SECRET.strip())
+            or (self.BREVO_INBOUND_SECRET and self.BREVO_INBOUND_SECRET.strip())
+        )
+
+
 
 settings = Settings()
