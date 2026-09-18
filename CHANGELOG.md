@@ -27,6 +27,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - `.gitignore`: every `.env*` file is ignored except `.env.example`; OS files (`.DS_Store`, `Thumbs.db`) too.
 - `.env.example`: `AI_PROVIDER=gemini`.
 - The test-count claims in the docs now say "400+" instead of a number that goes stale.
+- **Production compose stack:** `POSTGRES_PASSWORD` is now required (it silently defaulted to `postgres`), and the API is published on `127.0.0.1:8000` instead of all interfaces, so it is reachable only through the reverse proxy. Documented `POSTGRES_*` in `.env.example`.
 
 ### Removed
 - Internal spec-driven-development scaffolding: `.agents/` and `openspec/`.
@@ -38,6 +39,9 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - A test that checks the Brevo token never appears in application logs could pass without checking anything if no log was captured; it now asserts that logs were captured.
 - Backend docstrings and comments that described behavior the code does not have (Alembic "not used", "normalized" and "top" keywords in the knowledge base, `is_authorized` allowing whitelist management, the API key "sent even if unset", `/purge` deleting any bot message) were corrected, and comments pointing at deleted spec documents were removed.
 - `frontend/README.md` listed six backend endpoints that do not exist; it now lists the ones the frontend calls.
+- Bot: `/mute`, `/unmute`, `/ban`, `/kick` and `/warn` sent as a reply to a member's message were ignored, and so was a question asked as a reply in a private chat. The support-group reply handler was consuming every reply in every chat.
+- `deploy/Caddyfile` did not redact anything: the `token` query parameter was written to the access log in clear text (tested with Caddy 2.11). It now redacts the query secrets and the `X-Webhook-Token`, `X-Brevo-Token` and `X-Api-Key` headers.
+- Five routing tests passed without checking anything because the bot's throttling was dropping their messages; they now use separate users and assert no throttling happened.
 
 ## Earlier history (2026-09-12 to 2026-09-18)
 

@@ -138,11 +138,12 @@ docker compose up --build -d
 ```
 
 #### Docker Compose Mode (Production PostgreSQL 16):
-For high-volume production deployments with multiple concurrent support agents, use the dedicated PostgreSQL stack:
+For high-volume production deployments with multiple concurrent support agents, use the dedicated PostgreSQL stack. Set `POSTGRES_PASSWORD` in `backend/.env` first (URL-safe characters only, e.g. `openssl rand -hex 24`): there is no default, and the stack refuses to start without it.
 ```bash
 cd backend
 docker compose -f docker-compose.prod.yml up --build -d
 ```
+The API is published on `127.0.0.1:8000` only, so put the reverse proxy described in the next section in front of it; that is also what keeps secrets out of the access logs.
 
 ## 6. Production Reverse Proxy & Webhook Hardening
 
