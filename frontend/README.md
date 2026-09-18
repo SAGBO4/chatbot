@@ -1,13 +1,11 @@
 <p align="center">
-  <img src="public/stack-wallet-bot.png" width="140" alt="Stack Wallet Bot">
-</p>
-
-<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="public/stack-logo-white.png">
     <source media="(prefers-color-scheme: light)" srcset="public/stack-logo-full.png">
-    <img alt="Stack Wallet" src="public/stack-logo-full.png" width="260">
+    <img alt="Stack Wallet" src="public/stack-logo-full.png" width="260" valign="middle">
   </picture>
+  &nbsp;&nbsp;&nbsp;
+  <img src="public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
 </p>
 
 # Stack Wallet Support Portal (Telegram WebApp & Web Portal)

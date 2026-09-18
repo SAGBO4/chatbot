@@ -1,3 +1,13 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="../frontend/public/stack-logo-white.png">
+    <source media="(prefers-color-scheme: light)" srcset="../frontend/public/stack-logo-full.png">
+    <img alt="Stack Wallet" src="../frontend/public/stack-logo-full.png" width="260" valign="middle">
+  </picture>
+  &nbsp;&nbsp;&nbsp;
+  <img src="../frontend/public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
+</p>
+
 # Backend — API, Telegram Bot & Infrastructure
 
 FastAPI backend, Telegram bot (aiogram 3), and supporting infrastructure for the [Telegram Support Bot](../README.md) project. See the [root README](../README.md) for the product overview, architecture diagram, and feature list.
