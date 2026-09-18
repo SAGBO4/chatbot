@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="public/stack-wallet-bot.svg" width="120" alt="Stack Wallet Bot">
+  <img src="public/stack-wallet-bot.png" width="140" alt="Stack Wallet Bot">
 </p>
 
 <p align="center">
