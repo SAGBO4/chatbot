@@ -6,7 +6,7 @@
 &nbsp;&nbsp;&nbsp;
 <img src="frontend/public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
 
-# Stack Wallet telegram Support Bot
+# Stack Wallet Telegram Support Bot
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.13-blue.svg)
@@ -18,42 +18,19 @@ A Telegram support bot with a knowledge base and an AI feedback loop: it answers
 
 ## How it works
 
-```
-                    TELEGRAM
-                       │
-                       ▼
-                ┌──────────────┐
-                │ Telegram Bot │
-                └──────┬───────┘
-                       │
-                       ▼
-                ┌──────────────┐
-                │ Backend API  │
-                └──────┬───────┘
-                       │
-             ┌─────────┴─────────┐
-             ▼                   ▼
-      Knowledge Base       AI (Optional)
-             │                   │
-             └─────────┬─────────┘
-                       ▼
-                  User Answer
-                       │
-                Issue resolved?
-                    /       \
-                  YES        NO
-                   │          │
-                   ▼          ▼
-                  END       TICKET
-                              │
-                              ▼
-                         SUPPORT TEAM (Telegram Group)
-                              │
-                              ▼
-                         New Solution
-                              │
-                              ▼
-                        Knowledge Base
+```mermaid
+flowchart TD
+    Telegram["Telegram"] --> Bot["Telegram Bot"]
+    Bot --> API["Backend API"]
+    API --> KB["Knowledge Base"]
+    API --> AI["AI (optional)"]
+    KB --> Answer["Answer sent to user"]
+    AI --> Answer
+    Answer --> Resolved{"Issue resolved?"}
+    Resolved -->|Yes| Done["Done"]
+    Resolved -->|No| Ticket["Ticket created"]
+    Ticket --> Support["Support team<br/>(Telegram group)"]
+    Support --> Solution["New solution<br/>indexed into the Knowledge Base"]
 ```
 
 A user asks a question, the bot searches the knowledge base (optionally backed by an LLM), and shows a YES/NO button to confirm it actually helped. A "no" opens a ticket in your private support group — an agent just replies to that message, the user gets the answer, and it's indexed back into the knowledge base for next time.
