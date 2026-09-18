@@ -19,9 +19,11 @@ import {
   Check,
   User,
 } from 'lucide-react';
+import { useTelegram } from '@/lib/telegram/TelegramContext';
 
 export const TicketList: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { user, isAdmin } = useTelegram();
   const [tickets, setTickets] = useState<TicketResponse[]>([]);
   const [userIdFilter, setUserIdFilter] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(true);
@@ -39,7 +41,8 @@ export const TicketList: React.FC = () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await api.getTickets(userId);
+      const targetUserId = isAdmin ? userId : (user?.id || undefined);
+      const data = await api.getTickets(targetUserId);
       setTickets(data);
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || 'Erreur lors du chargement des tickets';
@@ -53,7 +56,8 @@ export const TicketList: React.FC = () => {
     let ignore = false;
     const loadInitialTickets = async () => {
       try {
-        const data = await api.getTickets();
+        const targetUserId = isAdmin ? undefined : (user?.id || undefined);
+        const data = await api.getTickets(targetUserId);
         if (!ignore) {
           setTickets(data);
           setIsLoading(false);
@@ -70,7 +74,7 @@ export const TicketList: React.FC = () => {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [user, isAdmin]);
 
   const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
@@ -120,26 +124,39 @@ export const TicketList: React.FC = () => {
     <div className="space-y-6">
       {/* Filter and Action Header */}
       <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4 bg-white/[0.03] backdrop-blur-2xl border border-white/[0.08] p-4 rounded-2xl">
-        <form onSubmit={handleSearch} className="flex flex-1 items-center gap-2 max-w-md">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
-            <input
-              type="text"
-              placeholder={t.filterPlaceholder}
-              value={userIdFilter}
-              onChange={(e) => setUserIdFilter(e.target.value)}
-              className="w-full rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/[0.1] pl-9 pr-3 py-2 text-xs text-white placeholder-neutral-500 focus:border-white/40 focus:outline-none focus:ring-1 focus:ring-white/20"
-            />
-          </div>
-          <Button type="submit" variant="primary" size="sm">
-            {t.btnFilter}
-          </Button>
-          {userIdFilter && (
-            <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
-              {t.btnClear}
+        {isAdmin ? (
+          <form onSubmit={handleSearch} className="flex flex-1 items-center gap-2 max-w-md">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
+              <input
+                type="text"
+                placeholder={t.filterPlaceholder}
+                value={userIdFilter}
+                onChange={(e) => setUserIdFilter(e.target.value)}
+                className="w-full rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/[0.1] pl-9 pr-3 py-2 text-xs text-white placeholder-neutral-500 focus:border-white/40 focus:outline-none focus:ring-1 focus:ring-white/20"
+              />
+            </div>
+            <Button type="submit" variant="primary" size="sm">
+              {t.btnFilter}
             </Button>
-          )}
-        </form>
+            {userIdFilter && (
+              <Button type="button" variant="ghost" size="sm" onClick={handleReset}>
+                {t.btnClear}
+              </Button>
+            )}
+          </form>
+        ) : (
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-semibold text-white">
+              {locale === 'fr' ? 'Mes demandes d’assistance' : 'My Support Requests'}
+            </span>
+            {user && (
+              <span className="text-[10px] text-neutral-400 bg-white/[0.06] border border-white/10 px-2 py-0.5 rounded-full">
+                ID {user.id}
+              </span>
+            )}
+          </div>
+        )}
 
         <div className="flex items-center gap-2 justify-end">
           <Button
@@ -147,7 +164,7 @@ export const TicketList: React.FC = () => {
             variant="secondary"
             size="sm"
             onClick={() => {
-              const parsedId = userIdFilter.trim() ? parseInt(userIdFilter.trim(), 10) : undefined;
+              const parsedId = isAdmin && userIdFilter.trim() ? parseInt(userIdFilter.trim(), 10) : (isAdmin ? undefined : user?.id);
               fetchTickets(parsedId);
             }}
             isLoading={isLoading}
@@ -239,8 +256,8 @@ export const TicketList: React.FC = () => {
                 </div>
               )}
 
-              {/* Agent Resolve Action button for Open/Pending tickets */}
-              {ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED' && (
+              {/* Agent Resolve Action button for Open/Pending tickets (Admin only) */}
+              {isAdmin && ticket.status !== 'RESOLVED' && ticket.status !== 'CLOSED' && (
                 <div className="mt-3.5 pt-3 border-t border-white/[0.08] flex justify-end">
                   <Button
                     variant="outline"
@@ -257,8 +274,8 @@ export const TicketList: React.FC = () => {
         </div>
       )}
 
-      {/* Modal: Resolve Ticket as Support Agent */}
-      {selectedTicket && (
+      {/* Modal: Resolve Ticket as Support Agent (Admin only) */}
+      {isAdmin && selectedTicket && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 bg-black/80 backdrop-blur-md">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-black/95 border border-white/[0.12] p-5 sm:p-6 shadow-2xl relative">
             <button

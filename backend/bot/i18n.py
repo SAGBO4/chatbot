@@ -103,8 +103,8 @@ TRANSLATIONS = {
         "en": "✅ **Ticket #{ticket_id} resolved!**\n• The reply was forwarded to the user (`ID: {user_id}`).\n• The solution was automatically added to the knowledge base.",
     },
     "support_resolution_error": {
-        "fr": "❌ **Erreur lors de la résolution du ticket #{ticket_id}** : {error}",
-        "en": "❌ **Error resolving ticket #{ticket_id}**: {error}",
+        "fr": "❌ **Erreur lors de la résolution du ticket #{ticket_id}** (voir les logs pour le détail).",
+        "en": "❌ **Error resolving ticket #{ticket_id}** (see logs for details).",
     },
 
     # --- community_handlers.py ---
@@ -151,8 +151,8 @@ TRANSLATIONS = {
         "en": "⚠️ Specify the target by replying to their message, or by giving their Telegram ID as the first argument (e.g. `/mute 123456789 3600`).",
     },
     "moderation_mute_error": {
-        "fr": "❌ Impossible de mute cet utilisateur : {error}",
-        "en": "❌ Could not mute this user: {error}",
+        "fr": "❌ Impossible de mute cet utilisateur (voir les logs pour le détail).",
+        "en": "❌ Could not mute this user (see logs for details).",
     },
     "moderation_mute_success": {
         "fr": "🔇 *{name}* a été mute {duration_text}.",
@@ -167,32 +167,32 @@ TRANSLATIONS = {
         "en": "indefinitely",
     },
     "moderation_unmute_error": {
-        "fr": "❌ Impossible de unmute cet utilisateur : {error}",
-        "en": "❌ Could not unmute this user: {error}",
+        "fr": "❌ Impossible de unmute cet utilisateur (voir les logs pour le détail).",
+        "en": "❌ Could not unmute this user (see logs for details).",
     },
     "moderation_unmute_success": {
         "fr": "🔊 *{name}* a été unmute.",
         "en": "🔊 *{name}* has been unmuted.",
     },
     "moderation_ban_error": {
-        "fr": "❌ Impossible de bannir cet utilisateur : {error}",
-        "en": "❌ Could not ban this user: {error}",
+        "fr": "❌ Impossible de bannir cet utilisateur (voir les logs pour le détail).",
+        "en": "❌ Could not ban this user (see logs for details).",
     },
     "moderation_ban_success": {
         "fr": "🚫 *{name}* a été banni du groupe.",
         "en": "🚫 *{name}* has been banned from the group.",
     },
     "moderation_kick_error": {
-        "fr": "❌ Impossible d'expulser cet utilisateur : {error}",
-        "en": "❌ Could not kick this user: {error}",
+        "fr": "❌ Impossible d'expulser cet utilisateur (voir les logs pour le détail).",
+        "en": "❌ Could not kick this user (see logs for details).",
     },
     "moderation_kick_success": {
         "fr": "👢 *{name}* a été expulsé du groupe (peut revenir).",
         "en": "👢 *{name}* has been kicked from the group (can rejoin).",
     },
     "moderation_warn_error": {
-        "fr": "❌ Impossible d'enregistrer l'avertissement : {error}",
-        "en": "❌ Could not record the warning: {error}",
+        "fr": "❌ Impossible d'enregistrer l'avertissement (voir les logs pour le détail).",
+        "en": "❌ Could not record the warning (see logs for details).",
     },
     "moderation_warn_success": {
         "fr": "⚠️ *{name}* a reçu un avertissement{reason_text}. Total : {total}.",

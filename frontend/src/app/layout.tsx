@@ -29,15 +29,13 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="fr" className="dark">
-      <head>
+    <html lang="fr" className="dark" suppressHydrationWarning>
+      <body className="flex min-h-screen min-h-[100dvh] flex-col bg-[#0a0e17] text-slate-100 antialiased selection:bg-blue-600/30 selection:text-white overflow-x-hidden relative">
         {/* Telegram WebApp official script for seamless Mini App integration */}
         <Script
           src="https://telegram.org/js/telegram-web-app.js"
           strategy="beforeInteractive"
         />
-      </head>
-      <body className="flex min-h-screen min-h-[100dvh] flex-col bg-[#0a0e17] text-slate-100 antialiased selection:bg-blue-600/30 selection:text-white overflow-x-hidden relative">
         <TelegramProvider>
           <LanguageProvider>
             {/* Ambient soft glow at top */}

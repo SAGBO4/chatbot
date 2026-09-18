@@ -26,6 +26,11 @@ def create_dispatcher(
 
     throttler = throttling_middleware or ThrottlingMiddleware()
     dp.message.middleware(throttler)
+    # Callback queries (inline button clicks, e.g. "resolve:yes/no") each
+    # trigger a backend call just like a message does, so they must be rate
+    # limited the same way - otherwise a user can bypass all message
+    # throttling by rapid-clicking a button instead of typing.
+    dp.callback_query.middleware(throttler)
 
     # Command-specific routers are registered before user_router: its
     # handle_user_query matches any text in a private chat (no command
