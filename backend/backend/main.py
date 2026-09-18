@@ -488,7 +488,9 @@ async def attach_support_card(
     response_model=TicketResponse,
     dependencies=[Depends(verify_api_key)],
 )
+@limiter.limit("15/minute")
 async def resolve_ticket(
+    request: Request,
     ticket_id: int,
     payload: TicketResolveRequest,
     background_tasks: BackgroundTasks,

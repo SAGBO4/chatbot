@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 from aiogram import Router, Bot
 from aiogram.types import Message, ChatPermissions
 from aiogram.filters import Command, CommandObject
-from bot.admin_check import is_group_admin
+from bot.admin_check import is_group_admin, invalidate_admin_cache
 from bot.group_scope import is_community_group_chat
 from bot.api_client import BackendClient
 from bot.language import get_active_language

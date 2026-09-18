@@ -134,9 +134,33 @@ def test_fastapi_rate_limiter():
         assert res.status_code == 200
         assert res.json() == {"status": "ok"}
 
-    # 4th request gets 429
     res4 = client.get("/limited-endpoint")
     assert res4.status_code == 429
     data = res4.json() if "json" in res4.headers.get("content-type", "") else {}
     msg = data.get("detail") or data.get("error") or res4.text
     assert "rate limit exceeded" in str(msg).lower()
+
+
+def test_resolve_ticket_rate_limiting(monkeypatch):
+    """Verify that ticket resolution endpoint is rate limited."""
+    from backend.main import app as main_app
+    from backend.config import settings
+
+    test_key = "test-api-key-rate-limit-123"
+    monkeypatch.setattr(settings, "API_KEY", test_key)
+
+    client = TestClient(main_app)
+    headers = {"X-API-Key": test_key}
+
+    # Call 16 times in succession (limit is 15/minute)
+    responses = []
+    for _ in range(16):
+        res = client.post(
+            "/api/tickets/99999/resolve",
+            json={"solution": "test fix", "resolved_by": "tester"},
+            headers=headers,
+        )
+        responses.append(res.status_code)
+
+    # 16th request must trigger 429 rate limit exceeded
+    assert 429 in responses, f"Expected 429 in responses, got {responses}"

@@ -65,3 +65,31 @@ async def test_different_users_are_cached_independently():
     assert admin_result is True
     assert member_result is False
     assert bot.get_chat_member.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_force_refresh_bypasses_cache():
+    bot = AsyncMock()
+    bot.get_chat_member.return_value = MagicMock(status="administrator")
+    await admin_check.is_group_admin(bot, chat_id=-100, user_id=1)
+    await admin_check.is_group_admin(bot, chat_id=-100, user_id=1, force_refresh=True)
+    assert bot.get_chat_member.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_invalidate_admin_cache_clears_entries():
+    bot = AsyncMock()
+    bot.get_chat_member.return_value = MagicMock(status="administrator")
+    await admin_check.is_group_admin(bot, chat_id=-100, user_id=1)
+    await admin_check.is_group_admin(bot, chat_id=-100, user_id=2)
+
+    # Invalidate specific user
+    admin_check.invalidate_admin_cache(chat_id=-100, user_id=1)
+    await admin_check.is_group_admin(bot, chat_id=-100, user_id=1)
+    # user 1 called again (2 calls total for user 1, 1 for user 2)
+    assert bot.get_chat_member.call_count == 3
+
+    # Invalidate all
+    admin_check.invalidate_admin_cache()
+    await admin_check.is_group_admin(bot, chat_id=-100, user_id=2)
+    assert bot.get_chat_member.call_count == 4

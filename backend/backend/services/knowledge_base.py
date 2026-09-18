@@ -1,5 +1,6 @@
 import re
 import math
+import asyncio
 from collections import Counter
 from typing import List, Tuple, Optional, Set
 from sqlalchemy import select, or_
@@ -215,7 +216,7 @@ class KnowledgeBaseService:
                 prefix_term = f"%{token[:4]}%"
                 conditions.append(KnowledgeArticle.question.ilike(prefix_term))
                 conditions.append(KnowledgeArticle.keywords.ilike(prefix_term))
-        stmt = stmt.where(or_(*conditions))
+        stmt = stmt.where(or_(*conditions)).limit(200)
             
         result = await session.execute(stmt)
         articles = list(result.scalars().all())
@@ -245,6 +246,26 @@ class KnowledgeBaseService:
             if not articles:
                 return []
 
+        # Run CPU-bound scoring and n-gram computation off the main asyncio event loop
+        return await asyncio.to_thread(
+            cls._score_and_rank_articles,
+            articles=articles,
+            query_text=query_text,
+            query_vec=query_vec,
+            threshold=threshold,
+            limit=limit,
+        )
+
+    @classmethod
+    def _score_and_rank_articles(
+        cls,
+        articles: List[KnowledgeArticle],
+        query_text: str,
+        query_vec: Counter,
+        threshold: float,
+        limit: int,
+    ) -> List[Tuple[KnowledgeArticle, float]]:
+        """Synchronous CPU worker computing similarities without starving the async loop."""
         scored: List[Tuple[KnowledgeArticle, float]] = []
 
         for article in articles:
