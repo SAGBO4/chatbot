@@ -1,6 +1,5 @@
 .venv
 .git
-.agents
 __pycache__
 *.pyc
 *.pyo

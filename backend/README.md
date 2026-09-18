@@ -58,8 +58,8 @@ source .venv/bin/activate
 cd backend
 pip install -r requirements.txt
 
-# Copy configuration template
-cp .env.example .env
+# Copy configuration template (defined once at the repo root)
+cp ../.env.example .env
 ```
 
 ## 2. Configure the `.env` File
