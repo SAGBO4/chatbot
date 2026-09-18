@@ -1,4 +1,10 @@
-# Contributing
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="frontend/public/stack-logo-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="frontend/public/stack-logo-full.png">
+  <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="220">
+</picture>
+
+<h1><img src="frontend/public/stack-wallet-contributing.png" width="54" alt="Contributing Guide" valign="middle"> Contributing</h1>
 
 Thanks for taking the time to contribute. This is a small project maintained on a best-effort basis, so please be patient with review times.
 

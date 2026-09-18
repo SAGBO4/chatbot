@@ -1,4 +1,10 @@
-# Contributor Covenant Code of Conduct
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="frontend/public/stack-logo-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="frontend/public/stack-logo-full.png">
+  <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="220">
+</picture>
+
+<h1><img src="frontend/public/stack-wallet-conduct.png" width="54" alt="Code of Conduct" valign="middle"> Contributor Covenant Code of Conduct</h1>
 
 ## Our Pledge
 

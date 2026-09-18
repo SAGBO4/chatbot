@@ -1,4 +1,10 @@
-# Security Policy
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="frontend/public/stack-logo-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="frontend/public/stack-logo-full.png">
+  <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="220">
+</picture>
+
+<h1><img src="frontend/public/stack-wallet-security.png" width="54" alt="Security Policy" valign="middle"> Security Policy</h1>
 
 ## Supported Versions
 
