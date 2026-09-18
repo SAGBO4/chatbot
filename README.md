@@ -4,7 +4,7 @@
   <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="260">
 </picture>
 
-<h1><img src="frontend/public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle"> Stack Wallet Telegram Support Bot</h1>
+<h1><img src="frontend/public/stack-wallet-bot.png" width="54" alt="Stack Wallet Bot" valign="middle"> Stack Wallet Telegram Support Bot</h1>
 
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 ![Python](https://img.shields.io/badge/python-3.13-blue.svg)
