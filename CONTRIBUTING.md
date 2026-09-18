@@ -61,6 +61,7 @@ If you added or changed backend behavior, add or update tests — see [backend/R
 - Target the `dev` branch, not `main`.
 - Describe what changed and why, not just what — the diff already shows what.
 - Link the issue it addresses, if any.
+- Add a line under **Unreleased** in [CHANGELOG.md](CHANGELOG.md) for anything a user or a contributor would notice.
 - Make sure CI is green before requesting review.
 
 ## Reporting bugs

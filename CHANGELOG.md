@@ -1,0 +1,62 @@
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="frontend/public/stack-logo-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="frontend/public/stack-logo-full.png">
+  <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="220">
+</picture>
+
+<h1><img src="frontend/public/stack-wallet-bot.png" width="54" alt="Stack Wallet Bot" valign="middle"> Changelog</h1>
+
+All notable changes to this project are documented here. The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
+
+No version has been tagged yet, so changes are listed under **Unreleased**, and the history before that is grouped by date.
+
+## [Unreleased]
+
+### Added
+- Community files: [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1), [SECURITY.md](SECURITY.md), issue forms and a pull request template.
+- CI: a `frontend` job (`npm ci`, lint, build) next to the backend job.
+- `frontend/.env.example` and documentation of the frontend proxy: `BACKEND_API_URL`, `BACKEND_API_KEY`, `TELEGRAM_BOT_TOKEN`, and who can do what through it.
+- Stack Wallet banners and bot illustrations in the READMEs and community files; a Mermaid diagram of the support flow.
+- `"license": "MIT"` in `frontend/package.json`.
+
+### Changed
+- **Breaking:** the Python package `backend/backend/` is now `backend/app/`. The server entrypoint is `uvicorn app.main:app` (was `backend.main:app`); update any script, Docker command or import that used the old name.
+- The single 275-line README, duplicated in `backend/`, is split into a root README (overview, quickstart), `backend/README.md` and `frontend/README.md`.
+- CI: `ruff check .` now fails the build on lint errors (it was ignored with `|| true`).
+- `.gitignore`: every `.env*` file is ignored except `.env.example`; OS files (`.DS_Store`, `Thumbs.db`) too.
+- `.env.example`: `AI_PROVIDER=gemini`.
+- The test-count claims in the docs now say "400+" instead of a number that goes stale.
+
+### Removed
+- Internal spec-driven-development scaffolding: `.agents/` and `openspec/`.
+- `backend/TODO.md` (a personal, outdated checklist), `backend/LICENSE` and `backend/.env.example` (identical copies of the root files).
+- Unused create-next-app SVGs and the unused `StackLogo` component in the frontend.
+
+### Fixed
+- Docs said the Dockerfile was multi-stage; it is not.
+- A test that checks the Brevo token never appears in application logs could pass without checking anything if no log was captured; it now asserts that logs were captured.
+
+## Earlier history (2026-09-12 to 2026-09-18)
+
+### 2026-09-18
+- Community group features: `/ask` Q&A with expiring YES/NO buttons, moderation (`/mute`, `/unmute`, `/ban`, `/kick`, `/warn`, `/purge`), crypto prices (`/btc`, `/eth`, `/firo`, ...).
+- Dynamic community group setup with `/setup_community`, an owner (`BOT_OWNER_TELEGRAM_ID`) and an admin whitelist; French and English bot messages with `/language`.
+- Mobile-first Next.js WebApp for Telegram Mini App with a monochrome glassmorphism design.
+- Email support made optional: the bot can run in pure Telegram mode.
+- Security: admin role cache window fixed, ticket resolution rate-limited, auth and IDOR gaps hardened, the frontend moved behind a same-origin proxy that keeps the API key server-side and verifies Telegram `initData`.
+
+### 2026-09-16
+- Ticket retrieval scoped by `user_id` to prevent IDOR.
+- Brevo inbound webhook: header-based token authentication, log redaction of secrets, and isolated background tasks.
+- Quality tooling: mutation testing (mutmut), bandit and semgrep annotations resolved, a dependency lockfile for security scanning, and a large hermetic test suite covering the bot, email, knowledge base, webhooks, tickets and rate limiting.
+
+### 2026-09-14
+- Backend infrastructure: Alembic migrations, connection pooling, PostgreSQL support with a production Docker Compose stack, request rate limiting, health check that pings the database, GitHub Actions CI.
+- Several rounds of review fixes: SQLite locking and WAL mode, transactional atomicity, input validation, email parsing, bilingual search, feedback deduplication.
+- README translated to English.
+
+### 2026-09-12 to 2026-09-13
+- First version: Telegram support bot with a knowledge base and a feedback loop that indexes every agent solution.
+- Dual-channel ticketing: Telegram support group and email, kept in sync; Brevo inbound email webhook.
+- Optional AI answers and speech-to-text for agents' voice replies.
+- Hardened ticket resolution authorization.

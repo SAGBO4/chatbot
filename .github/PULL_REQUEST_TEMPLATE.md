@@ -12,4 +12,5 @@ Closes #
 - [ ] Frontend: `npm run lint` and `npm run build` pass
 - [ ] Tests added or updated for behavior changes
 - [ ] Docs updated if setup, configuration or behavior changed
+- [ ] `CHANGELOG.md` updated under **Unreleased** if the change is user-visible
 - [ ] No secrets, tokens or personal data in the diff
