@@ -5,9 +5,9 @@ from fastapi import status
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.exc import OperationalError
 
-from backend.main import app, lifespan
-from backend.config import settings
-from backend.database import get_db
+from app.main import app, lifespan
+from app.config import settings
+from app.database import get_db
 
 
 @pytest.mark.asyncio

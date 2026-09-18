@@ -73,11 +73,11 @@ async def _safe_background_task(coro_fn, *args, **kwargs):
             exc_info=True,
         )
 
-from backend.config import settings
-from backend.database import get_db, init_db, async_session_maker
-from backend.models import Ticket, TicketStatus
+from app.config import settings
+from app.database import get_db, init_db, async_session_maker
+from app.models import Ticket, TicketStatus
 from bot.utils import escape_telegram_markdown, truncate_telegram_text
-from backend.schemas import (
+from app.schemas import (
     QueryRequest,
     QueryResponse,
     TicketCreateRequest,
@@ -100,16 +100,16 @@ from backend.schemas import (
     WhitelistListResponse,
     WhitelistCheckResponse,
 )
-from backend.services.query_orchestrator import QueryOrchestrator
-from backend.services.ticket_service import TicketService
-from backend.services.knowledge_base import KnowledgeBaseService
-from backend.services.email_service import EmailService
-from backend.services.telegram_relay import TelegramRelay
-from backend.services.ai_assistant import AIAssistantService
-from backend.services.warning_service import WarningService
-from backend.services.crypto_service import CryptoService
-from backend.services.bot_settings_service import BotSettingsService, WhitelistService
-from backend.limiter import limiter, RateLimitExceeded, _rate_limit_exceeded_handler
+from app.services.query_orchestrator import QueryOrchestrator
+from app.services.ticket_service import TicketService
+from app.services.knowledge_base import KnowledgeBaseService
+from app.services.email_service import EmailService
+from app.services.telegram_relay import TelegramRelay
+from app.services.ai_assistant import AIAssistantService
+from app.services.warning_service import WarningService
+from app.services.crypto_service import CryptoService
+from app.services.bot_settings_service import BotSettingsService, WhitelistService
+from app.limiter import limiter, RateLimitExceeded, _rate_limit_exceeded_handler
 import httpx
 
 TICKET_SUBJECT_REGEX = re.compile(r"Ticket\s*#(\d+)", re.IGNORECASE)

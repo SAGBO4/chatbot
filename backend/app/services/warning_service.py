@@ -1,7 +1,7 @@
 from typing import List
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.models import CommunityWarning
+from app.models import CommunityWarning
 
 
 class WarningService:

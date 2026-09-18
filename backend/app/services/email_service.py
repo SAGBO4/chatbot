@@ -3,7 +3,7 @@ import logging
 import asyncio
 from email.message import EmailMessage
 from typing import Optional, Callable
-from backend.config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 

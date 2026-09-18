@@ -1,8 +1,8 @@
 from typing import Optional, List, Tuple
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.models import Ticket, TicketStatus, utc_now
-from backend.services.knowledge_base import KnowledgeBaseService
+from app.models import Ticket, TicketStatus, utc_now
+from app.services.knowledge_base import KnowledgeBaseService
 
 
 class TicketService:

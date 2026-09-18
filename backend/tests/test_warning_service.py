@@ -1,8 +1,8 @@
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from backend.database import init_db
-from backend.services.warning_service import WarningService
+from app.database import init_db
+from app.services.warning_service import WarningService
 
 
 @pytest_asyncio.fixture

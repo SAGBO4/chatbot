@@ -7,10 +7,10 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.exc import OperationalError
 
-from backend.config import settings
-from backend.models import KnowledgeArticle
-from backend.services.knowledge_base import KnowledgeBaseService
-from backend.services.ai_assistant import AIAssistantService
+from app.config import settings
+from app.models import KnowledgeArticle
+from app.services.knowledge_base import KnowledgeBaseService
+from app.services.ai_assistant import AIAssistantService
 from tests.conftest import TEST_API_KEY
 
 

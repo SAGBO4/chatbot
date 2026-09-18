@@ -5,7 +5,7 @@ from collections import Counter
 from typing import List, Tuple, Optional, Set
 from sqlalchemy import select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.models import KnowledgeArticle
+from app.models import KnowledgeArticle
 
 FRENCH_STOPWORDS = {
     "le", "la", "les", "de", "du", "des", "un", "une", "je", "tu", "il", "elle",

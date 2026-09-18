@@ -2,9 +2,9 @@ import pytest
 from unittest.mock import AsyncMock
 import httpx
 
-from backend.config import settings
-from backend.models import KnowledgeArticle
-from backend.services.ai_assistant import AIAssistantService
+from app.config import settings
+from app.models import KnowledgeArticle
+from app.services.ai_assistant import AIAssistantService
 
 
 @pytest.fixture

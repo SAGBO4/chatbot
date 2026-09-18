@@ -1,9 +1,9 @@
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.config import settings
-from backend.schemas import QueryResponse
-from backend.services.knowledge_base import KnowledgeBaseService
-from backend.services.ai_assistant import AIAssistantService
+from app.config import settings
+from app.schemas import QueryResponse
+from app.services.knowledge_base import KnowledgeBaseService
+from app.services.ai_assistant import AIAssistantService
 
 FALLBACK_NO_MATCH = (
     "Je n'ai pas trouvé de réponse directe à votre question dans notre base de connaissances. "

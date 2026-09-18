@@ -2,7 +2,7 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from typing import Optional
-from backend.config import settings
+from app.config import settings
 from bot.api_client import BackendClient
 from bot.handlers.user_handlers import user_router
 from bot.handlers.support_handlers import support_router

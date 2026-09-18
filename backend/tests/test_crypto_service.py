@@ -1,7 +1,7 @@
 import httpx
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from backend.services.crypto_service import CryptoService
+from app.services.crypto_service import CryptoService
 
 
 @pytest.fixture(autouse=True)

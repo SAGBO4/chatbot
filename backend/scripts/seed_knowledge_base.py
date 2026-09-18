@@ -5,8 +5,8 @@ Usage:
 """
 import asyncio
 
-from backend.database import async_session_maker, init_db
-from backend.services.knowledge_base import KnowledgeBaseService
+from app.database import async_session_maker, init_db
+from app.services.knowledge_base import KnowledgeBaseService
 
 # Each entry: (question, solution, keywords). Keywords cover both FR and EN
 # terms so the lexical search matches questions asked in either language.

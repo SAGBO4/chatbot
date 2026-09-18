@@ -18,7 +18,7 @@ FastAPI backend, Telegram bot (aiogram 3), and supporting infrastructure for the
 
 ```
 backend/
-├── backend/              # FastAPI Application & Services (the importable `backend` package)
+├── app/                  # FastAPI Application & Services
 │   ├── config.py         # Pydantic settings & env resolution
 │   ├── database.py       # Async SQLAlchemy engine (SQLite / PostgreSQL)
 │   ├── models.py         # ORM models (Tickets, Knowledge Base, Moderation)
@@ -42,8 +42,6 @@ backend/
 ├── requirements.txt       # Python dependencies
 └── pytest.ini             # Pytest configuration
 ```
-
-> **Note:** the project root is `backend/`, and the importable Python package is the nested `backend/backend/` — that's why `backend.main:app` (see the Dockerfile `CMD` and the `uvicorn` command below) resolves from inside this directory. It's an intentional (if slightly confusing) src-style layout, not a duplicate folder.
 
 ---
 
@@ -128,7 +126,7 @@ To resolve tickets via email replies:
 ```bash
 # Terminal 1: Start the backend API
 cd backend
-uvicorn backend.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 
 # Terminal 2: Start the Telegram Bot
 cd backend
@@ -188,15 +186,15 @@ cd backend
 pytest -v
 
 # Run with module coverage report (HTML report + >=85% threshold check)
-pytest --cov=backend --cov=bot --cov-report=html --cov-fail-under=85
+pytest --cov=app --cov=bot --cov-report=html --cov-fail-under=85
 
 # Mutation testing (verifies that tests actively catch seeded bugs)
 mutmut run
 
 # Static security analysis & linting
 ruff check .
-bandit -r backend/ bot/                 # Python AST security linter (0 issues)
-semgrep scan --config=auto backend/ bot/ # Semantic AST multi-rule security analysis (0 issues)
+bandit -r app/ bot/                     # Python AST security linter (0 issues)
+semgrep scan --config=auto app/ bot/     # Semantic AST multi-rule security analysis (0 issues)
 trivy fs --file-patterns "pip:requirements.lock" requirements.lock # Dependency vulnerabilities & secret scanning (0 issues)
 pip-audit                               # PyPA advisory vulnerability scanner (0 issues)
 ```

@@ -1,6 +1,6 @@
 from typing import Optional, Dict, Any
 import httpx
-from backend.config import settings
+from app.config import settings
 
 
 class BackendClient:

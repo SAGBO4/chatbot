@@ -6,8 +6,8 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.exc import OperationalError
 from sqlalchemy import text
 
-from backend.config import settings
-from backend.main import verify_api_key
+from app.config import settings
+from app.main import verify_api_key
 from tests.conftest import TEST_API_KEY
 
 
@@ -130,8 +130,8 @@ async def test_health_check_database_outage_returns_503_service_unavailable(app_
     client, session_maker, _ = app_test_env
 
     # Simuler une panne de session DB sur text("SELECT 1")
-    from backend.main import app
-    from backend.database import get_db
+    from app.main import app
+    from app.database import get_db
 
     async def broken_get_db():
         session = AsyncMock()

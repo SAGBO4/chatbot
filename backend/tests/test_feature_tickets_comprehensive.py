@@ -5,10 +5,10 @@ from unittest.mock import patch, MagicMock
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.config import settings
-from backend.models import Ticket, TicketStatus, KnowledgeArticle
-from backend.services.ticket_service import TicketService
-from backend.services.email_service import EmailService
+from app.config import settings
+from app.models import Ticket, TicketStatus, KnowledgeArticle
+from app.services.ticket_service import TicketService
+from app.services.email_service import EmailService
 from tests.conftest import TEST_API_KEY
 
 
@@ -584,7 +584,7 @@ async def test_tickets_background_tasks_uncaught_exception_isolated_and_logged(a
 
     # 1. Création avec crash direct de la coroutine
     with patch(
-        "backend.services.email_service.EmailService.send_ticket_created_notification",
+        "app.services.email_service.EmailService.send_ticket_created_notification",
         side_effect=ConnectionResetError("Fatal SMTP drop"),
     ):
         with caplog.at_level(logging.ERROR):
@@ -598,7 +598,7 @@ async def test_tickets_background_tasks_uncaught_exception_isolated_and_logged(a
 
     # 2. Résolution avec crash direct de la coroutine
     with patch(
-        "backend.services.email_service.EmailService.send_ticket_resolved_notification",
+        "app.services.email_service.EmailService.send_ticket_resolved_notification",
         side_effect=TimeoutError("Fatal SMTP timeout"),
     ):
         with caplog.at_level(logging.ERROR):
@@ -628,9 +628,9 @@ async def test_ticket_creation_and_resolution_bypasses_email_tasks_when_disabled
     monkeypatch.setattr(settings, "EMAIL_ENABLED", False)
 
     with patch(
-        "backend.services.email_service.EmailService.send_ticket_created_notification"
+        "app.services.email_service.EmailService.send_ticket_created_notification"
     ) as mock_send_created, patch(
-        "backend.services.email_service.EmailService.send_ticket_resolved_notification"
+        "app.services.email_service.EmailService.send_ticket_resolved_notification"
     ) as mock_send_resolved:
         # 1. Création du ticket
         resp_create = await client.post(

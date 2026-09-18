@@ -3,7 +3,7 @@ import httpx
 from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
-from backend.services.crypto_service import SYMBOL_TO_COINGECKO_ID
+from app.services.crypto_service import SYMBOL_TO_COINGECKO_ID
 from bot.api_client import BackendClient
 from bot.language import get_active_language
 from bot.i18n import t

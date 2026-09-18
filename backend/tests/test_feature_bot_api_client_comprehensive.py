@@ -2,7 +2,7 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock, patch
 
-from backend.config import settings
+from app.config import settings
 from bot.api_client import BackendClient
 
 

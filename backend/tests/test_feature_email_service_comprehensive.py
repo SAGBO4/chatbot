@@ -4,8 +4,8 @@ from email.message import EmailMessage
 from unittest.mock import MagicMock
 import pytest
 
-from backend.config import settings
-from backend.services.email_service import EmailService
+from app.config import settings
+from app.services.email_service import EmailService
 
 
 def _mock_smtp_context_manager():

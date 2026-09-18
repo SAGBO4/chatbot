@@ -1,7 +1,7 @@
 import logging
 from typing import Optional, Tuple, Union
 import httpx
-from backend.config import settings
+from app.config import settings
 from bot.utils import truncate_telegram_text
 
 logger = logging.getLogger(__name__)

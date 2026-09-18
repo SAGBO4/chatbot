@@ -1,8 +1,8 @@
 import logging
 from typing import List, Tuple, Optional
 import httpx
-from backend.config import settings
-from backend.models import KnowledgeArticle
+from app.config import settings
+from app.models import KnowledgeArticle
 
 logger = logging.getLogger(__name__)
 

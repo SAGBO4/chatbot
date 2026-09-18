@@ -83,7 +83,7 @@ async def test_bot_user_query_and_resolution_flow(memory_storage):
 
 @pytest.mark.asyncio
 async def test_bot_resolution_no_escalates_to_group(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     user = MagicMock(spec=User, id=789, username="marc789", first_name="Marc")
     state = make_fsm_context(memory_storage, 789, 789)
@@ -141,7 +141,7 @@ async def test_bot_resolution_no_escalates_to_group(memory_storage, monkeypatch)
 async def test_support_agent_reply_handler_resolves_by_message_id(monkeypatch):
     """Primary path: the reply is resolved via the replied-to message's identity,
     without needing the card's text to match the regex pattern at all."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -203,7 +203,7 @@ async def test_support_agent_reply_handler_resolves_by_message_id(monkeypatch):
 async def test_support_agent_reply_falls_back_to_text_when_id_lookup_misses(monkeypatch):
     """When the id-based lookup finds nothing (e.g. a ticket created before this
     mechanism existed), the previous text-parsing behavior still resolves it."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -258,7 +258,7 @@ async def test_support_agent_reply_text_fallback_ignored_when_replied_message_no
     contain "TICKET #<n> ID: <n>" must never be parsed as a real ticket
     card, even by a genuine group admin replying to it.
     """
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -301,7 +301,7 @@ async def test_support_agent_reply_rejected_for_non_admin_group_member(monkeypat
     ignored, never resolve the ticket or message the user on the team's
     behalf.
     """
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
     monkeypatch.setattr(
         "bot.handlers.support_handlers.is_group_admin",
         AsyncMock(return_value=False),
@@ -339,7 +339,7 @@ async def test_support_agent_reply_rejected_for_non_admin_group_member(monkeypat
 async def test_support_agent_reply_no_match_replies_with_explicit_notice(monkeypatch):
     """When neither the id-based lookup nor the text fallback identify a
     ticket, the bot must not resolve anything and must say so explicitly."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -394,7 +394,7 @@ def _make_support_agent_message(group_chat, agent_user, replied_card):
 async def test_support_agent_reply_media_without_caption_asks_for_text(monkeypatch):
     """A photo/sticker/voice reply with no usable text must not crash
     (message.text is None for media) and must not resolve the ticket."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -419,7 +419,7 @@ async def test_support_agent_reply_media_without_caption_asks_for_text(monkeypat
 async def test_support_agent_reply_photo_with_caption_resolves_ticket(monkeypatch):
     """A photo (e.g. a screenshot) with a caption uses the caption as the
     solution, instead of crashing or being discarded."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -449,9 +449,9 @@ async def test_support_agent_reply_photo_with_caption_resolves_ticket(monkeypatc
 async def test_support_agent_reply_voice_transcribed_via_whisper(monkeypatch):
     """A voice reply is transcribed via OpenAI Whisper when AI_PROVIDER=openai,
     then used as the ticket solution."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
-    monkeypatch.setattr("backend.config.settings.AI_PROVIDER", "openai")
-    monkeypatch.setattr("backend.config.settings.AI_API_KEY", "sk-test-key")
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.AI_PROVIDER", "openai")
+    monkeypatch.setattr("app.config.settings.AI_API_KEY", "sk-test-key")
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -490,9 +490,9 @@ async def test_support_agent_reply_voice_transcribed_via_whisper(monkeypatch):
 async def test_support_agent_reply_voice_without_openai_asks_for_text(monkeypatch):
     """Without AI_PROVIDER=openai, a voice reply cannot be transcribed - the
     handler must ask for text instead of crashing or silently failing."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
-    monkeypatch.setattr("backend.config.settings.AI_PROVIDER", "gemini")
-    monkeypatch.setattr("backend.config.settings.AI_API_KEY", None)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.AI_PROVIDER", "gemini")
+    monkeypatch.setattr("app.config.settings.AI_API_KEY", None)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -516,7 +516,7 @@ async def test_support_agent_reply_voice_without_openai_asks_for_text(monkeypatc
 
 @pytest.mark.asyncio
 async def test_support_agent_reply_ignored_from_private_chat(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     attacker_user = MagicMock(spec=User, id=789, username="attacker", first_name="Eve", last_name=None)
     # The attacker DMs the bot: private chat id equals their own user id, as Telegram does.
@@ -548,7 +548,7 @@ async def test_support_agent_reply_ignored_from_private_chat(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_support_agent_reply_ignored_from_other_group(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     other_user = MagicMock(spec=User, id=111, username="not_an_agent", first_name="Bob", last_name=None)
     # A different group chat than the configured support group.
@@ -580,7 +580,7 @@ async def test_support_agent_reply_ignored_from_other_group(monkeypatch):
 @pytest.mark.asyncio
 async def test_support_agent_reply_ignored_when_support_group_unconfigured(monkeypatch):
     # Default configuration: TELEGRAM_SUPPORT_GROUP_ID is unset (sentinel "0").
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", 0)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", 0)
 
     user = MagicMock(spec=User, id=0, username="whoever", first_name="Whoever", last_name=None)
     # Chat id happens to be the same falsy sentinel value as the unconfigured setting.
@@ -612,7 +612,7 @@ async def test_support_agent_reply_ignored_when_support_group_unconfigured(monke
 @pytest.mark.asyncio
 async def test_support_agent_reply_escapes_markdown_in_solution_and_agent_name(monkeypatch):
     support_group_id = -100999888777
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=999, username="agent_007", first_name="Agent_007", last_name=None)
     chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -652,7 +652,7 @@ async def test_support_agent_reply_escapes_markdown_in_solution_and_agent_name(m
 @pytest.mark.asyncio
 async def test_support_agent_reply_falls_back_to_plain_text_on_send_error(monkeypatch):
     support_group_id = -100999888777
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=999, username="agent_bob", first_name="Bob", last_name=None)
     chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -714,7 +714,7 @@ async def test_handle_resolve_no_double_click_prevention(memory_storage):
 @pytest.mark.asyncio
 async def test_support_agent_reply_already_resolved_collision(monkeypatch):
     support_group_id = -100999888777
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=999, username="agent_late", first_name="Agent Late")
     chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -754,7 +754,7 @@ async def test_support_agent_reply_already_resolved_collision(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_handle_resolve_no_with_excessively_long_text_does_not_overflow_telegram_limit(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     user = MagicMock(spec=User, id=888, username="long_user", first_name="Long")
     state = make_fsm_context(memory_storage, 888, 888)
@@ -796,7 +796,7 @@ async def test_handle_resolve_no_with_excessively_long_text_does_not_overflow_te
 
 @pytest.mark.asyncio
 async def test_handle_resolve_no_proceeds_to_escalate_when_user_edit_text_fails(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     user = MagicMock(spec=User, id=777, username="edit_fail_user", first_name="User")
     state = make_fsm_context(memory_storage, 777, 777)
@@ -836,7 +836,7 @@ async def test_handle_resolve_no_proceeds_to_escalate_when_user_edit_text_fails(
 @pytest.mark.asyncio
 async def test_support_agent_reply_with_excessively_long_solution_caps_user_notification(monkeypatch):
     support_group_id = -100999888
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_long", first_name="Agent")
     group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -875,7 +875,7 @@ async def test_support_agent_reply_with_excessively_long_solution_caps_user_noti
 async def test_support_agent_reply_truncates_solution_exceeding_backend_limit(monkeypatch):
     """When an agent sends a solution > 5000 chars, it is truncated before calling backend resolve_ticket."""
     support_group_id = -100999888
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_verbose", first_name="Agent")
     group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")

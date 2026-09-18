@@ -4,8 +4,8 @@ import pytest
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.models import KnowledgeArticle
-from backend.services.knowledge_base import (
+from app.models import KnowledgeArticle
+from app.services.knowledge_base import (
     KnowledgeBaseService,
     tokenize,
     compute_tf_vector,

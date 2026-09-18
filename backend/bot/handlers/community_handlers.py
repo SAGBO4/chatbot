@@ -7,7 +7,7 @@ from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command, CommandObject
 from aiogram.fsm.context import FSMContext
-from backend.config import settings
+from app.config import settings
 from bot.keyboards import get_community_resolution_keyboard
 from bot.api_client import BackendClient
 from bot.admin_check import is_group_admin

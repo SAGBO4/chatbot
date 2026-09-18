@@ -4,12 +4,12 @@ import httpx
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from backend.main import app
-from backend.database import get_db, init_db
-from backend.config import settings
-from backend.models import Base, TicketStatus, KnowledgeArticle
-from backend.services.knowledge_base import KnowledgeBaseService
-from backend.services.ai_assistant import AIAssistantService
+from app.main import app
+from app.database import get_db, init_db
+from app.config import settings
+from app.models import Base, TicketStatus, KnowledgeArticle
+from app.services.knowledge_base import KnowledgeBaseService
+from app.services.ai_assistant import AIAssistantService
 
 TEST_API_KEY = "test-api-key"
 

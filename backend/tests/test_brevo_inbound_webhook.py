@@ -4,10 +4,10 @@ import httpx
 from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from backend.config import settings
-from backend.main import app
-from backend.database import get_db, init_db
-from backend.services.telegram_relay import TelegramRelay
+from app.config import settings
+from app.main import app
+from app.database import get_db, init_db
+from app.services.telegram_relay import TelegramRelay
 
 TEST_BREVO_SECRET = "test-brevo-secret"
 TEST_API_KEY = "test-api-key"
@@ -149,7 +149,7 @@ async def test_brevo_batch_exception_on_later_item_preserves_earlier_resolved_ti
     monkeypatch.setattr(TelegramRelay, "send_message_to_user", AsyncMock(return_value=True))
     monkeypatch.setattr(TelegramRelay, "notify_support_group", AsyncMock(return_value=True))
 
-    from backend import main as backend_main
+    from app import main as backend_main
     real_resolve = backend_main._resolve_inbound_email
 
     call_count = 0

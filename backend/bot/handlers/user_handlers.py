@@ -11,7 +11,7 @@ from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
 from bot.i18n import t
 from bot.utils import truncate_telegram_text, TELEGRAM_MAX_MESSAGE_LENGTH
-from backend.config import settings
+from app.config import settings
 
 logger = logging.getLogger(__name__)
 user_router = Router()

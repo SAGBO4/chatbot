@@ -1,8 +1,8 @@
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from backend.database import init_db
-from backend.services.knowledge_base import KnowledgeBaseService
+from app.database import init_db
+from app.services.knowledge_base import KnowledgeBaseService
 
 
 @pytest_asyncio.fixture
@@ -109,7 +109,7 @@ async def test_knowledge_base_deduplication_by_source_ticket_id(async_session):
 
 
 def test_bilingual_tokenization():
-    from backend.services.knowledge_base import tokenize
+    from app.services.knowledge_base import tokenize
     # English stopwords like 'how', 'can', 'my' must be filtered
     tokens_en = tokenize("How can I reset my password?")
     assert "how" not in tokens_en

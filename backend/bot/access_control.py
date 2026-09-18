@@ -1,7 +1,7 @@
 import time
 import logging
 from typing import Dict, Optional, Tuple
-from backend.config import settings
+from app.config import settings
 from bot.api_client import BackendClient
 
 logger = logging.getLogger(__name__)

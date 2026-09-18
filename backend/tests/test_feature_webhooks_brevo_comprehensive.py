@@ -4,9 +4,9 @@ import pytest
 from unittest.mock import patch
 from sqlalchemy import select
 
-from backend.config import settings
-from backend.models import Ticket, TicketStatus
-from backend.services.ticket_service import TicketService
+from app.config import settings
+from app.models import Ticket, TicketStatus
+from app.services.ticket_service import TicketService
 from tests.conftest import TEST_BREVO_INBOUND_SECRET
 
 
@@ -359,7 +359,8 @@ async def test_webhooks_brevo_token_query_parameter_not_leaked_in_application_lo
             json={"items": []},
         )
 
-    backend_records = [r for r in caplog.records if r.name.startswith("backend")]
+    backend_records = [r for r in caplog.records if r.name.split(".")[0] == "app"]
+    assert backend_records, "no application log records captured; the check below would pass vacuously"
     for record in backend_records:
         assert TEST_BREVO_INBOUND_SECRET not in record.getMessage()
 
@@ -436,7 +437,7 @@ async def test_webhooks_brevo_access_log_middleware_redacts_query_token_succes(a
             json={"items": []},
         )
 
-    backend_records = [r for r in caplog.records if r.name.startswith("backend")]
+    backend_records = [r for r in caplog.records if r.name.split(".")[0] == "app"]
     # Le secret en clair ne doit jamais apparaître dans les logs du backend
     assert not any(TEST_BREVO_INBOUND_SECRET in r.getMessage() for r in backend_records)
     # Le message du middleware de log d'accès doit contenir [REDACTED]
@@ -463,7 +464,7 @@ async def test_webhooks_brevo_exception_in_single_item_handled_as_internal_error
         t2 = await TicketService.create_ticket(session, 2, "u2", "Q2")
 
     # Patch _resolve_inbound_email pour crasher uniquement sur le ticket 1
-    from backend.main import _resolve_inbound_email
+    from app.main import _resolve_inbound_email
     orig_fn = _resolve_inbound_email
 
     async def mock_resolve_item(*args, **kwargs):
@@ -479,7 +480,7 @@ async def test_webhooks_brevo_exception_in_single_item_handled_as_internal_error
         ]
     }
 
-    with patch("backend.main._resolve_inbound_email", side_effect=mock_resolve_item):
+    with patch("app.main._resolve_inbound_email", side_effect=mock_resolve_item):
         resp = await client.post(
             f"/api/webhooks/email-inbound/brevo?token={TEST_BREVO_INBOUND_SECRET}",
             json=payload,

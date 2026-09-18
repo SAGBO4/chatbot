@@ -1,5 +1,5 @@
 """
-Adversarial QA suite for backend.main.clean_email_reply_body().
+Adversarial QA suite for app.main.clean_email_reply_body().
 
 Goal: break the function, not confirm it works. Sections:
   1. Nominal behavior (safety net for legitimate refactors)
@@ -20,7 +20,7 @@ directly - kept in this file as permanent regression guards.
 """
 import time
 import pytest
-from backend.main import clean_email_reply_body
+from app.main import clean_email_reply_body
 
 
 # ---------------------------------------------------------------------------

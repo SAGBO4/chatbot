@@ -2,9 +2,9 @@ import pytest
 import pytest_asyncio
 from unittest.mock import AsyncMock
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from backend.database import init_db as real_init_db
-from backend.config import settings
-from backend.services.bot_settings_service import BotSettingsService
+from app.database import init_db as real_init_db
+from app.config import settings
+from app.services.bot_settings_service import BotSettingsService
 
 
 @pytest_asyncio.fixture
@@ -19,14 +19,14 @@ async def test_session_maker(tmp_path):
 
 @pytest.mark.asyncio
 async def test_lifespan_seeds_legacy_community_group_when_env_set(test_session_maker, monkeypatch):
-    import backend.main as main_module
+    import app.main as main_module
 
     monkeypatch.setattr(settings, "TELEGRAM_COMMUNITY_GROUP_ID", -100555)
     monkeypatch.setattr(main_module, "async_session_maker", test_session_maker)
     monkeypatch.setattr(main_module, "init_db", AsyncMock())
-    monkeypatch.setattr("backend.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
-    monkeypatch.setattr("backend.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
-    monkeypatch.setattr("backend.services.crypto_service.CryptoService.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.crypto_service.CryptoService.set_shared_client", lambda *a, **k: None)
 
     async with main_module.lifespan(main_module.app):
         pass
@@ -38,14 +38,14 @@ async def test_lifespan_seeds_legacy_community_group_when_env_set(test_session_m
 
 @pytest.mark.asyncio
 async def test_lifespan_does_not_seed_when_env_unset(test_session_maker, monkeypatch):
-    import backend.main as main_module
+    import app.main as main_module
 
     monkeypatch.setattr(settings, "TELEGRAM_COMMUNITY_GROUP_ID", 0)
     monkeypatch.setattr(main_module, "async_session_maker", test_session_maker)
     monkeypatch.setattr(main_module, "init_db", AsyncMock())
-    monkeypatch.setattr("backend.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
-    monkeypatch.setattr("backend.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
-    monkeypatch.setattr("backend.services.crypto_service.CryptoService.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.crypto_service.CryptoService.set_shared_client", lambda *a, **k: None)
 
     async with main_module.lifespan(main_module.app):
         pass
@@ -57,7 +57,7 @@ async def test_lifespan_does_not_seed_when_env_unset(test_session_maker, monkeyp
 
 @pytest.mark.asyncio
 async def test_lifespan_never_overwrites_existing_persisted_value(test_session_maker, monkeypatch):
-    import backend.main as main_module
+    import app.main as main_module
 
     async with test_session_maker() as session:
         await BotSettingsService.set_community_group_id(session, -100111, updated_by="owner")
@@ -65,9 +65,9 @@ async def test_lifespan_never_overwrites_existing_persisted_value(test_session_m
     monkeypatch.setattr(settings, "TELEGRAM_COMMUNITY_GROUP_ID", -100999)
     monkeypatch.setattr(main_module, "async_session_maker", test_session_maker)
     monkeypatch.setattr(main_module, "init_db", AsyncMock())
-    monkeypatch.setattr("backend.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
-    monkeypatch.setattr("backend.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
-    monkeypatch.setattr("backend.services.crypto_service.CryptoService.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
+    monkeypatch.setattr("app.services.crypto_service.CryptoService.set_shared_client", lambda *a, **k: None)
 
     async with main_module.lifespan(main_module.app):
         pass

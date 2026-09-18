@@ -33,7 +33,7 @@ async def _fake_get_community_group_id(backend_client=None):
 
 @pytest.fixture(autouse=True)
 def configure_community_group(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS", 600)
+    monkeypatch.setattr("app.config.settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS", 600)
     monkeypatch.setattr("bot.group_scope.get_community_group_id", _fake_get_community_group_id)
     community_handlers._recent_bot_messages.clear()
     yield
@@ -134,7 +134,7 @@ async def test_resolve_yes_confirms_and_clears_state(memory_storage):
 
 @pytest.mark.asyncio
 async def test_resolve_yes_rejects_expired_answer(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS", 1)
+    monkeypatch.setattr("app.config.settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS", 1)
     state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
     await state.update_data(
         last_question="q", last_answer="a", last_answer_timestamp=time.time() - 100,
@@ -152,7 +152,7 @@ async def test_resolve_yes_rejects_expired_answer(memory_storage, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_resolve_no_creates_ticket_and_only_posts_neutral_ack_in_community(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100777)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100777)
     state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
     await state.update_data(
         last_question="Erreur de sync", last_answer="Solution auto",

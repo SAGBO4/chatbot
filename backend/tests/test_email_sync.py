@@ -8,12 +8,12 @@ import httpx
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from backend.config import settings
-from backend.main import app, clean_email_reply_body, escape_telegram_markdown
-from backend.database import get_db, init_db
-from backend.models import TicketStatus
-from backend.services.email_service import EmailService
-from backend.services.telegram_relay import TelegramRelay
+from app.config import settings
+from app.main import app, clean_email_reply_body, escape_telegram_markdown
+from app.database import get_db, init_db
+from app.models import TicketStatus
+from app.services.email_service import EmailService
+from app.services.telegram_relay import TelegramRelay
 
 TEST_WEBHOOK_SECRET = "test-webhook-secret"
 TEST_API_KEY = "test-api-key"

@@ -1,8 +1,8 @@
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from backend.database import init_db
-from backend.services.bot_settings_service import BotSettingsService, WhitelistService, DEFAULT_LANGUAGE
+from app.database import init_db
+from app.services.bot_settings_service import BotSettingsService, WhitelistService, DEFAULT_LANGUAGE
 
 
 @pytest_asyncio.fixture

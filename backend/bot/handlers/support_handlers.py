@@ -4,7 +4,7 @@ from typing import Optional, Union
 import httpx
 from aiogram import Router, F, Bot
 from aiogram.types import Message
-from backend.config import settings
+from app.config import settings
 from bot.admin_check import is_group_admin
 from bot.api_client import BackendClient
 from bot.language import get_active_language

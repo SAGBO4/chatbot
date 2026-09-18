@@ -5,7 +5,7 @@ from unittest.mock import AsyncMock, MagicMock
 from aiogram.types import CallbackQuery, Message, User, Chat
 
 from bot.middlewares.throttling import ThrottlingMiddleware
-from backend.limiter import limiter
+from app.limiter import limiter
 
 
 @pytest.mark.asyncio

@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
 
 from bot.middlewares.throttling import ThrottlingMiddleware
-from backend.limiter import Limiter, RateLimitExceeded, _rate_limit_exceeded_handler
+from app.limiter import Limiter, RateLimitExceeded, _rate_limit_exceeded_handler
 
 
 @pytest.mark.asyncio
@@ -143,8 +143,8 @@ def test_fastapi_rate_limiter():
 
 def test_resolve_ticket_rate_limiting(monkeypatch):
     """Verify that ticket resolution endpoint is rate limited."""
-    from backend.main import app as main_app
-    from backend.config import settings
+    from app.main import app as main_app
+    from app.config import settings
 
     test_key = "test-api-key-rate-limit-123"
     monkeypatch.setattr(settings, "API_KEY", test_key)

@@ -5,7 +5,7 @@ from aiogram.types import User, Chat, Message, CallbackQuery, Voice
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage, StorageKey
 
-from backend.config import settings
+from app.config import settings
 from bot.handlers.user_handlers import (
     handle_start,
     handle_help,

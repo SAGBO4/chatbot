@@ -1,8 +1,8 @@
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import select, inspect, text
-from backend.models import Base, Ticket, KnowledgeArticle, TicketStatus
-from backend.database import init_db
+from app.models import Base, Ticket, KnowledgeArticle, TicketStatus
+from app.database import init_db
 
 
 @pytest.mark.asyncio

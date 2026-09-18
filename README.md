@@ -64,7 +64,7 @@ chatbot/
 
 ```
 backend/
-├── backend/              # FastAPI Application & Services
+├── app/                  # FastAPI Application & Services
 ├── bot/                   # Telegram Bot (aiogram 3)
 ├── alembic/               # Database schema migration revisions
 ├── tests/                 # 400+ test cases (unit, integration, resilience, E2E)
@@ -116,7 +116,7 @@ Then start these three separately — each keeps running, so use three terminals
 
 **Backend API**
 ```bash
-cd backend && uvicorn backend.main:app --reload --port 8000
+cd backend && uvicorn app.main:app --reload --port 8000
 ```
 
 **Telegram bot**

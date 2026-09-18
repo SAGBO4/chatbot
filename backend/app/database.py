@@ -6,8 +6,8 @@ from alembic.config import Config
 from alembic import command
 from sqlalchemy import inspect, text, event
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from backend.config import settings
-from backend.models import Base
+from app.config import settings
+from app.models import Base
 
 logger = logging.getLogger(__name__)
 

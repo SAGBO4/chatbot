@@ -3,8 +3,8 @@ import pytest
 import httpx
 from unittest.mock import AsyncMock
 
-from backend.config import settings
-from backend.services.telegram_relay import TelegramRelay
+from app.config import settings
+from app.services.telegram_relay import TelegramRelay
 
 
 @pytest.mark.asyncio

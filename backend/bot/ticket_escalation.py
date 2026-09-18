@@ -1,6 +1,6 @@
 import logging
 from aiogram import Bot
-from backend.config import settings
+from app.config import settings
 from bot.api_client import BackendClient
 from bot.utils import escape_telegram_markdown, truncate_telegram_text
 

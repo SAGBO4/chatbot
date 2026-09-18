@@ -2,7 +2,7 @@ import logging
 from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from backend.models import BotSetting, BotAdminWhitelist
+from app.models import BotSetting, BotAdminWhitelist
 
 logger = logging.getLogger(__name__)
 

@@ -8,10 +8,10 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.config import settings
-from backend.models import Ticket, TicketStatus, KnowledgeArticle
-from backend.services.ticket_service import TicketService
-from backend.services.telegram_relay import TelegramRelay
+from app.config import settings
+from app.models import Ticket, TicketStatus, KnowledgeArticle
+from app.services.ticket_service import TicketService
+from app.services.telegram_relay import TelegramRelay
 from tests.conftest import TEST_EMAIL_WEBHOOK_SECRET
 
 
