@@ -141,13 +141,16 @@ def test_fastapi_rate_limiter():
     assert "rate limit exceeded" in str(msg).lower()
 
 
-def test_resolve_ticket_rate_limiting():
+def test_resolve_ticket_rate_limiting(monkeypatch):
     """Verify that ticket resolution endpoint is rate limited."""
     from backend.main import app as main_app
     from backend.config import settings
 
+    test_key = "test-api-key-rate-limit-123"
+    monkeypatch.setattr(settings, "API_KEY", test_key)
+
     client = TestClient(main_app)
-    headers = {"X-API-Key": settings.API_KEY or "test_key"} if settings.API_KEY else {}
+    headers = {"X-API-Key": test_key}
 
     # Call 16 times in succession (limit is 15/minute)
     responses = []
