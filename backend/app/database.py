@@ -49,17 +49,12 @@ async_session_maker = async_sessionmaker(
 
 def _add_missing_columns(sync_conn) -> None:
     """
-    Adds to already-existing tables any column declared on the ORM models but
-    absent from the live schema, so a deployment that already has a database
-    file (e.g. the `chatbot.db` volume in docker-compose) picks up new
-    columns instead of failing every query with "no such column" once the
-    app starts selecting them.
+    Safety net for databases that predate the Alembic migrations, or when the upgrade fails.
 
-    `Base.metadata.create_all` (run just before this) only issues
-    `CREATE TABLE IF NOT EXISTS`, so it never alters a table that already
-    exists. This project has no migrations framework, and every column added
-    after a table's initial release is nullable, so a plain `ADD COLUMN` is
-    sufficient and safe on both SQLite and Postgres.
+    Adds any column declared on the ORM models but missing from an existing table, so the app
+    does not fail with "no such column". `create_all` only issues `CREATE TABLE IF NOT EXISTS`
+    and never alters an existing table. Columns added after a table's first release are
+    nullable, so a plain `ADD COLUMN` is safe on both SQLite and Postgres.
     """
     inspector = inspect(sync_conn)
     existing_tables = set(inspector.get_table_names())
@@ -87,8 +82,12 @@ def run_alembic_upgrade(connection_url: Optional[str] = None) -> None:
 
 
 async def init_db(db_engine=None) -> None:
+    """
+    Prepare the schema. Without `db_engine` (normal startup) it first runs the Alembic
+    migrations, falling back to a warning if they fail; then `create_all` and
+    `_add_missing_columns` make sure every table and column exists.
+    """
     target_engine = db_engine or engine
-    # For standard application startup on the configured database, run Alembic migrations
     if db_engine is None:
         if "sqlite" in settings.DATABASE_URL:
             db_path_str = settings.DATABASE_URL.split(":///")[-1]
@@ -106,5 +105,6 @@ async def init_db(db_engine=None) -> None:
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
+    """FastAPI dependency: one database session per request."""
     async with async_session_maker() as session:
         yield session

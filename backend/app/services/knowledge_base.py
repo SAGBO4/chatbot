@@ -44,12 +44,12 @@ def tokenize(text: str, remove_stopwords: bool = True) -> List[str]:
 
 
 def compute_tf_vector(tokens: List[str]) -> Counter:
-    """Compute normalized term frequencies."""
+    """Count how many times each token occurs (raw term frequencies, not normalized)."""
     return Counter(tokens)
 
 
 def token_similarity(vec1: Counter, vec2: Counter) -> float:
-    """Compute token overlap similarity with prefix and stem matching."""
+    """Share of `vec1`'s tokens found in `vec2`: an exact match counts 1, a prefix or substring match 0.85."""
     if not vec1 or not vec2:
         return 0.0
 
@@ -76,7 +76,7 @@ def token_similarity(vec1: Counter, vec2: Counter) -> float:
 
 
 def compute_char_ngram_similarity(s1: str, s2: str, n: int = 3) -> float:
-    """Compute character n-gram similarity for fuzzy matching."""
+    """Cosine similarity of character n-grams (fuzzy match); the length ratio when one string contains the other."""
     s1, s2 = s1.lower(), s2.lower()
     if not s1 or not s2:
         return 0.0
@@ -98,12 +98,14 @@ def compute_char_ngram_similarity(s1: str, s2: str, n: int = 3) -> float:
 
 
 def extract_keywords_from_text(text: str) -> str:
-    """Helper to extract top keywords from a sentence."""
+    """All distinct non-stopword tokens of `text`, sorted, as a comma-separated string."""
     tokens = tokenize(text, remove_stopwords=True)
     return ", ".join(sorted(set(tokens)))
 
 
 class KnowledgeBaseService:
+    """Stores knowledge base articles and finds the best matches for a question (no embeddings: pure lexical scoring)."""
+
     @staticmethod
     async def add_article(
         session: AsyncSession,
@@ -113,10 +115,13 @@ class KnowledgeBaseService:
         source_ticket_id: Optional[int] = None,
         auto_commit: bool = True,
     ) -> KnowledgeArticle:
-        # If no keywords provided, automatically extract from the question
+        """
+        Add an article, or update the one already linked to `source_ticket_id` (one article per ticket).
+
+        Keywords default to the question's tokens. With `auto_commit=False` it only flushes.
+        """
         computed_keywords = keywords or extract_keywords_from_text(question)
 
-        # If an article was already created for this ticket, update it rather than duplicating
         if source_ticket_id is not None:
             existing_stmt = select(KnowledgeArticle).where(KnowledgeArticle.source_ticket_id == source_ticket_id)
             existing_res = await session.execute(existing_stmt)
@@ -194,7 +199,12 @@ class KnowledgeBaseService:
         threshold: float = 0.3,
         limit: int = 5,
     ) -> List[Tuple[KnowledgeArticle, float]]:
-        """Search knowledge base articles using combined lexical and semantic scoring."""
+        """
+        Best matches for `query` as `(article, score)` pairs, highest score first, above `threshold`.
+
+        Up to 200 candidate rows are pre-filtered in SQL (LIKE on question and keywords for the first
+        12 tokens, then a character-trigram retry if nothing matches) and scored in Python.
+        """
         query_text = query.strip()
         if not query_text:
             return []
@@ -207,7 +217,7 @@ class KnowledgeBaseService:
 
         stmt = select(KnowledgeArticle)
         conditions = []
-        # Bound the number of tokens to 12 to prevent SQL clause explosion on long queries
+        # Only the first 12 tokens, so a long query cannot explode the SQL clause
         for token in query_tokens[:12]:
             term = f"%{token}%"
             conditions.append(KnowledgeArticle.question.ilike(term))
@@ -217,13 +227,12 @@ class KnowledgeBaseService:
                 conditions.append(KnowledgeArticle.question.ilike(prefix_term))
                 conditions.append(KnowledgeArticle.keywords.ilike(prefix_term))
         stmt = stmt.where(or_(*conditions)).limit(200)
-            
+
         result = await session.execute(stmt)
         articles = list(result.scalars().all())
 
         if not articles:
-            # Fallback: if SQL filtering found no exact token/prefix matches (e.g. typos or fuzzy variations),
-            # extract character 3-grams to search candidate articles via SQL, capped to 200 rows.
+            # Nothing matched (typos, variants): retry with character trigrams of the first 6 tokens.
             trigrams = set()
             for token in query_tokens[:6]:
                 if len(token) >= 3:
@@ -246,7 +255,7 @@ class KnowledgeBaseService:
             if not articles:
                 return []
 
-        # Run CPU-bound scoring and n-gram computation off the main asyncio event loop
+        # CPU-bound scoring runs in a thread so it does not block the event loop
         return await asyncio.to_thread(
             cls._score_and_rank_articles,
             articles=articles,
@@ -265,7 +274,14 @@ class KnowledgeBaseService:
         threshold: float,
         limit: int,
     ) -> List[Tuple[KnowledgeArticle, float]]:
-        """Synchronous CPU worker computing similarities without starving the async loop."""
+        """
+        Score each article and keep those at or above `threshold`.
+
+        score = min(1, 0.65 * token_similarity + 0.2 * char_ngram_similarity(query, question)
+                       + keyword_bonus + exact_bonus)
+        keyword_bonus: 0.2 per article keyword contained in the query, capped at 0.4.
+        exact_bonus:   0.25 when the query and the question contain one another (query of 4+ chars).
+        """
         scored: List[Tuple[KnowledgeArticle, float]] = []
 
         for article in articles:
@@ -273,13 +289,10 @@ class KnowledgeBaseService:
             article_tokens = tokenize(article_text, remove_stopwords=True)
             article_vec = compute_tf_vector(article_tokens)
 
-            # Token / prefix similarity
             tok_sim = token_similarity(query_vec, article_vec)
 
-            # Character ngram similarity
             char_sim = compute_char_ngram_similarity(query_text, article.question)
 
-            # Keyword direct match bonus
             kw_bonus = 0.0
             if article.keywords:
                 raw_kws = [k.strip().lower() for k in article.keywords.split(",") if k.strip()]
@@ -288,19 +301,17 @@ class KnowledgeBaseService:
                         kw_bonus += 0.2
             kw_bonus = min(0.4, kw_bonus)
 
-            # Substring / exact match bonus (require minimum length to avoid matching single common letters)
+            # Minimum length, or single common letters would match everything
             exact_bonus = 0.0
             if len(query_text) >= 4 and (
                 query_text.lower() in article.question.lower() or article.question.lower() in query_text.lower()
             ):
                 exact_bonus = 0.25
 
-            # Combined score capped at 1.0
             final_score = min(1.0, (tok_sim * 0.65) + (char_sim * 0.2) + kw_bonus + exact_bonus)
 
             if final_score >= threshold:
                 scored.append((article, round(final_score, 4)))
 
-        # Sort by score descending
         scored.sort(key=lambda item: item[1], reverse=True)
         return scored[:limit]

@@ -9,6 +9,8 @@ logger = logging.getLogger(__name__)
 
 
 class EmailService:
+    """Support notification emails over SMTP (sent from a thread so the event loop is never blocked)."""
+
     @staticmethod
     def _send_smtp_sync(msg: EmailMessage) -> bool:
         """Synchronous SMTP sender run in an executor thread."""
@@ -17,10 +19,8 @@ class EmailService:
                 logger.info("SMTP sending simulated (host not configured): %s", msg["Subject"])
                 return True
 
-            # Port 465 is implicit-TLS/SMTPS (Gmail SSL, iCloud, many corporate
-            # hosts): it expects a TLS handshake from the very first byte and
-            # rejects a plaintext EHLO, so it needs SMTP_SSL rather than
-            # SMTP + starttls() (which only works with STARTTLS-style port 587).
+            # Port 465 is implicit TLS: it expects the handshake from the first byte, so it needs
+            # SMTP_SSL; SMTP + starttls() only works on STARTTLS ports such as 587.
             smtp_cls = smtplib.SMTP_SSL if settings.SMTP_PORT == 465 else smtplib.SMTP
             with smtp_cls(settings.SMTP_HOST, settings.SMTP_PORT, timeout=10.0) as server:
                 if settings.SMTP_USE_TLS and settings.SMTP_PORT != 465:
@@ -75,6 +75,7 @@ class EmailService:
         automated_answer: Optional[str] = None,
         custom_sender: Optional[Callable[[EmailMessage], bool]] = None,
     ) -> bool:
+        """Tell the support team a ticket was opened; replying to that email resolves it."""
         handle = user_handle or f"User_{user_id}"
         subject = f"[Ticket #{ticket_id}] Nouvelle demande de support de @{handle}"
         body = (
@@ -102,6 +103,7 @@ class EmailService:
         solution: str,
         custom_sender: Optional[Callable[[EmailMessage], bool]] = None,
     ) -> bool:
+        """Tell the support team a ticket was resolved, and on which channel."""
         subject = f"[Ticket #{ticket_id}] Résolu via {resolution_channel}"
         body = (
             f"Bonjour Équipe Support,\n\n"

@@ -5,6 +5,8 @@ from app.models import CommunityWarning
 
 
 class WarningService:
+    """Moderation warnings issued to a user within a community group."""
+
     @staticmethod
     async def add_warning(
         session: AsyncSession,
@@ -13,6 +15,7 @@ class WarningService:
         warned_by: str,
         reason: str = None,
     ) -> CommunityWarning:
+        """Record a warning; a blank `reason` is stored as null."""
         warning = CommunityWarning(
             user_id=user_id,
             group_id=group_id,
@@ -28,6 +31,7 @@ class WarningService:
     async def list_warnings(
         session: AsyncSession, user_id: int, group_id: int
     ) -> List[CommunityWarning]:
+        """A user's warnings in a group, newest first."""
         result = await session.execute(
             select(CommunityWarning)
             .where(CommunityWarning.user_id == user_id, CommunityWarning.group_id == group_id)
@@ -37,6 +41,7 @@ class WarningService:
 
     @staticmethod
     async def count_warnings(session: AsyncSession, user_id: int, group_id: int) -> int:
+        """How many warnings a user has in a group."""
         result = await session.execute(
             select(func.count())
             .select_from(CommunityWarning)

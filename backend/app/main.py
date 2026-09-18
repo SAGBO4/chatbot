@@ -53,11 +53,7 @@ logger.addFilter(SensitiveDataFilter())
 
 
 async def _safe_background_task(coro_fn, *args, **kwargs):
-    """
-    Executes a background task inside an isolated fault boundary so that any
-    unhandled exception (socket timeout, network drop, etc.) is logged with
-    full context and does not propagate to Starlette's ASGI response serialization loop.
-    """
+    """Run a background task and log any exception (timeout, network drop...) instead of letting it reach Starlette."""
     try:
         if inspect.iscoroutinefunction(coro_fn):
             await coro_fn(*args, **kwargs)
@@ -170,14 +166,9 @@ def verify_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
         )
 
 
-# Zero-width / invisible formatting characters that must never be able to
-# mask a quote marker (e.g. a zero-width space slipped in front of '>' -
-# accidentally by a mail client, or deliberately - would otherwise defeat
-# every check below and leak quoted thread history into the ticket solution
-# and the knowledge base). Stripped only for marker *detection*; the
-# original line text is what actually gets kept in clean_lines, so this
-# never alters real content.
-_INVISIBLE_CHARS_RE = re.compile("[​‌‍⁠﻿]")
+# Zero-width characters must not hide a quote marker (e.g. a zero-width space before ">").
+# They are stripped for marker detection only, never from the text that is kept.
+_INVISIBLE_CHARS_RE = re.compile("[\u200b\u200c\u200d\u2060\ufeff]")
 
 # Quoted email header line, e.g. "From: support@example.com" or
 # "De : Jean <jean@example.com>".
@@ -186,18 +177,12 @@ _FROM_PREFIX_RE = re.compile(r"^(?:From|De)\s*:\s*(.*)$", re.IGNORECASE)
 
 def _is_quoted_header_line(text: str) -> bool:
     """
-    True if `text` is (only) a "From:"/"De :" header whose value ends in an
-    email address, bare or bracketed - not merely a sentence that starts
-    that way and happens to mention an address mid-sentence, e.g. "De :
-    notre point de vue technique <support@example.com>, le souci vient du
-    DNS." must NOT match.
+    True if `text` is only a "From:" / "De :" header whose value ends in an email address
+    (bare or bracketed). A sentence that merely starts that way and mentions an address
+    mid-sentence ("De : notre point de vue <a@b.c>, le souci vient du DNS.") must not match.
 
-    Deliberately implemented with plain string operations instead of a
-    single regex: an earlier version used `.*(?:<...@...>|\\S+@\\S+)\\s*$`,
-    which has two unbounded, overlapping quantifiers (`.*` and `\\S+`) and
-    is vulnerable to catastrophic backtracking (confirmed by a dedicated
-    ReDoS test - a ~200KB non-matching line took 100+ seconds). This
-    formulation only ever does bounded, linear work.
+    Plain string operations on purpose: a single regex with two overlapping unbounded
+    quantifiers backtracked catastrophically (a ~200KB line took 100+ seconds; see the ReDoS test).
     """
     match = _FROM_PREFIX_RE.match(text)
     if not match:
@@ -219,41 +204,26 @@ def _is_quoted_header_line(text: str) -> bool:
 
 def clean_email_reply_body(body: Optional[str]) -> str:
     """
-    Strips email thread history and quote lines.
+    Strip quoted thread history from an email reply: keep what precedes the first quote marker.
 
-    Returns whatever precedes the first quote marker, which is legitimately
-    empty when the marker sits on the first line (bottom-posted replies,
-    forwards, some Brevo payloads whose extraction fell back to the raw
-    text) - i.e. the reply added no new content of its own. Callers must
-    treat an empty result as "nothing to resolve with" rather than falling
-    back to the untouched body, which would leak the quoted thread history
-    back into the ticket solution and the knowledge base.
-
-    `body` is normally a str (guaranteed by the Pydantic request schemas of
-    every current caller), but this is a small reusable text helper, not a
-    request handler, so it validates its own input rather than trusting
-    every future caller: None is treated as "no content" (returns "",
-    consistent with the "nothing to resolve" contract above), and any other
-    non-str type raises TypeError immediately instead of failing later with
-    a confusing AttributeError/TypeError deep inside the loop.
+    The result is legitimately empty when the marker is on the first line (bottom-posted reply,
+    forward): the reply added no content. Callers must treat "" as "nothing to resolve" and never
+    fall back to the raw body, which would leak the quoted thread into the ticket solution and the
+    knowledge base. `None` gives ""; any other non-str raises TypeError.
     """
     if body is None:
         return ""
     if not isinstance(body, str):
         raise TypeError(f"clean_email_reply_body expects a str or None, got {type(body).__name__!r}")
 
-    # Split strictly on real line breaks (\r\n, \r, \n) - NOT str.splitlines(),
-    # which also treats \x0b, \x0c, \x1c-\x1e, \x85 (NEL), U+2028 and U+2029
-    # as line boundaries and can fragment one legitimate sentence into
-    # multiple independently-matched "lines".
+    # Split on real line breaks only: str.splitlines() also splits on \x0b, \x0c, \x1c-\x1e, \x85
+    # and U+2028/2029, which would cut one sentence into several "lines".
     lines = body.replace("\r\n", "\n").replace("\r", "\n").split("\n")
 
     clean_lines = []
     for line in lines:
         stripped = line.strip()
-        # Marker detection is done on a copy with invisible characters
-        # stripped out, so they can't be used to smuggle a marker past these
-        # checks; `line` (unmodified) is still what gets appended below.
+        # Detect markers on a copy without invisible characters; the original `line` is what is kept.
         detection_text = _INVISIBLE_CHARS_RE.sub("", stripped)
 
         # Common email quote markers: standard email quote prefix '>'
@@ -280,6 +250,10 @@ def clean_email_reply_body(body: Optional[str]) -> str:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    """
+    Startup: Sentry (if configured), database schema, the legacy community group seed, and one
+    shared HTTP client for the Telegram relay, AI and crypto services. Shutdown closes that client.
+    """
     if getattr(settings, "SENTRY_DSN", None):
         try:
             import sentry_sdk
@@ -323,23 +297,17 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[o.strip() for o in settings.CORS_ALLOWED_ORIGINS.split(",") if o.strip()],
-    # No cookie/session-based auth is used (see verify_api_key: X-API-Key
-    # header), so credentialed CORS requests are never needed. Keeping this
-    # False is also what makes allow_origins=["*"] (the local/dev default)
-    # safe - browsers refuse "*" together with allow_credentials=True.
+    # Auth uses the X-API-Key header, not cookies, so credentials are never needed. Keeping this
+    # False is also what makes the dev default allow_origins=["*"] safe.
     allow_credentials=False,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
-# REVERSE PROXY ACCESS LOGGING GUIDANCE:
-# To prevent sensitive query tokens (?token=...) from leaking into server access logs:
-# - Nginx: log $uri instead of $request_uri, or configure map to redact query strings:
-#     log_format safe '$remote_addr - $remote_user [$time_local] "$request_method $uri" $status $body_bytes_sent';
-# - Caddy: configure log filtering or pass tokens via X-Webhook-Token header instead of URL queries.
 @app.middleware("http")
 async def sanitize_access_logging_middleware(request: Request, call_next):
+    """Log each request with secrets in the query string redacted (the reverse proxy must do the same: see deploy/)."""
     sanitized_url = sanitize_url_query(str(request.url))
     logger.debug("HTTP %s %s - incoming", request.method, sanitized_url)
     response = await call_next(request)
@@ -349,6 +317,7 @@ async def sanitize_access_logging_middleware(request: Request, call_next):
 
 @app.get("/health")
 async def health_check(session: AsyncSession = Depends(get_db)):
+    """Liveness probe: pings the database and answers 503 if it is unreachable."""
     try:
         await session.execute(text("SELECT 1"))
         return {"status": "ok", "database": "connected", "service": "support-bot-backend"}
@@ -367,6 +336,7 @@ async def handle_query(
     payload: QueryRequest,
     session: AsyncSession = Depends(get_db),
 ):
+    """Answer a user's question from the knowledge base (and the optional AI), with a confidence score."""
     return await QueryOrchestrator.process_query(
         session=session,
         query=payload.query,
@@ -388,6 +358,7 @@ async def create_ticket(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
 ):
+    """Open a support ticket; the support team is emailed in the background when email is enabled."""
     ticket = await TicketService.create_ticket(
         session=session,
         user_id=payload.user_id,
@@ -396,7 +367,6 @@ async def create_ticket(
         automated_answer=payload.automated_answer,
     )
 
-    # Multi-channel alert: dispatch email notification to support team in the background if email is configured
     if settings.is_email_configured():
         background_tasks.add_task(
             _safe_background_task,
@@ -419,6 +389,7 @@ async def list_tickets(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
+    """List tickets, optionally filtered by status or `user_id`; paginated."""
     status_val = status_filter.value if status_filter else None
     return await TicketService.get_all_tickets(
         session=session,
@@ -461,6 +432,7 @@ async def get_ticket(
     user_id: Optional[int] = Query(default=None, description="Optional user ID to enforce ownership scoping"),
     session: AsyncSession = Depends(get_db),
 ):
+    """Get one ticket. With `user_id`, a ticket belonging to another user is reported as not found."""
     ticket = await TicketService.get_ticket(session=session, ticket_id=ticket_id, user_id=user_id)
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
@@ -502,6 +474,11 @@ async def resolve_ticket(
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
 ):
+    """
+    Resolve a ticket and, by default, add its solution to the knowledge base.
+
+    `is_newly_resolved` is false when another agent had already resolved it.
+    """
     channel = payload.resolution_channel or "TELEGRAM"
     ticket, newly_resolved = await TicketService.resolve_ticket(
         session=session,
@@ -540,17 +517,16 @@ async def _resolve_inbound_email(
     preloaded_ticket: Optional[Ticket] = None,
 ) -> Dict[str, Any]:
     """
-    Shared resolution logic for an inbound support reply email, regardless of
-    which webhook shape delivered it (generic HMAC-signed endpoint or Brevo's
-    native Inbound Parsing endpoint).
+    Resolve a ticket from an inbound support reply email, whichever webhook delivered it
+    (the generic HMAC endpoint or Brevo's batch endpoint).
 
-    Extracts the ticket id from the subject, resolves the ticket, forwards the
-    solution to the user on Telegram, notifies the support group, and feeds
-    the knowledge base. Never raises for a missing/unmatched ticket id or an
-    unknown ticket id - both are reported back as a result dict so a caller
-    processing a batch (Brevo) can continue with its other items; a caller
-    with a single-item contract (the generic endpoint) can still translate
-    these into its existing HTTPException responses.
+    Extracts the ticket id from the subject, resolves the ticket, forwards the solution to the
+    user on Telegram, notifies the support group and feeds the knowledge base.
+
+    Never raises for expected problems: it returns a dict whose `status` is one of
+    `unauthorized_sender`, `no_ticket_reference`, `empty_body`, `ticket_not_found`,
+    `already_resolved` or `resolved`, so a batch caller can carry on with its other items and a
+    single-item caller can map the status to an HTTP error.
     """
     if not settings.is_authorized_email_sender(sender):
         return {
@@ -608,11 +584,9 @@ async def _resolve_inbound_email(
             "message": f"Ticket #{ticket_id} was already resolved by {ticket.resolved_by} via {ticket.resolution_channel}.",
         }
 
-    # 1. Forward the solution to the user on Telegram. The solution and sender
-    # come straight from an inbound email, so any Markdown metacharacter they
-    # contain must be escaped before being wrapped in our own ** / * / ` -
-    # otherwise an unbalanced '*', '_' or '`' makes Telegram reject the whole
-    # message with a 400 after the ticket has already been marked resolved.
+    # Solution and sender come from an email: escape their Markdown before wrapping them in our own
+    # formatting, or an unbalanced `*`, `_` or backtick makes Telegram reject the whole message (400)
+    # after the ticket is already marked resolved.
     safe_solution = escape_telegram_markdown(clean_solution)
     safe_sender = escape_telegram_markdown(sender)
 
@@ -654,11 +628,10 @@ async def _resolve_inbound_email(
 
 def _select_brevo_body(item: BrevoInboundItem) -> str:
     """
-    Picks the best available body from a Brevo Inbound Parsing item: its own
-    signature/quote-stripped extraction when present, else the raw text body.
-    Either way the result still passes through clean_email_reply_body as a
-    second pass, so behavior degrades gracefully if Brevo's extraction ever
-    misses a quote marker our own regex still catches.
+    Pick a Brevo item's own quote-stripped extraction when present, else its raw text body.
+
+    Either way `clean_email_reply_body` runs on it afterwards, as a second pass in case Brevo's
+    extraction misses a quote marker.
     """
     if item.ExtractedMarkdownMessage and item.ExtractedMarkdownMessage.strip():
         return item.ExtractedMarkdownMessage
@@ -670,16 +643,13 @@ def verify_brevo_inbound_token(
     header_token: Optional[str] = None,
 ) -> None:
     """
-    Verifies the shared secret Brevo sends back either via an X-Webhook-Token /
-    X-Brevo-Token header or as a `?token=` query parameter on every call to the
-    Brevo inbound webhook.
+    Verify the shared secret sent with every Brevo inbound webhook call, either in an
+    `X-Webhook-Token` / `X-Brevo-Token` header or as a `?token=` query parameter.
 
-    Brevo does not sign its webhook requests natively. Authenticating via custom
-    headers (X-Webhook-Token or X-Brevo-Token) avoids leaking tokens in HTTP
-    access logs, while maintaining backward-compatible support for `?token=...`.
+    Brevo does not sign its requests. The headers keep the token out of HTTP access logs;
+    `?token=` remains supported for compatibility.
 
-    Raises HTTPException if the secret is not configured (fail closed), the
-    token is missing, or it does not match.
+    Raises HTTPException if the secret is not configured (fail closed), or the token is missing or wrong.
     """
     if not settings.EMAIL_ENABLED:
         raise HTTPException(
@@ -708,14 +678,10 @@ async def handle_inbound_email(
     x_webhook_signature: Optional[str] = Header(default=None),
 ):
     """
-    Handles incoming support reply emails.
-    Extracts ticket ID from subject ([Ticket #123]), resolves the ticket,
-    delivers the answer to the user on Telegram, and updates the knowledge base.
+    Resolve a ticket from a support reply email (ticket id taken from the subject, `[Ticket #123]`).
 
-    The request must carry a valid HMAC-SHA256 signature of the raw body
-    (header X-Webhook-Signature, hex-encoded, keyed with EMAIL_WEBHOOK_SECRET)
-    so that only the trusted email relay can create/resolve tickets and feed
-    the knowledge base.
+    The request must carry a hex HMAC-SHA256 of the raw body in `X-Webhook-Signature`, keyed with
+    EMAIL_WEBHOOK_SECRET, so only the trusted email relay can resolve tickets and feed the knowledge base.
     """
     raw_body = await request.body()
     verify_email_webhook_signature(raw_body, x_webhook_signature)
@@ -756,21 +722,14 @@ async def handle_brevo_inbound_email(
     x_brevo_token: Optional[str] = Header(default=None),
 ):
     """
-    Handles Brevo's native Inbound Parsing webhook shape: a batch (`items[]`)
-    of parsed emails, each authenticated collectively by a shared secret sent
-    either via `X-Webhook-Token` / `X-Brevo-Token` headers or as a `?token=`
-    query parameter.
+    Resolve tickets from Brevo's Inbound Parsing webhook: a batch (`items[]`) of parsed emails
+    authenticated by one shared secret (see `verify_brevo_inbound_token`).
 
-    Every item is resolved independently via the same logic as the generic
-    /api/webhooks/email-inbound endpoint (_resolve_inbound_email): one item's
-    failure (no ticket id in its subject, unknown ticket) is reported in that
-    item's result entry without aborting the rest of the batch.
+    Each item goes through `_resolve_inbound_email` independently: one item's failure is reported
+    in its own result entry and does not abort the batch.
 
-    The token is checked before the body is parsed (raw bytes -> manual
-    model_validate_json, same as the generic endpoint) rather than via a
-    `payload: BrevoInboundWebhookRequest` parameter, so an unauthenticated
-    caller gets a plain 401 instead of a 422 disclosing the expected JSON
-    shape.
+    The token is checked before the body is parsed (manual `model_validate_json` instead of a
+    `payload` parameter) so an unauthenticated caller gets a 401, not a 422 revealing the expected JSON.
     """
     header_token = x_webhook_token or x_brevo_token
     verify_brevo_inbound_token(token=token, header_token=header_token)
@@ -835,6 +794,7 @@ async def ingest_knowledge(
     payload: KnowledgeIngestRequest,
     session: AsyncSession = Depends(get_db),
 ):
+    """Add a knowledge base article manually."""
     return await KnowledgeBaseService.add_article(
         session=session,
         question=payload.question,
@@ -854,6 +814,7 @@ async def list_knowledge(
     offset: int = Query(default=0, ge=0),
     session: AsyncSession = Depends(get_db),
 ):
+    """List knowledge base articles; paginated."""
     return await KnowledgeBaseService.get_all_articles(session=session, limit=limit, offset=offset)
 
 
@@ -867,6 +828,7 @@ async def create_warning(
     payload: WarningCreateRequest,
     session: AsyncSession = Depends(get_db),
 ):
+    """Record a moderation warning for a user in a group."""
     return await WarningService.add_warning(
         session=session,
         user_id=payload.user_id,
@@ -886,6 +848,7 @@ async def list_warnings(
     group_id: int = Query(..., description="Telegram group id the warnings were issued in"),
     session: AsyncSession = Depends(get_db),
 ):
+    """List a user's warnings in a group, with their count."""
     warnings = await WarningService.list_warnings(session=session, user_id=user_id, group_id=group_id)
     return WarningListResponse(count=len(warnings), warnings=warnings)
 
@@ -896,6 +859,7 @@ async def list_warnings(
     dependencies=[Depends(verify_api_key)],
 )
 async def get_crypto_price(symbol: str):
+    """Live market data for an asset symbol (e.g. `btc`): 404 for an unknown symbol, 503 when the price provider is down."""
     if CryptoService.resolve_asset_id(symbol) is None:
         raise HTTPException(status_code=404, detail=f"Unknown asset '{symbol}'")
 
@@ -912,6 +876,7 @@ async def get_crypto_price(symbol: str):
     dependencies=[Depends(verify_api_key)],
 )
 async def get_bot_setting(key: str, session: AsyncSession = Depends(get_db)):
+    """Read a persisted bot setting."""
     value = await BotSettingsService.get_value(session=session, key=key)
     return BotSettingResponse(key=key, value=value)
 
@@ -926,6 +891,7 @@ async def set_bot_setting(
     payload: BotSettingRequest,
     session: AsyncSession = Depends(get_db),
 ):
+    """Create or update a persisted bot setting."""
     setting = await BotSettingsService.set_value(
         session=session, key=key, value=payload.value, updated_by=payload.updated_by
     )
@@ -942,6 +908,7 @@ async def add_whitelist_entry(
     payload: WhitelistAddRequest,
     session: AsyncSession = Depends(get_db),
 ):
+    """Add a user to the admin whitelist."""
     return await WhitelistService.add(session=session, user_id=payload.user_id, added_by=payload.added_by)
 
 
@@ -950,6 +917,7 @@ async def add_whitelist_entry(
     dependencies=[Depends(verify_api_key)],
 )
 async def remove_whitelist_entry(user_id: int, session: AsyncSession = Depends(get_db)):
+    """Remove a user from the admin whitelist (404 if not listed)."""
     removed = await WhitelistService.remove(session=session, user_id=user_id)
     if not removed:
         raise HTTPException(status_code=404, detail="Whitelist entry not found")
@@ -962,6 +930,7 @@ async def remove_whitelist_entry(user_id: int, session: AsyncSession = Depends(g
     dependencies=[Depends(verify_api_key)],
 )
 async def list_whitelist_entries(session: AsyncSession = Depends(get_db)):
+    """List the admin whitelist."""
     entries = await WhitelistService.list(session=session)
     return WhitelistListResponse(entries=entries)
 
@@ -972,5 +941,6 @@ async def list_whitelist_entries(session: AsyncSession = Depends(get_db)):
     dependencies=[Depends(verify_api_key)],
 )
 async def check_whitelist_entry(user_id: int, session: AsyncSession = Depends(get_db)):
+    """Whether a user counts as admin: the bot owner always does, everyone else must be whitelisted."""
     is_whitelisted = settings.is_bot_owner(user_id) or await WhitelistService.is_whitelisted(session=session, user_id=user_id)
     return WhitelistCheckResponse(user_id=user_id, is_whitelisted=is_whitelisted)

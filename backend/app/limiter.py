@@ -1,9 +1,16 @@
+"""
+Rate limiting for the API: `slowapi` when installed, otherwise a small in-memory fallback.
+
+The fallback keeps its counters in the process, so its limits are not shared between workers.
+Exposes `limiter` (used as `@limiter.limit("30/minute")`), `RateLimitExceeded` and the 429 handler.
+"""
 import time
 from typing import Callable, Optional, Dict, List
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
 
 def _rate_limit_exceeded_handler(request: Request, exc: Exception):
+    """Turn a rate-limit error into a 429 JSON response (the message goes in both `detail` and `error`)."""
     detail = getattr(exc, "detail", "Rate limit exceeded")
     msg = f"Rate limit exceeded: {detail}" if "Rate limit exceeded" not in str(detail) else str(detail)
     return JSONResponse(
@@ -18,6 +25,7 @@ try:
     SLOWAPI_AVAILABLE = True
 
     def get_remote_address(*args, **kwargs) -> str:
+        """Client IP used as the rate-limit key; `127.0.0.1` when no request is available."""
         if args and hasattr(args[0], "client"):
             return slowapi_get_remote_address(args[0])
         request = kwargs.get("request")

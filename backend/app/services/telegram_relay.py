@@ -8,6 +8,8 @@ logger = logging.getLogger(__name__)
 
 
 class TelegramRelay:
+    """Sends messages to Telegram users and to the support group through the Bot API, from the backend."""
+
     _shared_client: Optional[httpx.AsyncClient] = None
 
     @classmethod

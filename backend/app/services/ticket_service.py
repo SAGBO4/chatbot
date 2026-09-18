@@ -6,6 +6,8 @@ from app.services.knowledge_base import KnowledgeBaseService
 
 
 class TicketService:
+    """Ticket persistence and lifecycle. Methods that change data commit, except `resolve_ticket(auto_commit=False)`."""
+
     @staticmethod
     async def create_ticket(
         session: AsyncSession,
@@ -14,6 +16,7 @@ class TicketService:
         question: str,
         automated_answer: Optional[str] = None,
     ) -> Ticket:
+        """Create an OPEN ticket."""
         ticket = Ticket(
             user_id=user_id,
             user_handle=user_handle,
@@ -30,6 +33,7 @@ class TicketService:
     async def get_ticket(
         session: AsyncSession, ticket_id: int, user_id: Optional[int] = None
     ) -> Optional[Ticket]:
+        """One ticket by id. With `user_id`, only if it belongs to that user (ownership check)."""
         query = select(Ticket).where(Ticket.id == ticket_id)
         if user_id is not None:
             query = query.where(Ticket.user_id == user_id)
@@ -44,6 +48,7 @@ class TicketService:
         limit: int = 50,
         offset: int = 0,
     ) -> List[Ticket]:
+        """Tickets, newest first, optionally filtered by status and/or owner."""
         query = select(Ticket)
         if status:
             query = query.where(Ticket.status == status)
@@ -75,6 +80,7 @@ class TicketService:
     async def get_ticket_by_support_message_id(
         session: AsyncSession, message_id: int
     ) -> Optional[Ticket]:
+        """The ticket whose support-group card has this Telegram message id."""
         result = await session.execute(
             select(Ticket).where(Ticket.support_group_message_id == message_id)
         )
@@ -92,8 +98,11 @@ class TicketService:
         preloaded_ticket: Optional[Ticket] = None,
     ) -> Tuple[Optional[Ticket], bool]:
         """
-        Resolve a ticket. Returns (ticket, is_newly_resolved).
-        If already resolved, returns (ticket, False) to prevent duplicate actions.
+        Resolve a ticket and return `(ticket, is_newly_resolved)`; `(None, False)` if it does not exist.
+
+        An already resolved ticket is returned untouched with `False`, so callers do not repeat
+        notifications. `preloaded_ticket` lets a batch caller skip the lookup; `auto_commit=False`
+        leaves the commit to the caller.
         """
         ticket = preloaded_ticket or await TicketService.get_ticket(session, ticket_id)
         if not ticket:

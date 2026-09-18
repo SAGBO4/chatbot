@@ -8,6 +8,13 @@ logger = logging.getLogger(__name__)
 
 
 class AIAssistantService:
+    """
+    Optional LLM step: turns the best knowledge base articles into an answer in the user's language.
+
+    Providers: openai, gemini, deepseek (`DEFAULT_MODELS`). Any failure returns None so the
+    caller falls back to the article text.
+    """
+
     _shared_client: Optional[httpx.AsyncClient] = None
 
     @classmethod
@@ -24,6 +31,7 @@ class AIAssistantService:
 
     @staticmethod
     def _build_prompt(query: str, retrieved_articles: List[Tuple[KnowledgeArticle, float]]) -> str:
+        """Prompt telling the model to answer only from the top 3 retrieved articles, in the question's language."""
         context_snippets = []
         for idx, (art, score) in enumerate(retrieved_articles[:3], start=1):
             context_snippets.append(f"[{idx}] Question: {art.question}\nSolution: {art.solution}")
@@ -88,9 +96,7 @@ class AIAssistantService:
         base_url: str,
     ) -> Optional[str]:
         """Calls an OpenAI-compatible chat completions endpoint (used by OpenAI and DeepSeek)."""
-        # A caller-supplied client is shared (connection pool, custom
-        # transport) and must outlive this call, so only a client we create
-        # ourselves gets closed via `async with`.
+        # Only close a client we created: a caller-supplied one is shared and must outlive this call.
         owns_client = client is None
         session = client or httpx.AsyncClient(timeout=10.0)
         try:

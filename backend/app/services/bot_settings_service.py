@@ -12,8 +12,11 @@ DEFAULT_LANGUAGE = "fr"
 
 
 class BotSettingsService:
+    """Key/value settings persisted in the database (community group id, language)."""
+
     @staticmethod
     async def get_value(session: AsyncSession, key: str) -> Optional[str]:
+        """The stored value, or None when the key was never set."""
         result = await session.execute(select(BotSetting).where(BotSetting.key == key))
         setting = result.scalars().first()
         return setting.value if setting else None
@@ -22,6 +25,7 @@ class BotSettingsService:
     async def set_value(
         session: AsyncSession, key: str, value: Optional[str], updated_by: Optional[str] = None
     ) -> BotSetting:
+        """Create or update a setting."""
         result = await session.execute(select(BotSetting).where(BotSetting.key == key))
         setting = result.scalars().first()
         if setting is None:
@@ -77,8 +81,11 @@ class BotSettingsService:
 
 
 class WhitelistService:
+    """Users allowed to run admin commands, on top of the bot owner who always is."""
+
     @staticmethod
     async def add(session: AsyncSession, user_id: int, added_by: str) -> BotAdminWhitelist:
+        """Add a user; adding one who is already listed returns the existing entry."""
         result = await session.execute(select(BotAdminWhitelist).where(BotAdminWhitelist.user_id == user_id))
         entry = result.scalars().first()
         if entry is not None:
@@ -91,6 +98,7 @@ class WhitelistService:
 
     @staticmethod
     async def remove(session: AsyncSession, user_id: int) -> bool:
+        """Remove a user; False if they were not listed."""
         result = await session.execute(select(BotAdminWhitelist).where(BotAdminWhitelist.user_id == user_id))
         entry = result.scalars().first()
         if entry is None:
@@ -106,5 +114,6 @@ class WhitelistService:
 
     @staticmethod
     async def list(session: AsyncSession) -> List[BotAdminWhitelist]:
+        """All entries, oldest first."""
         result = await session.execute(select(BotAdminWhitelist).order_by(BotAdminWhitelist.created_at.asc()))
         return list(result.scalars().all())

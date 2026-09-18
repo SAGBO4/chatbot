@@ -8,9 +8,8 @@ logger = logging.getLogger(__name__)
 
 COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price"
 
-# Curated symbol -> CoinGecko asset id mapping (see design.md decision 6:
-# CoinGecko ids don't map 1:1 from ticker symbols, so this is deliberately a
-# small, explicit, extendable table rather than a live search-and-guess).
+# Ticker symbol -> CoinGecko asset id. CoinGecko ids don't map 1:1 from tickers, so this is an
+# explicit, extendable table rather than a live search-and-guess.
 SYMBOL_TO_COINGECKO_ID: Dict[str, str] = {
     "btc": "bitcoin",
     "eth": "ethereum",
@@ -26,16 +25,20 @@ SYMBOL_TO_COINGECKO_ID: Dict[str, str] = {
 
 
 class CryptoService:
+    """Live crypto market data from CoinGecko, cached in memory for CRYPTO_CACHE_TTL_SECONDS."""
+
     _shared_client: Optional[httpx.AsyncClient] = None
-    # In-memory TTL cache keyed by coingecko id -> (data, fetched_at).
+    # coingecko id -> (data, fetched_at)
     _cache: Dict[str, tuple] = {}
 
     @classmethod
     def set_shared_client(cls, client: Optional[httpx.AsyncClient]) -> None:
+        """Use one shared httpx client for provider calls (set at app startup, cleared at shutdown)."""
         cls._shared_client = client
 
     @classmethod
     def resolve_asset_id(cls, symbol: str) -> Optional[str]:
+        """CoinGecko id for a ticker symbol (case-insensitive), or None if it is not in the table."""
         return SYMBOL_TO_COINGECKO_ID.get(symbol.strip().lower())
 
     @classmethod
@@ -43,10 +46,10 @@ class CryptoService:
         cls, symbol: str, client: Optional[httpx.AsyncClient] = None
     ) -> Optional[Dict[str, float]]:
         """
-        Returns current price/24h change/market cap/24h volume (in USD) for
-        the given asset symbol, or None if the symbol is unrecognized or the
-        provider call failed (timeout, rate limit, malformed response) - all
-        treated as recoverable per the crypto-market-data spec, never raised.
+        Price, 24h change (%), market cap and 24h volume (USD) for a ticker symbol.
+
+        Returns None, never raises, when the symbol is unknown or the provider fails (timeout,
+        rate limit, malformed response).
         """
         asset_id = cls.resolve_asset_id(symbol)
         if asset_id is None:

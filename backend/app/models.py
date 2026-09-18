@@ -1,3 +1,4 @@
+"""Database models. Timestamps are timezone-aware UTC."""
 import enum
 from datetime import datetime, timezone
 from typing import Optional
@@ -6,10 +7,12 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 
 class Base(DeclarativeBase):
-    pass
+    """Declarative base shared by every model (also used by Alembic autogenerate)."""
 
 
 class TicketStatus(str, enum.Enum):
+    """Ticket lifecycle. The current code only ever sets OPEN and RESOLVED; lookups are case-insensitive."""
+
     OPEN = "OPEN"
     IN_PROGRESS = "IN_PROGRESS"
     RESOLVED = "RESOLVED"
@@ -25,12 +28,14 @@ class TicketStatus(str, enum.Enum):
         return None
 
 
-
 def utc_now() -> datetime:
+    """Current time as an aware UTC datetime (default for the created_at / updated_at columns)."""
     return datetime.now(timezone.utc)
 
 
 class Ticket(Base):
+    """A support request. `status` stores a TicketStatus value; `resolution_channel` is TELEGRAM or EMAIL."""
+
     __tablename__ = "tickets"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -57,6 +62,8 @@ class Ticket(Base):
 
 
 class CommunityWarning(Base):
+    """A moderation warning issued to a user in a community group."""
+
     __tablename__ = "community_warnings"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
@@ -70,6 +77,8 @@ class CommunityWarning(Base):
 
 
 class BotSetting(Base):
+    """A persisted bot setting (key/value), e.g. `community_group_id` or `language`."""
+
     __tablename__ = "bot_settings"
 
     key: Mapped[str] = mapped_column(String(100), primary_key=True)
@@ -81,6 +90,8 @@ class BotSetting(Base):
 
 
 class BotAdminWhitelist(Base):
+    """A user allowed to run admin commands, in addition to the bot owner."""
+
     __tablename__ = "bot_admin_whitelist"
 
     user_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
@@ -91,6 +102,8 @@ class BotAdminWhitelist(Base):
 
 
 class KnowledgeArticle(Base):
+    """A question/solution pair the bot answers with: added manually, or from a resolved ticket (`source_ticket_id`)."""
+
     __tablename__ = "knowledge_articles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)

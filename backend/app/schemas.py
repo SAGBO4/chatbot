@@ -1,3 +1,4 @@
+"""Request and response bodies of the REST API. The `max_length` limits bound the size of untrusted input."""
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
@@ -15,6 +16,7 @@ class QueryResponse(BaseModel):
     confidence: float
     answer: str
     article_id: Optional[int] = None
+    # Whether to ask the user to confirm the answer (false only for an empty question)
     requires_resolution_confirmation: bool = True
 
 
@@ -28,6 +30,7 @@ class TicketCreateRequest(BaseModel):
 class TicketResolveRequest(BaseModel):
     solution: str = Field(..., min_length=1, max_length=5000)
     resolved_by: Optional[str] = None
+    # TELEGRAM or EMAIL
     resolution_channel: Optional[str] = "TELEGRAM"
     add_to_knowledge_base: bool = True
 
@@ -47,6 +50,7 @@ class TicketResponse(BaseModel):
     created_at: datetime
     resolved_at: Optional[datetime] = None
     support_group_message_id: Optional[int] = None
+    # Only set by the resolve endpoint: false when another agent had already resolved the ticket
     is_newly_resolved: Optional[bool] = None
 
 
@@ -60,6 +64,7 @@ class InboundEmailWebhookRequest(BaseModel):
     body: str = Field(..., max_length=200_000)
 
 
+# The Brevo* models mirror Brevo's inbound-parsing payload, hence the capitalized field names.
 class BrevoInboundFrom(BaseModel):
     Address: str = Field(..., max_length=320)
 

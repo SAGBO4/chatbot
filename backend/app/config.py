@@ -4,75 +4,60 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
+    """Application settings, read from the environment or a `.env` file (see `.env.example`)."""
+
     model_config = SettingsConfigDict(
         env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    # Telegram configuration
+    # Telegram
     TELEGRAM_BOT_TOKEN: str = "placeholder_token"
+    # Admin/support group. Env-only on purpose: no chat command can redirect ticket traffic.
     TELEGRAM_SUPPORT_GROUP_ID: Union[int, str] = 0
     TELEGRAM_WEBAPP_URL: Optional[str] = None
 
-    # Telegram Community Group configuration
-    # Legacy static community group id. Used only as a one-time seed for the
-    # persisted `community_group_id` bot setting on first startup (see
-    # backend/services/bot_settings_service.py seed_legacy_community_group);
-    # ignored afterwards. New deployments configure the community group
-    # dynamically via /setup_community instead. Kept distinct from
-    # TELEGRAM_SUPPORT_GROUP_ID (the admin group, which stays env-fixed) so
-    # ticket internals and moderation logs never leak into the public group.
+    # Legacy: only seeds the persisted `community_group_id` setting on first startup
+    # (app/services/bot_settings_service.py); afterwards /setup_community is the only way to change it.
     TELEGRAM_COMMUNITY_GROUP_ID: Union[int, str] = 0
 
-    # Bot owner: the Telegram user id always authorized to configure the
-    # community group, manage the admin whitelist, and change the bot
-    # language (see bot/access_control.py). Deliberately env-only (not
-    # editable from within Telegram) so this root authority can never be
-    # altered by whitelist data corruption or a compromised chat command.
+    # Always allowed to configure the community group, the admin whitelist and the language.
+    # Env-only so this root authority cannot be altered from inside Telegram.
     BOT_OWNER_TELEGRAM_ID: Optional[int] = None
 
     @field_validator("BOT_OWNER_TELEGRAM_ID", mode="before")
     @classmethod
     def _blank_owner_id_means_unset(cls, value):
-        """
-        An empty BOT_OWNER_TELEGRAM_ID= line in .env (the template's default,
-        until an operator fills it in) must mean "unset", not a parsing
-        error - without this, `Settings()` would raise at import time and
-        take the whole app down before it ever got a chance to log anything.
-        """
+        """A blank `BOT_OWNER_TELEGRAM_ID=` (the .env.example default) means "unset"; otherwise `Settings()` fails at import."""
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
 
-    # Seconds a group-triggered answer's YES/NO resolution buttons stay active
-    # before being disabled.
+    # Seconds a community answer's YES/NO buttons stay active
     COMMUNITY_RESOLUTION_TIMEOUT_SECONDS: int = 600
 
-    # Crypto market data configuration (CoinGecko)
+    # Crypto market data (CoinGecko)
     CRYPTO_PROVIDER_TIMEOUT_SECONDS: float = 10.0
     CRYPTO_CACHE_TTL_SECONDS: int = 45
 
-    # Backend configuration
+    # Backend
     BACKEND_HOST: str = "0.0.0.0"  # nosec: B104
     BACKEND_PORT: int = 8000
     BACKEND_URL: str = "http://localhost:8000"
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/chatbot.db"
 
-    # Monitoring & Telemetry
     SENTRY_DSN: Optional[str] = None
 
-    # AI & Knowledge Base configuration
+    # AI: AI_PROVIDER is "openai", "gemini" or "deepseek"; leave AI_MODEL unset for the
+    # provider's default (see AIAssistantService.DEFAULT_MODELS).
     AI_ENABLED: bool = False
     AI_API_KEY: Optional[str] = None
-    # Which LLM provider to use: "openai", "gemini", or "deepseek".
     AI_PROVIDER: str = "openai"
-    # Model name for the selected provider. Leave unset to use a sane default
-    # per provider (see AIAssistantService.DEFAULT_MODELS).
     AI_MODEL: Optional[str] = None
     KB_CONFIDENCE_THRESHOLD: float = 0.3
 
-    # Email & SMTP configuration
+    # Email & SMTP
     EMAIL_ENABLED: bool = False
     SMTP_HOST: str = "smtp.example.com"
     SMTP_PORT: int = 587
@@ -82,81 +67,43 @@ class Settings(BaseSettings):
     SUPPORT_EMAIL_RECIPIENT: str = "support-team@example.com"
     SMTP_USE_TLS: bool = True
 
-    # Inbound email webhook security
-    # Shared secret used to verify the HMAC-SHA256 signature of inbound webhook
-    # requests (header: X-Webhook-Signature). Must be set to a strong random
-    # value in production, and shared with whatever forwards emails to this
-    # endpoint (e.g. the email provider or an IMAP relay script).
+    # Inbound email webhooks. Two secrets because they protect different transports: a body HMAC
+    # (X-Webhook-Signature) and a `?token=` query parameter (Brevo does not sign its requests).
+    # Set both to strong random values in production.
     EMAIL_WEBHOOK_SECRET: Optional[str] = None
-
-    # Brevo Inbound Parsing webhook security
-    # Shared secret Brevo is configured to send back as a `?token=` query
-    # parameter on every call to /api/webhooks/email-inbound/brevo (Brevo does
-    # not sign its webhook requests or support a custom header, so a secret
-    # embedded in the URL is the only practical authentication). Must be set
-    # to a strong random value in production. Kept distinct from
-    # EMAIL_WEBHOOK_SECRET since the two protect different transports (a URL
-    # token vs. a body HMAC) with different exposure risks.
     BREVO_INBOUND_SECRET: Optional[str] = None
 
-    # Comma-separated list of email addresses or domains (@domain.com) authorized to resolve
-    # tickets via inbound email webhooks. If empty, all senders presenting valid webhook secrets are accepted.
+    # Comma-separated addresses or "@domain" suffixes allowed to resolve tickets by email.
+    # Empty accepts any sender that presents a valid secret.
     ALLOWED_SUPPORT_EMAIL_SENDERS: str = ""
 
-    # Backend API authentication
-    # Shared secret the Telegram bot (and any other trusted caller) must send
-    # in the X-API-Key header on every request to the backend API (except
-    # /health and /api/webhooks/email-inbound, which has its own HMAC check).
-    # Must be set to a strong random value whenever the backend is reachable
-    # over a network you don't fully control (e.g. hosted on a public VPS).
+    # Secret the bot sends as `X-API-Key` on every API request, except /health and the two inbound
+    # email webhooks (they check their own secret). Required whenever the backend is reachable
+    # over a network you don't control.
     API_KEY: Optional[str] = None
 
-    # CORS: comma-separated list of allowed origins for browser calls to this
-    # API (e.g. "https://admin.example.com,https://app.example.com"). Default
-    # "*" is fine for local testing/dev, since this API is authenticated via
-    # the X-API-Key header (not cookies), so no credentialed CORS request is
-    # ever needed. Restrict this to your real origin(s) once you have a web
-    # frontend, and keep it as "*" (or empty) if nothing ever calls this API
-    # from a browser.
+    # Comma-separated browser origins allowed to call the API. "*" is fine for local dev because
+    # auth uses `X-API-Key`, not cookies; restrict it once a browser frontend calls the API directly.
     CORS_ALLOWED_ORIGINS: str = "*"
 
     def support_group_is_configured(self) -> bool:
-        """
-        Whether TELEGRAM_SUPPORT_GROUP_ID points to a real Telegram group.
-
-        The default `0` (and any falsy value) means "not configured yet".
-        Single source of truth for this check - it used to be copy-pasted as
-        `not group_id or str(group_id) == "0"` in three places (bot support
-        handlers, bot user handlers, backend telegram relay), which risked
-        drifting out of sync.
-        """
+        """True when TELEGRAM_SUPPORT_GROUP_ID is a real group id; the default 0 (or any falsy value) means "not configured"."""
         return bool(self.TELEGRAM_SUPPORT_GROUP_ID) and str(self.TELEGRAM_SUPPORT_GROUP_ID) != "0"
 
     def community_group_is_configured(self) -> bool:
-        """
-        Whether TELEGRAM_COMMUNITY_GROUP_ID points to a real Telegram group.
-
-        Same "0 (or falsy) means not configured" convention as
-        support_group_is_configured(), kept as a single source of truth for
-        gating the community-group Q&A, /purge, crypto, and moderation
-        routers.
-        """
+        """Same convention as `support_group_is_configured()`; gates the community Q&A, moderation and crypto routers."""
         return bool(self.TELEGRAM_COMMUNITY_GROUP_ID) and str(self.TELEGRAM_COMMUNITY_GROUP_ID) != "0"
 
     def is_bot_owner(self, user_id: int) -> bool:
-        """
-        Whether user_id is the configured bot owner. Returns False whenever
-        BOT_OWNER_TELEGRAM_ID is unset, so no user is ever granted owner
-        authorization by omission.
-        """
+        """False when BOT_OWNER_TELEGRAM_ID is unset, so nobody is owner by omission."""
         return self.BOT_OWNER_TELEGRAM_ID is not None and int(user_id) == int(self.BOT_OWNER_TELEGRAM_ID)
 
     def is_authorized_email_sender(self, sender: str) -> bool:
         """
-        Validates if an inbound email sender is authorized to resolve tickets.
-        If ALLOWED_SUPPORT_EMAIL_SENDERS is set, checks against the comma-separated
-        list of allowed emails or domains (e.g. '@stackwallet.com, support@stackwallet.com').
-        If empty, all senders with valid webhook secrets are accepted.
+        Whether an inbound email sender may resolve tickets.
+
+        Any sender when ALLOWED_SUPPORT_EMAIL_SENDERS is empty; otherwise an exact address
+        or an "@domain" suffix from that list (e.g. "@stackwallet.com, support@stackwallet.com").
         """
         if not self.ALLOWED_SUPPORT_EMAIL_SENDERS:
             return True
@@ -170,23 +117,17 @@ class Settings(BaseSettings):
         return False
 
     def is_email_configured(self) -> bool:
-        """
-        Whether outgoing email support is enabled.
-        Returns True when EMAIL_ENABLED is set to True in configuration, False otherwise.
-        """
+        """Whether outgoing email is enabled (EMAIL_ENABLED)."""
         return bool(self.EMAIL_ENABLED)
 
     def is_email_inbound_configured(self) -> bool:
-        """
-        Whether inbound email support is enabled and configured with at least one secret.
-        """
+        """Whether inbound email is enabled and at least one webhook secret is set."""
         if not self.EMAIL_ENABLED:
             return False
         return bool(
             (self.EMAIL_WEBHOOK_SECRET and self.EMAIL_WEBHOOK_SECRET.strip())
             or (self.BREVO_INBOUND_SECRET and self.BREVO_INBOUND_SECRET.strip())
         )
-
 
 
 settings = Settings()

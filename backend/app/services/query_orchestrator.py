@@ -12,6 +12,8 @@ FALLBACK_NO_MATCH = (
 
 
 class QueryOrchestrator:
+    """Answers a user question from the knowledge base, optionally rephrased by the AI."""
+
     @staticmethod
     async def process_query(
         session: AsyncSession,
@@ -19,6 +21,13 @@ class QueryOrchestrator:
         user_id: Optional[int] = None,
         user_handle: Optional[str] = None,
     ) -> QueryResponse:
+        """
+        Search the knowledge base and answer with the best article. When AI is enabled, the LLM
+        rephrases that article using the top matches; if it fails, the article text is used as is.
+
+        Nothing above the confidence threshold gives `found=False` and a fallback message offering
+        to escalate. `user_id` and `user_handle` are accepted but not used.
+        """
         clean_query = query.strip()
         if not clean_query:
             return QueryResponse(
