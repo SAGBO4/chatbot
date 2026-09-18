@@ -10,7 +10,8 @@ htmlcov/
 *.db-shm
 *.db-wal
 *.sqlite3
-.env
+.env*
+!.env.example
 .chroma/
 frontend/node_modules/
 frontend/.next/
@@ -19,3 +20,7 @@ backend/data/*.db*
 !backend/data/.gitkeep
 tutorial_vps.html
 *.pdf
+
+# OS cruft
+.DS_Store
+Thumbs.db
