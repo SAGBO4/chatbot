@@ -5,6 +5,7 @@ import httpx
 from aiogram import Router, F, Bot
 from aiogram.types import Message
 from backend.config import settings
+from bot.admin_check import is_group_admin
 from bot.api_client import BackendClient
 from bot.language import get_active_language
 from bot.i18n import t
@@ -97,6 +98,13 @@ async def handle_support_agent_reply(
     if not _is_support_group_chat(message.chat.id):
         return
 
+    # Being in the right group is not enough: only a verified admin/agent of
+    # that group may resolve tickets, message arbitrary users on their
+    # behalf, or feed the knowledge base. Re-checked live against Telegram
+    # (see is_group_admin), never trusted from client-controlled state.
+    if not message.from_user or not await is_group_admin(bot, message.chat.id, message.from_user.id):
+        return
+
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
 
@@ -113,12 +121,19 @@ async def handle_support_agent_reply(
         logger.warning("Support-card lookup by message id failed, falling back to text: %s", exc)
         matched_ticket = None
 
+    replied_author = getattr(message.reply_to_message, "from_user", None)
+    replied_from_bot = replied_author is not None and replied_author.id == bot.id
+
     if matched_ticket:
         ticket_id = matched_ticket["id"]
         target_user_id = matched_ticket.get("user_id")
-    else:
+    elif replied_from_bot:
         # 2. Fallback: parse the card's text (covers tickets created before
-        # this lookup existed, or a card whose id was never recorded).
+        # this lookup existed, or a card whose id was never recorded). Only
+        # trusted when the replied-to message was actually posted by the bot
+        # itself - otherwise an admin replying to any other message in the
+        # group (or a message crafted by a non-admin to look like a card)
+        # could be parsed as a ticket/user id pair that was never real.
         replied_text = message.reply_to_message.text or message.reply_to_message.caption or ""
         ticket_match = TICKET_ID_REGEX.search(replied_text)
         user_match = USER_ID_REGEX.search(replied_text)
@@ -212,4 +227,4 @@ async def handle_support_agent_reply(
 
     except Exception as exc:
         logger.error("Error resolving ticket %s via group reply: %s", ticket_id, exc)
-        await message.reply(t("support_resolution_error", lang, ticket_id=ticket_id, error=exc))
+        await message.reply(t("support_resolution_error", lang, ticket_id=ticket_id))

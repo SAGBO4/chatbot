@@ -106,7 +106,7 @@ async def handle_mute(
         )
     except Exception as exc:
         logger.error("Failed to mute user %s in chat %s: %s", user_id, message.chat.id, exc)
-        await message.reply(t("moderation_mute_error", lang, error=exc))
+        await message.reply(t("moderation_mute_error", lang))
         return
 
     safe_name = escape_telegram_markdown(display_name)
@@ -144,7 +144,7 @@ async def handle_unmute(
         )
     except Exception as exc:
         logger.error("Failed to unmute user %s in chat %s: %s", user_id, message.chat.id, exc)
-        await message.reply(t("moderation_unmute_error", lang, error=exc))
+        await message.reply(t("moderation_unmute_error", lang))
         return
 
     safe_name = escape_telegram_markdown(display_name)
@@ -173,7 +173,7 @@ async def handle_ban(
         await bot.ban_chat_member(chat_id=message.chat.id, user_id=user_id)
     except Exception as exc:
         logger.error("Failed to ban user %s in chat %s: %s", user_id, message.chat.id, exc)
-        await message.reply(t("moderation_ban_error", lang, error=exc))
+        await message.reply(t("moderation_ban_error", lang))
         return
 
     safe_name = escape_telegram_markdown(display_name)
@@ -205,7 +205,7 @@ async def handle_kick(
         await bot.unban_chat_member(chat_id=message.chat.id, user_id=user_id, only_if_banned=True)
     except Exception as exc:
         logger.error("Failed to kick user %s in chat %s: %s", user_id, message.chat.id, exc)
-        await message.reply(t("moderation_kick_error", lang, error=exc))
+        await message.reply(t("moderation_kick_error", lang))
         return
 
     safe_name = escape_telegram_markdown(display_name)
@@ -245,7 +245,7 @@ async def handle_warn(
         total = warnings_data.get("count", "?")
     except Exception as exc:
         logger.error("Failed to record warning for user %s in chat %s: %s", user_id, message.chat.id, exc)
-        await message.reply(t("moderation_warn_error", lang, error=exc))
+        await message.reply(t("moderation_warn_error", lang))
         return
 
     safe_name = escape_telegram_markdown(display_name)

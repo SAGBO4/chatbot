@@ -23,9 +23,11 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import Link from 'next/link';
+import { useTelegram } from '@/lib/telegram/TelegramContext';
 
 export default function SettingsPage() {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
+  const { isAdmin, isLoadingAdmin } = useTelegram();
 
   // Settings state
   const [communityGroupId, setCommunityGroupId] = useState('');
@@ -186,6 +188,41 @@ export default function SettingsPage() {
       setIsQueryingWarns(false);
     }
   };
+
+  if (isLoadingAdmin) {
+    return (
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-400">
+        <RefreshCw className="h-6 w-6 animate-spin text-white mb-3" />
+        <p className="text-xs">{locale === 'fr' ? 'Vérification des droits administrateur...' : 'Verifying admin permissions...'}</p>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="mx-auto max-w-lg px-4 py-16 text-center">
+        <Card elevated className="p-8 border-white/[0.1]">
+          <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 mx-auto mb-4">
+            <ShieldCheck className="h-6 w-6" />
+          </div>
+          <h2 className="text-lg font-bold text-white mb-2">
+            {locale === 'fr' ? 'Accès Administrateur Requis' : 'Admin Access Required'}
+          </h2>
+          <p className="text-xs text-neutral-400 leading-relaxed mb-6">
+            {locale === 'fr'
+              ? 'Cette section est strictement réservée aux administrateurs et modérateurs autorisés du bot Stack Wallet. Votre compte Telegram ne dispose pas de ces privilèges.'
+              : 'This section is strictly restricted to authorized Stack Wallet bot administrators and moderators. Your Telegram account does not have these privileges.'}
+          </p>
+          <Link href="/">
+            <Button variant="primary" size="sm" className="w-full justify-center">
+              <ArrowLeft className="h-3.5 w-3.5 mr-1.5" />
+              {locale === 'fr' ? 'Retour au support' : 'Back to Support'}
+            </Button>
+          </Link>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">

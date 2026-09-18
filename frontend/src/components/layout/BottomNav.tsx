@@ -20,12 +20,12 @@ interface BottomNavProps {
 export const BottomNav: React.FC<BottomNavProps> = ({ onOpenMenu }) => {
   const pathname = usePathname();
   const { t } = useTranslation();
-  const { triggerHaptic } = useTelegram();
+  const { isAdmin, triggerHaptic } = useTelegram();
 
   const tabs = [
     { href: '/', label: t.navSupport, icon: HelpCircle },
     { href: '/tickets', label: t.navTickets, icon: Ticket },
-    { href: '/knowledge', label: t.navKnowledge, icon: BookOpen },
+    { href: '/knowledge', label: isAdmin ? t.navKnowledge : 'FAQ', icon: BookOpen },
     { href: '/crypto', label: t.navCrypto, icon: TrendingUp },
   ];
 
