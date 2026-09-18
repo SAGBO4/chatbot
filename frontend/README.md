@@ -1,6 +1,6 @@
 # Stack Wallet Support Portal (Telegram WebApp & Web Portal)
 
-Mobile-first web frontend for the Telegram Support Bot and Knowledge Base, styled with the official **Stack Wallet** monochrome design system and frosted glassmorphism.
+Mobile-first web frontend for the [Telegram Support Bot](../README.md) and Knowledge Base, styled with the official **Stack Wallet** monochrome design system and frosted glassmorphism. See the [root README](../README.md) for the product overview and [backend/README.md](../backend/README.md) for the API this frontend talks to.
 
 ---
 
