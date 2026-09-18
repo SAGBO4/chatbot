@@ -441,7 +441,7 @@ async def get_ticket_by_support_message(
     """
     Looks up a ticket by the Telegram message id of its support-group card,
     so an agent's reply can be matched by message identity rather than by
-    parsing the card's text (see openspec change harden-support-reply-ticket-lookup).
+    parsing the card's text.
     """
     ticket = await TicketService.get_ticket_by_support_message_id(
         session=session, message_id=message_id

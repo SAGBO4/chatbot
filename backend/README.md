@@ -32,7 +32,7 @@ backend/
 │   └── handlers/         # Bot handlers (user, support, community, crypto)
 ├── alembic/               # Database schema migration revisions
 ├── alembic.ini            # Alembic configuration
-├── tests/                 # 414 test cases (unit, integration, resilience, E2E)
+├── tests/                 # 400+ test cases (unit, integration, resilience, E2E)
 ├── scripts/               # Management scripts (e.g. seed_knowledge_base.py)
 ├── data/                  # Persistent storage directory
 ├── deploy/                # Reverse proxy configurations (Caddy / Nginx)
@@ -177,14 +177,14 @@ To safeguard credentials passed via webhooks:
 
 ## Testing & Verification
 
-The automated test suite contains **414 tests** across modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
+The automated test suite contains **400+ tests** across modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
 
 All tests run hermetically using isolated SQLite databases and mock external boundaries (Brevo SMTP and Telegram Bot API) to guarantee safety, zero external network leaks, and rapid execution (~16s):
 
 ```bash
 cd backend
 
-# Run all 414 tests
+# Run all tests
 pytest -v
 
 # Run with module coverage report (HTML report + >=85% threshold check)

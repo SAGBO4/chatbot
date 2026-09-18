@@ -52,7 +52,7 @@ class Ticket(Base):
     )
     # Telegram message id of the ticket card posted to the Support Group, used
     # to resolve an agent's reply by message identity rather than by parsing
-    # the card's text (see openspec change harden-support-reply-ticket-lookup).
+    # the card's text.
     support_group_message_id: Mapped[Optional[int]] = mapped_column(BigInteger, nullable=True, index=True)
 
 
