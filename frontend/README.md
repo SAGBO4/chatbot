@@ -1,8 +1,12 @@
 <p align="center">
+  <img src="public/stack-wallet-bot.svg" width="120" alt="Stack Wallet Bot">
+</p>
+
+<p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="public/stack-logo-white.png">
     <source media="(prefers-color-scheme: light)" srcset="public/stack-logo-full.png">
-    <img alt="Stack Wallet" src="public/stack-logo-full.png" width="300">
+    <img alt="Stack Wallet" src="public/stack-logo-full.png" width="260">
   </picture>
 </p>
 
