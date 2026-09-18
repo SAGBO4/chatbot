@@ -1,20 +1,16 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/stack-logo-white.png">
-    <source media="(prefers-color-scheme: light)" srcset="frontend/public/stack-logo-full.png">
-    <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="260" valign="middle">
-  </picture>
-  &nbsp;&nbsp;&nbsp;
-  <img src="frontend/public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
-</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="frontend/public/stack-logo-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="frontend/public/stack-logo-full.png">
+  <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="260" valign="middle">
+</picture>
+&nbsp;&nbsp;&nbsp;
+<img src="frontend/public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
 
-<h1 align="center">Stack Wallet Support Bot</h1>
+# Stack Wallet telegram Support Bot
 
-<p align="center">
-  <a href="LICENSE"><img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg"></a>
-  <img alt="Python" src="https://img.shields.io/badge/python-3.13-blue.svg">
-  <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18.18-339933.svg">
-</p>
+[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+![Python](https://img.shields.io/badge/python-3.13-blue.svg)
+![Node](https://img.shields.io/badge/node-%3E%3D18.18-339933.svg)
 
 A Telegram support bot with a knowledge base and an AI feedback loop: it answers questions, escalates to your team the moment it's stuck, and learns from every resolution — so the next person asking the same thing gets an instant answer instead of another ticket.
 
@@ -79,33 +75,48 @@ The security and reliability details (webhook auth, IDOR protection, rate limiti
 
 ## Project Structure
 
+This is a monorepo with two top-level projects, each with its own README:
+
 ```
-├── backend/                      # Complete Python Backend Services — see backend/README.md
-│   ├── backend/                  # FastAPI Application & Services
-│   ├── bot/                      # Telegram Bot (aiogram 3)
-│   ├── alembic/                  # Database schema migration revisions
-│   ├── tests/                    # 414 test cases (unit, integration, resilience, E2E)
-│   ├── scripts/                  # Management scripts (e.g. seed_knowledge_base.py)
-│   ├── data/                     # Persistent storage directory
-│   ├── deploy/                   # Reverse proxy configurations (Caddy / Nginx)
-│   ├── Dockerfile                # Production multi-stage Docker image
-│   ├── docker-compose.yml        # Multi-service local orchestrator
-│   ├── docker-compose.prod.yml   # Production stack with PostgreSQL 16
-│   └── requirements.txt          # Python dependencies
-├── frontend/                     # Modern Next.js Mobile-First WebApp (B&W Glassmorphism) — see frontend/README.md
-│   ├── src/
-│   │   ├── app/                  # App Router routes (/, /tickets, /knowledge, /crypto, /settings)
-│   │   ├── components/           # UI primitives, layout (Header, BottomNav, Drawer), cards
-│   │   ├── lib/                  # Backend API client, i18n dictionaries, Telegram WebApp SDK
-│   │   └── types/                # TypeScript shared models
-│   ├── public/                   # Static assets & Stack Wallet icons
-│   └── package.json              # Next.js 16, React 19, Tailwind CSS v4
-└── .env.example                  # Environment variables template
+chatbot/
+├── backend/        # Python — FastAPI API + Telegram bot
+├── frontend/        # Next.js — Mobile-first WebApp
+└── .env.example
 ```
 
-Full breakdown of each part, install steps, configuration, tests, and deployment live in their own READMEs:
-- [backend/README.md](backend/README.md) — FastAPI API, Telegram bot, database migrations, Docker, tests, production hardening.
-- [frontend/README.md](frontend/README.md) — Next.js WebApp / Telegram Mini App.
+<details>
+<summary><strong>backend/</strong> — see <a href="backend/README.md">backend/README.md</a></summary>
+
+```
+backend/
+├── backend/              # FastAPI Application & Services
+├── bot/                   # Telegram Bot (aiogram 3)
+├── alembic/               # Database schema migration revisions
+├── tests/                 # 414 test cases (unit, integration, resilience, E2E)
+├── scripts/               # Management scripts (e.g. seed_knowledge_base.py)
+├── data/                  # Persistent storage directory
+├── deploy/                # Reverse proxy configurations (Caddy / Nginx)
+├── Dockerfile             # Production multi-stage Docker image
+├── docker-compose.yml     # Multi-service local orchestrator
+├── docker-compose.prod.yml # Production stack with PostgreSQL 16
+└── requirements.txt       # Python dependencies
+```
+</details>
+
+<details>
+<summary><strong>frontend/</strong> — see <a href="frontend/README.md">frontend/README.md</a></summary>
+
+```
+frontend/
+├── src/
+│   ├── app/               # App Router routes (/, /tickets, /knowledge, /crypto, /settings)
+│   ├── components/        # UI primitives, layout (Header, BottomNav, Drawer), cards
+│   ├── lib/                # Backend API client, i18n dictionaries, Telegram WebApp SDK
+│   └── types/              # TypeScript shared models
+├── public/                 # Static assets & Stack Wallet icons
+└── package.json            # Next.js 16, React 19, Tailwind CSS v4
+```
+</details>
 
 ---
 
