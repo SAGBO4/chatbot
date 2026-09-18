@@ -37,7 +37,7 @@ A user asks a question, the bot searches the knowledge base (optionally backed b
 
 - **Instant Telegram support** — ask a question, get an answer pulled straight from a knowledge base that keeps learning from every ticket a human resolves.
 - **One-tap escalation** — if the bot's answer doesn't help, a single "No" opens a ticket in your private support group; agents resolve it by just replying.
-- **Optional AI** — works out of the box with free lexical/semantic search, or plug in OpenAI, Gemini, or DeepSeek for LLM-powered answers.
+- **Optional AI** — works out of the box with free keyword and fuzzy text search (no embeddings), or plug in OpenAI, Gemini, or DeepSeek for LLM-powered answers.
 - **Public community Q&A** — members ask `/ask <question>` right in a group chat; the bot answers publicly and only escalates privately when needed.
 - **Moderation & crypto, built in** — `/mute`, `/ban`, `/warn`, `/purge`, plus live prices via `/btc`, `/eth`, `/firo`, and more.
 - **No-redeploy setup** — point the bot at a new community group anytime with `/setup_community`, right from Telegram.

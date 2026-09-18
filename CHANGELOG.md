@@ -16,6 +16,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - Community files: [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1), [SECURITY.md](SECURITY.md), issue forms and a pull request template.
 - CI: a `frontend` job (`npm ci`, lint, build) next to the backend job.
 - `frontend/.env.example` and documentation of the frontend proxy: `BACKEND_API_URL`, `BACKEND_API_KEY`, `TELEGRAM_BOT_TOKEN`, and who can do what through it.
+- Docstrings on the backend API routes (4 of 21 operations had a description in the generated OpenAPI schema, all 21 do now), services, models and bot handlers; the knowledge base scoring formula is documented.
 - Stack Wallet banners and bot illustrations in the READMEs and community files; a Mermaid diagram of the support flow.
 - `"license": "MIT"` in `frontend/package.json`.
 
@@ -35,6 +36,8 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 ### Fixed
 - Docs said the Dockerfile was multi-stage; it is not.
 - A test that checks the Brevo token never appears in application logs could pass without checking anything if no log was captured; it now asserts that logs were captured.
+- Backend docstrings and comments that described behavior the code does not have (Alembic "not used", "normalized" and "top" keywords in the knowledge base, `is_authorized` allowing whitelist management, the API key "sent even if unset", `/purge` deleting any bot message) were corrected, and comments pointing at deleted spec documents were removed.
+- `frontend/README.md` listed six backend endpoints that do not exist; it now lists the ones the frontend calls.
 
 ## Earlier history (2026-09-12 to 2026-09-18)
 
