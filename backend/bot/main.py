@@ -59,6 +59,21 @@ async def main():
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
     dp = create_dispatcher(backend_client=backend_client)
 
+    # Configure persistent WebApp menu button if HTTPS URL is provided
+    webapp_url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    if webapp_url and webapp_url.startswith("https://"):
+        try:
+            from aiogram.types import MenuButtonWebApp, WebAppInfo
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="Support",
+                    web_app=WebAppInfo(url=webapp_url),
+                )
+            )
+            logger.info("Telegram WebApp Menu Button configured: %s", webapp_url)
+        except Exception as exc:
+            logger.warning("Failed to configure WebApp Menu Button: %s", exc)
+
     logger.info("Starting Telegram Bot polling...")
     try:
         await dp.start_polling(bot)

@@ -5,12 +5,13 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
-from bot.keyboards import get_resolution_keyboard
+from bot.keyboards import get_resolution_keyboard, get_webapp_keyboard
 from bot.api_client import BackendClient
 from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
 from bot.i18n import t
 from bot.utils import truncate_telegram_text, TELEGRAM_MAX_MESSAGE_LENGTH
+from backend.config import settings
 
 logger = logging.getLogger(__name__)
 user_router = Router()
@@ -24,13 +25,31 @@ class UserQueryState(StatesGroup):
 async def handle_start(message: Message, state: FSMContext, backend_client: Optional[BackendClient] = None):
     await state.clear()
     lang = await get_active_language(backend_client=backend_client)
-    await message.answer(t("welcome", lang), parse_mode="Markdown")
+    url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    keyboard = get_webapp_keyboard(url) if url else None
+    await message.answer(t("welcome", lang), parse_mode="Markdown", reply_markup=keyboard)
+
+
+@user_router.message(Command("webapp", "app"))
+async def handle_webapp(message: Message):
+    url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    if not url:
+        await message.answer(
+            "L'URL de la WebApp n'est pas encore configurée dans le fichier `.env` (variable `TELEGRAM_WEBAPP_URL`)."
+        )
+        return
+    await message.answer(
+        "Accédez au centre d'assistance officiel Stack Wallet :",
+        reply_markup=get_webapp_keyboard(url, text="📱 Ouvrir l'Application Support"),
+    )
 
 
 @user_router.message(Command("help"))
 async def handle_help(message: Message, backend_client: Optional[BackendClient] = None):
     lang = await get_active_language(backend_client=backend_client)
-    await message.answer(t("help", lang), parse_mode="Markdown")
+    url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    keyboard = get_webapp_keyboard(url) if url else None
+    await message.answer(t("help", lang), parse_mode="Markdown", reply_markup=keyboard)
 
 
 @user_router.message(F.chat.type == "private", F.text)

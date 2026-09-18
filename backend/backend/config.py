@@ -5,7 +5,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(
-        env_file=".env",
+        env_file=(".env", "../.env"),
         env_file_encoding="utf-8",
         extra="ignore",
     )
@@ -13,6 +13,7 @@ class Settings(BaseSettings):
     # Telegram configuration
     TELEGRAM_BOT_TOKEN: str = "placeholder_token"
     TELEGRAM_SUPPORT_GROUP_ID: Union[int, str] = 0
+    TELEGRAM_WEBAPP_URL: Optional[str] = None
 
     # Telegram Community Group configuration
     # Legacy static community group id. Used only as a one-time seed for the

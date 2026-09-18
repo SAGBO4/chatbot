@@ -12,3 +12,8 @@ htmlcov/
 *.sqlite3
 .env
 .chroma/
+frontend/node_modules/
+frontend/.next/
+frontend/out/
+backend/data/*.db*
+!backend/data/.gitkeep
