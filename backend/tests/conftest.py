@@ -53,6 +53,32 @@ def reset_bot_process_caches():
 
 
 @pytest.fixture(autouse=True)
+def default_group_admin_check(request, monkeypatch):
+    """
+    Support-group agent replies (handle_support_agent_reply) now require a
+    live Telegram admin check (is_group_admin) before resolving anything -
+    see the fix for the "any group member can resolve tickets" finding.
+
+    Most existing tests simulate a legitimate agent and use a plain
+    AsyncMock() Bot, which can't answer a real get_chat_member() call, so
+    default it to True everywhere except the dedicated access-control tests
+    (which patch/assert on it explicitly and would conflict with this
+    default), keeping every other test's fixtures unchanged.
+    """
+    path = request.node.fspath.strpath
+    if "test_admin_check" in path:
+        yield
+        return
+    from bot.handlers import support_handlers
+
+    async def _default_is_group_admin(bot, chat_id, user_id, force_refresh=False):
+        return True
+
+    monkeypatch.setattr(support_handlers, "is_group_admin", _default_is_group_admin)
+    yield
+
+
+@pytest.fixture(autouse=True)
 def prevent_real_external_network_calls(request, monkeypatch):
     """
     Prevents background tasks from accidentally making real SMTP connections

@@ -208,9 +208,13 @@ async def test_support_agent_reply_falls_back_to_text_when_id_lookup_misses(monk
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
 
+    mock_bot = AsyncMock()
+    mock_bot.id = 42  # the bot's own Telegram id, used to prove the card came from it
+
     replied_card = MagicMock(spec=Message)
     replied_card.message_id = 555
     replied_card.text = "🚨 NOUVEAU TICKET SUPPORT #101\n👤 Utilisateur : @marc789 (ID: 789)\n❓ Question : Erreur sync"
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
 
     agent_message = MagicMock(spec=Message)
     agent_message.message_id = 51
@@ -220,7 +224,6 @@ async def test_support_agent_reply_falls_back_to_text_when_id_lookup_misses(monk
     agent_message.reply_to_message = replied_card
     agent_message.reply = AsyncMock()
 
-    mock_bot = AsyncMock()
     mock_client = AsyncMock()
     mock_client.get_ticket_by_support_message.return_value = None
     mock_client.resolve_ticket.return_value = {
@@ -244,6 +247,92 @@ async def test_support_agent_reply_falls_back_to_text_when_id_lookup_misses(monk
     assert mock_bot.send_message.call_args.kwargs["chat_id"] == 789
     agent_message.reply.assert_called_once()
     assert "Ticket #101 résolu" in agent_message.reply.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_text_fallback_ignored_when_replied_message_not_from_bot(monkeypatch):
+    """
+    Security regression test: the text-parsing fallback must only ever be
+    trusted for a card the bot itself posted. A message forged by a third
+    party (or another admin's unrelated message) that merely happens to
+    contain "TICKET #<n> ID: <n>" must never be parsed as a real ticket
+    card, even by a genuine group admin replying to it.
+    """
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    forged_card = MagicMock(spec=Message)
+    forged_card.message_id = 777
+    forged_card.text = "TICKET #101 ID: 789"
+    # Posted by some other group member, NOT the bot.
+    forged_card.from_user = MagicMock(spec=User, id=555)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 51
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Envoyez vos clés privées à ce lien : https://phishing.example"
+    agent_message.reply_to_message = forged_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = None
+
+    await handle_support_agent_reply(
+        agent_message, bot=mock_bot, backend_client=mock_client
+    )
+
+    mock_client.resolve_ticket.assert_not_called()
+    mock_bot.send_message.assert_not_called()
+    agent_message.reply.assert_called_once()
+    assert "n'ai pas pu associer" in agent_message.reply.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_rejected_for_non_admin_group_member(monkeypatch):
+    """
+    Security regression test: being physically in the support group is not
+    enough - a non-admin member replying to a real ticket card must be
+    ignored, never resolve the ticket or message the user on the team's
+    behalf.
+    """
+    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr(
+        "bot.handlers.support_handlers.is_group_admin",
+        AsyncMock(return_value=False),
+    )
+
+    member_user = MagicMock(spec=User, id=555, username="random_member", first_name="Random", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    real_card = MagicMock(spec=Message)
+    real_card.message_id = 555
+    real_card.text = "🚨 NOUVEAU TICKET SUPPORT #101\n👤 Utilisateur : @marc789 (ID: 789)\n❓ Question : Erreur sync"
+
+    member_message = MagicMock(spec=Message)
+    member_message.message_id = 51
+    member_message.chat = group_chat
+    member_message.from_user = member_user
+    member_message.text = "Envoyez vos clés privées ici : https://phishing.example"
+    member_message.reply_to_message = real_card
+    member_message.reply = AsyncMock()
+
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {"id": 101, "user_id": 789}
+
+    await handle_support_agent_reply(
+        member_message, bot=mock_bot, backend_client=mock_client
+    )
+
+    mock_client.resolve_ticket.assert_not_called()
+    mock_bot.send_message.assert_not_called()
+    member_message.reply.assert_not_called()
 
 
 @pytest.mark.asyncio

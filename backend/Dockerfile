@@ -8,8 +8,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     && rm -rf /var/lib/apt/lists/*
 
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
+COPY requirements.lock .
+# Installs from the fully pinned, verified lock file (see its header for how
+# it's regenerated) instead of requirements.txt's open-ended ">=" ranges, so
+# every build reproduces the exact dependency tree that was tested.
+RUN pip install --no-cache-dir -r requirements.lock
 
 RUN useradd -m -r appuser && mkdir -p /app/data && chown -R appuser:appuser /app
 COPY --chown=appuser:appuser . .

@@ -272,11 +272,12 @@ async def test_bot_handlers_support_agent_reply_matched_by_card_text_fallback_re
     client.resolve_ticket.return_value = {"id": 25, "is_newly_resolved": True}
 
     bot = AsyncMock()
+    bot.id = 42
 
     group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
     agent_user = MagicMock(spec=User, id=999, username="agent_tom")
     card_text = "🚨 NOUVEAU TICKET SUPPORT #25\nUtilisateur : @toto (ID: 3003)\nQuestion..."
-    card_msg = MagicMock(spec=Message, message_id=123, text=card_text)
+    card_msg = MagicMock(spec=Message, message_id=123, text=card_text, from_user=MagicMock(spec=User, id=bot.id))
 
     reply_msg = MagicMock(
         spec=Message,
@@ -356,6 +357,45 @@ async def test_bot_handlers_agent_reply_from_unauthorized_chat_ignored(monkeypat
 
     await handle_support_agent_reply(reply_msg, bot=AsyncMock(), backend_client=client)
     client.resolve_ticket.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_agent_reply_from_non_admin_group_member_ignored(monkeypatch):
+    """
+    2. SÉCURITÉ - Contrôle d'accès rôle admin:
+    Être présent dans le bon groupe support ne suffit pas: un simple membre
+    (non admin) ne doit jamais pouvoir résoudre un ticket ni parler au nom
+    de l'équipe support.
+    """
+    support_group_id = -100555666
+    monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr(
+        "bot.handlers.support_handlers.is_group_admin",
+        AsyncMock(return_value=False),
+    )
+
+    client = AsyncMock(spec=BackendClient)
+    client.get_ticket_by_support_message.return_value = {"id": 15, "user_id": 2002}
+
+    bot = AsyncMock()
+    group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+    non_admin_user = MagicMock(spec=User, id=321, username="not_an_agent")
+    card_msg = MagicMock(spec=Message, message_id=5544)
+
+    reply_msg = MagicMock(
+        spec=Message,
+        chat=group_chat,
+        from_user=non_admin_user,
+        reply_to_message=card_msg,
+        text="Envoyez vos clés privées à ce lien",
+    )
+    reply_msg.reply = AsyncMock()
+
+    await handle_support_agent_reply(reply_msg, bot=bot, backend_client=client)
+
+    client.resolve_ticket.assert_not_called()
+    bot.send_message.assert_not_called()
+    reply_msg.reply.assert_not_called()
 
 
 # ==============================================================================
