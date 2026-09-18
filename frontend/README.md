@@ -1,14 +1,10 @@
-<p align="center">
-  <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="public/stack-logo-white.png">
-    <source media="(prefers-color-scheme: light)" srcset="public/stack-logo-full.png">
-    <img alt="Stack Wallet" src="public/stack-logo-full.png" width="260" valign="middle">
-  </picture>
-  &nbsp;&nbsp;&nbsp;
-  <img src="public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
-</p>
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/stack-logo-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="public/stack-logo-full.png">
+  <img alt="Stack Wallet" src="public/stack-logo-full.png" width="260">
+</picture>
 
-# Stack Wallet Support Portal (Telegram WebApp & Web Portal)
+<h1><img src="public/stack-wallet-bot.png" width="54" alt="Stack Wallet Bot" valign="middle"> Stack Wallet Support Portal (Telegram WebApp & Web Portal)</h1>
 
 Mobile-first web frontend for the [Telegram Support Bot](../README.md) and Knowledge Base, styled with the official **Stack Wallet** monochrome design system and frosted glassmorphism. See the [root README](../README.md) for the product overview and [backend/README.md](../backend/README.md) for the API this frontend talks to.
 
