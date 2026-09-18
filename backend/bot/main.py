@@ -1,0 +1,86 @@
+import asyncio
+import logging
+from aiogram import Bot, Dispatcher
+from typing import Optional
+from backend.config import settings
+from bot.api_client import BackendClient
+from bot.handlers.user_handlers import user_router
+from bot.handlers.support_handlers import support_router
+from bot.handlers.community_handlers import community_router
+from bot.handlers.moderation_handlers import moderation_router
+from bot.handlers.crypto_handlers import crypto_router
+from bot.handlers.setup_handlers import setup_router
+from bot.middlewares.throttling import ThrottlingMiddleware
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("telegram_bot")
+
+
+def create_dispatcher(
+    backend_client: Optional[BackendClient] = None,
+    throttling_middleware: Optional[ThrottlingMiddleware] = None,
+) -> Dispatcher:
+    dp = Dispatcher()
+    if backend_client is not None:
+        dp["backend_client"] = backend_client
+
+    throttler = throttling_middleware or ThrottlingMiddleware()
+    dp.message.middleware(throttler)
+
+    # Command-specific routers are registered before user_router: its
+    # handle_user_query matches any text in a private chat (no command
+    # exclusion), so it would otherwise swallow "/btc", "/mute", etc. before
+    # a more specific router ever saw them.
+    dp.include_router(setup_router)
+    dp.include_router(support_router)
+    dp.include_router(community_router)
+    dp.include_router(moderation_router)
+    dp.include_router(crypto_router)
+    dp.include_router(user_router)
+    return dp
+
+
+async def main():
+    if getattr(settings, "SENTRY_DSN", None):
+        try:
+            import sentry_sdk
+            sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=1.0)
+            logger.info("Sentry monitoring initialized for Telegram Bot.")
+        except ImportError:
+            logger.warning("SENTRY_DSN is configured but sentry_sdk is not installed.")
+
+    if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":  # nosec B105
+        logger.error(
+            "TELEGRAM_BOT_TOKEN is not configured or set to placeholder. Please configure your .env file."
+        )
+        return
+
+    backend_client = BackendClient()
+    bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
+    dp = create_dispatcher(backend_client=backend_client)
+
+    # Configure persistent WebApp menu button if HTTPS URL is provided
+    webapp_url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    if webapp_url and webapp_url.startswith("https://"):
+        try:
+            from aiogram.types import MenuButtonWebApp, WebAppInfo
+            await bot.set_chat_menu_button(
+                menu_button=MenuButtonWebApp(
+                    text="Support",
+                    web_app=WebAppInfo(url=webapp_url),
+                )
+            )
+            logger.info("Telegram WebApp Menu Button configured: %s", webapp_url)
+        except Exception as exc:
+            logger.warning("Failed to configure WebApp Menu Button: %s", exc)
+
+    logger.info("Starting Telegram Bot polling...")
+    try:
+        await dp.start_polling(bot)
+    finally:
+        await backend_client.close()
+        await bot.session.close()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())
