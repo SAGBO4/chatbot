@@ -8,16 +8,16 @@
   <img src="frontend/public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
 </p>
 
-<h1 align="center">Telegram Support Bot with Knowledge Base & AI Feedback Loop</h1>
+<h1 align="center">Stack Wallet Support Bot</h1>
 
 <p align="center">
-  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg">
+  <a href="https://github.com/SAGBO4/chatbot/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/SAGBO4/chatbot/actions/workflows/ci.yml/badge.svg?branch=main"></a>
+  <a href="LICENSE"><img alt="License" src="https://img.shields.io/github/license/SAGBO4/chatbot?color=blue"></a>
   <img alt="Python" src="https://img.shields.io/badge/python-3.13-blue.svg">
   <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18.18-339933.svg">
-  <img alt="Tests" src="https://img.shields.io/badge/tests-414%20passing-brightgreen.svg">
 </p>
 
-A support bot for Telegram that gets smarter over time: it answers questions from a knowledge base, escalates to your team the moment it's stuck, and learns from every resolution — so the next person asking the same thing gets an instant answer instead of another ticket.
+A Telegram support bot with a knowledge base and an AI feedback loop: it answers questions, escalates to your team the moment it's stuck, and learns from every resolution — so the next person asking the same thing gets an instant answer instead of another ticket.
 
 ---
 
