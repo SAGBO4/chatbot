@@ -36,7 +36,7 @@ backend/
 ├── scripts/               # Management scripts (e.g. seed_knowledge_base.py)
 ├── data/                  # Persistent storage directory
 ├── deploy/                # Reverse proxy configurations (Caddy / Nginx)
-├── Dockerfile             # Production multi-stage Docker image
+├── Dockerfile             # Docker image for the API and the bot (non-root user)
 ├── docker-compose.yml     # Multi-service local orchestrator
 ├── docker-compose.prod.yml # Production stack with PostgreSQL 16
 ├── requirements.txt       # Python dependencies

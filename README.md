@@ -71,7 +71,7 @@ backend/
 ├── scripts/               # Management scripts (e.g. seed_knowledge_base.py)
 ├── data/                  # Persistent storage directory
 ├── deploy/                # Reverse proxy configurations (Caddy / Nginx)
-├── Dockerfile             # Production multi-stage Docker image
+├── Dockerfile             # Docker image for the API and the bot (non-root user)
 ├── docker-compose.yml     # Multi-service local orchestrator
 ├── docker-compose.prod.yml # Production stack with PostgreSQL 16
 └── requirements.txt       # Python dependencies
@@ -124,9 +124,10 @@ cd backend && uvicorn backend.main:app --reload --port 8000
 cd backend && python -m bot.main
 ```
 
-**Frontend**
+**Frontend** (first fill in `frontend/.env.local`, see [frontend/README.md](frontend/README.md#2-configure-the-environment))
 ```bash
-cd frontend && npm install && npm run dev
+cd frontend && cp .env.example .env.local
+npm install && npm run dev
 ```
 
 See [backend/README.md](backend/README.md) for: community group setup (`/setup_community`), inbound email webhooks, Docker Compose (SQLite or production PostgreSQL), reverse proxy hardening, rate limiting, and the automated test suite.
