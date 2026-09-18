@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="public/stack-logo-white.png">
+    <source media="(prefers-color-scheme: light)" srcset="public/stack-logo-full.png">
+    <img alt="Stack Wallet" src="public/stack-logo-full.png" width="300">
+  </picture>
+</p>
+
 # Stack Wallet Support Portal (Telegram WebApp & Web Portal)
 
 Mobile-first web frontend for the [Telegram Support Bot](../README.md) and Knowledge Base, styled with the official **Stack Wallet** monochrome design system and frosted glassmorphism. See the [root README](../README.md) for the product overview and [backend/README.md](../backend/README.md) for the API this frontend talks to.

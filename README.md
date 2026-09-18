@@ -1,3 +1,11 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="frontend/public/stack-logo-white.png">
+    <source media="(prefers-color-scheme: light)" srcset="frontend/public/stack-logo-full.png">
+    <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="360">
+  </picture>
+</p>
+
 # Telegram Support Bot with Knowledge Base & AI Feedback Loop
 
 This project implements a complete automated support system on Telegram, connected to a FastAPI Backend API, an evolving knowledge base, and a configurable AI module.
