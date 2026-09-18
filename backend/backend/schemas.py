@@ -55,20 +55,20 @@ class TicketSupportCardRequest(BaseModel):
 
 
 class InboundEmailWebhookRequest(BaseModel):
-    sender: str
-    subject: str
-    body: str
+    sender: str = Field(..., max_length=320)  # RFC 5321 max mailbox length
+    subject: str = Field(..., max_length=998)  # RFC 5322 max header line length
+    body: str = Field(..., max_length=200_000)
 
 
 class BrevoInboundFrom(BaseModel):
-    Address: str
+    Address: str = Field(..., max_length=320)
 
 
 class BrevoInboundItem(BaseModel):
     From: BrevoInboundFrom
-    Subject: str
-    RawTextBody: Optional[str] = None
-    ExtractedMarkdownMessage: Optional[str] = None
+    Subject: str = Field(..., max_length=998)
+    RawTextBody: Optional[str] = Field(default=None, max_length=200_000)
+    ExtractedMarkdownMessage: Optional[str] = Field(default=None, max_length=200_000)
 
 
 class BrevoInboundWebhookRequest(BaseModel):

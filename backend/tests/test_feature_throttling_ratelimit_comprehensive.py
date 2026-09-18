@@ -2,7 +2,7 @@ import time
 import logging
 import pytest
 from unittest.mock import AsyncMock, MagicMock
-from aiogram.types import Message, User, Chat
+from aiogram.types import CallbackQuery, Message, User, Chat
 
 from bot.middlewares.throttling import ThrottlingMiddleware
 from backend.limiter import limiter
@@ -26,6 +26,32 @@ async def test_throttling_messages_under_rate_limit_are_allowed():
         assert res == "OK"
 
     assert handler.call_count == 4
+
+
+@pytest.mark.asyncio
+async def test_throttling_applies_to_callback_queries_too():
+    """
+    2. SÉCURITÉ:
+    Les callback queries (clics sur boutons inline, ex: "resolve:no") sont
+    soumis à la même limite que les messages - sinon un utilisateur peut
+    contourner tout le throttling en spammant un bouton plutôt qu'un texte.
+    """
+    middleware = ThrottlingMiddleware(rate_limit=3, window_seconds=10.0)
+    handler = AsyncMock(return_value="OK")
+
+    user = MagicMock(spec=User, id=77)
+    callback = MagicMock(spec=CallbackQuery, from_user=user, data="resolve:no")
+    callback.answer = AsyncMock()
+
+    for _ in range(3):
+        res = await middleware(handler, callback, {})
+        assert res == "OK"
+
+    # 4th click within the window is dropped, never reaching the handler
+    res = await middleware(handler, callback, {})
+    assert res is None
+    assert handler.call_count == 3
+    callback.answer.assert_called_once()
 
 
 @pytest.mark.asyncio

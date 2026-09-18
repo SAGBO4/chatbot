@@ -29,7 +29,7 @@ import {
 export const Header: React.FC = () => {
   const pathname = usePathname();
   const { locale, toggleLocale, setLocale, t } = useTranslation();
-  const { user, triggerHaptic } = useTelegram();
+  const { user, isAdmin, triggerHaptic } = useTelegram();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [apiStatus, setApiStatus] = useState<'checking' | 'connected' | 'disconnected'>('checking');
 
@@ -67,9 +67,16 @@ export const Header: React.FC = () => {
   const navLinks = [
     { href: '/', label: t.navSupport, icon: HelpCircle, desc: locale === 'fr' ? 'Recherche & FAQ interactive' : 'Interactive Search & FAQ' },
     { href: '/tickets', label: t.navTickets, icon: Ticket, desc: locale === 'fr' ? 'Suivi de vos demandes' : 'Track your requests' },
-    { href: '/knowledge', label: t.navKnowledge, icon: BookOpen, desc: locale === 'fr' ? 'Documentation officielle' : 'Official guides' },
+    {
+      href: '/knowledge',
+      label: isAdmin ? t.navKnowledge : (locale === 'fr' ? 'FAQ' : 'FAQ'),
+      icon: BookOpen,
+      desc: isAdmin
+        ? (locale === 'fr' ? 'Base de connaissances & modération' : 'Knowledge Base & Moderation')
+        : (locale === 'fr' ? 'Top 10 questions fréquentes' : 'Top 10 common questions'),
+    },
     { href: '/crypto', label: t.navCrypto, icon: TrendingUp, desc: locale === 'fr' ? 'Cours des actifs en direct' : 'Live asset rates' },
-    { href: '/settings', label: t.navSettings, icon: Settings, desc: locale === 'fr' ? 'Modération & Configuration' : 'Moderation & Setup' },
+    ...(isAdmin ? [{ href: '/settings', label: t.navSettings, icon: Settings, desc: locale === 'fr' ? 'Modération & Configuration' : 'Moderation & Setup' }] : []),
   ];
 
   const handleOpenMenu = () => {
@@ -189,8 +196,15 @@ export const Header: React.FC = () => {
                       {(user.first_name || user.username || 'TG').slice(0, 2)}
                     </div>
                     <div>
-                      <div className="text-xs font-semibold text-white">
-                        {user.first_name || user.username}
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-white">
+                          {user.first_name || user.username}
+                        </span>
+                        {isAdmin && (
+                          <span className="text-[9px] font-bold uppercase tracking-wider bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-1 py-0.2 rounded">
+                            Admin
+                          </span>
+                        )}
                       </div>
                       <div className="text-[10px] text-neutral-400">Telegram WebApp</div>
                     </div>

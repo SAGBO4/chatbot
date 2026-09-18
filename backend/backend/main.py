@@ -700,6 +700,7 @@ def verify_brevo_inbound_token(
 
 
 @app.post("/api/webhooks/email-inbound")
+@limiter.limit("30/minute")
 async def handle_inbound_email(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -745,6 +746,7 @@ async def handle_inbound_email(
 
 
 @app.post("/api/webhooks/email-inbound/brevo")
+@limiter.limit("30/minute")
 async def handle_brevo_inbound_email(
     request: Request,
     background_tasks: BackgroundTasks,
@@ -827,7 +829,9 @@ async def handle_brevo_inbound_email(
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(verify_api_key)],
 )
+@limiter.limit("20/minute")
 async def ingest_knowledge(
+    request: Request,
     payload: KnowledgeIngestRequest,
     session: AsyncSession = Depends(get_db),
 ):
@@ -968,5 +972,5 @@ async def list_whitelist_entries(session: AsyncSession = Depends(get_db)):
     dependencies=[Depends(verify_api_key)],
 )
 async def check_whitelist_entry(user_id: int, session: AsyncSession = Depends(get_db)):
-    is_whitelisted = await WhitelistService.is_whitelisted(session=session, user_id=user_id)
+    is_whitelisted = settings.is_bot_owner(user_id) or await WhitelistService.is_whitelisted(session=session, user_id=user_id)
     return WhitelistCheckResponse(user_id=user_id, is_whitelisted=is_whitelisted)

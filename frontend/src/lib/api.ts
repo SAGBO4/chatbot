@@ -15,16 +15,31 @@ import {
   ApiError,
 } from '@/types';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY || '';
+// Same-origin proxy (see src/app/api/backend/[...path]/route.ts): the
+// browser never talks to the backend directly and never sees its API key -
+// only the Next.js server process does. Do NOT point this back at
+// NEXT_PUBLIC_API_URL; that would re-expose the backend (and its shared
+// X-API-Key requirement) directly to every visitor's browser again.
+const API_BASE = '/api/backend';
+
+// The Telegram Mini App's raw, signed WebApp.initData string (NOT
+// initDataUnsafe - that one has no signature and must never be trusted for
+// authorization). Set once by TelegramProvider on mount and forwarded on
+// every request so the server-side proxy can cryptographically verify who
+// is actually calling, instead of trusting a client-supplied user id.
+let telegramInitData: string | null = null;
+
+export function setTelegramInitData(raw: string | null): void {
+  telegramInitData = raw || null;
+}
 
 function getHeaders(): HeadersInit {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'Accept': 'application/json',
   };
-  if (API_KEY) {
-    headers['X-API-Key'] = API_KEY;
+  if (telegramInitData) {
+    headers['X-Telegram-Init-Data'] = telegramInitData;
   }
   return headers;
 }
@@ -54,7 +69,7 @@ export const api = {
    */
   async checkHealth(): Promise<HealthResponse> {
     try {
-      const res = await fetch(`${API_URL}/health`, {
+      const res = await fetch(`/api/health`, {
         method: 'GET',
         headers: getHeaders(),
         cache: 'no-store',
@@ -74,7 +89,7 @@ export const api = {
    */
   async querySupport(request: QueryRequest): Promise<QueryResponse> {
     try {
-      const res = await fetch(`${API_URL}/api/query`, {
+      const res = await fetch(`${API_BASE}/query`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(request),
@@ -94,7 +109,7 @@ export const api = {
    */
   async createTicket(request: TicketCreateRequest): Promise<TicketResponse> {
     try {
-      const res = await fetch(`${API_URL}/api/tickets`, {
+      const res = await fetch(`${API_BASE}/tickets`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(request),
@@ -114,7 +129,7 @@ export const api = {
    */
   async getTickets(userId?: number, statusFilter?: string): Promise<TicketResponse[]> {
     try {
-      const url = new URL(`${API_URL}/api/tickets`);
+      const url = new URL(`${API_BASE}/tickets`, window.location.origin);
       if (userId !== undefined && userId !== null) {
         url.searchParams.set('user_id', String(userId));
       }
@@ -141,7 +156,7 @@ export const api = {
    */
   async getTicket(ticketId: number, userId?: number): Promise<TicketResponse> {
     try {
-      const url = new URL(`${API_URL}/api/tickets/${ticketId}`);
+      const url = new URL(`${API_BASE}/tickets/${ticketId}`, window.location.origin);
       if (userId !== undefined && userId !== null) {
         url.searchParams.set('user_id', String(userId));
       }
@@ -165,7 +180,7 @@ export const api = {
    */
   async resolveTicket(ticketId: number, request: TicketResolveRequest): Promise<TicketResponse> {
     try {
-      const res = await fetch(`${API_URL}/api/tickets/${ticketId}/resolve`, {
+      const res = await fetch(`${API_BASE}/tickets/${ticketId}/resolve`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(request),
@@ -185,7 +200,7 @@ export const api = {
    */
   async getKnowledgeArticles(limit = 50, offset = 0): Promise<KnowledgeArticle[]> {
     try {
-      const url = new URL(`${API_URL}/api/knowledge`);
+      const url = new URL(`${API_BASE}/knowledge`, window.location.origin);
       url.searchParams.set('limit', String(limit));
       url.searchParams.set('offset', String(offset));
 
@@ -209,7 +224,7 @@ export const api = {
    */
   async ingestKnowledgeArticle(request: KnowledgeIngestRequest): Promise<KnowledgeArticle> {
     try {
-      const res = await fetch(`${API_URL}/api/knowledge/ingest`, {
+      const res = await fetch(`${API_BASE}/knowledge/ingest`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(request),
@@ -229,7 +244,7 @@ export const api = {
    */
   async getCryptoPrice(symbol: string): Promise<CryptoPriceResponse> {
     try {
-      const res = await fetch(`${API_URL}/api/crypto/${symbol.toLowerCase()}`, {
+      const res = await fetch(`${API_BASE}/crypto/${symbol.toLowerCase()}`, {
         method: 'GET',
         headers: getHeaders(),
         cache: 'no-store',
@@ -270,7 +285,7 @@ export const api = {
     reason?: string;
   }): Promise<WarningResponse> {
     try {
-      const res = await fetch(`${API_URL}/api/moderation/warnings`, {
+      const res = await fetch(`${API_BASE}/moderation/warnings`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify(payload),
@@ -290,7 +305,7 @@ export const api = {
    */
   async getWarnings(userId: number, groupId = -1001234567890): Promise<WarningListResponse> {
     try {
-      const url = new URL(`${API_URL}/api/moderation/warnings`);
+      const url = new URL(`${API_BASE}/moderation/warnings`, window.location.origin);
       url.searchParams.set('user_id', String(userId));
       url.searchParams.set('group_id', String(groupId));
 
@@ -314,7 +329,7 @@ export const api = {
    */
   async getAdminSetting(key: string): Promise<BotSettingResponse> {
     try {
-      const res = await fetch(`${API_URL}/api/admin/settings/${key}`, {
+      const res = await fetch(`${API_BASE}/admin/settings/${key}`, {
         method: 'GET',
         headers: getHeaders(),
         cache: 'no-store',
@@ -334,7 +349,7 @@ export const api = {
    */
   async setAdminSetting(key: string, value: string, updatedBy = 'Admin Web'): Promise<BotSettingResponse> {
     try {
-      const res = await fetch(`${API_URL}/api/admin/settings/${key}`, {
+      const res = await fetch(`${API_BASE}/admin/settings/${key}`, {
         method: 'PUT',
         headers: getHeaders(),
         body: JSON.stringify({ value, updated_by: updatedBy }),
@@ -354,7 +369,7 @@ export const api = {
    */
   async listWhitelist(): Promise<{ entries: { user_id: number; added_by: string; created_at: string }[] }> {
     try {
-      const res = await fetch(`${API_URL}/api/admin/whitelist`, {
+      const res = await fetch(`${API_BASE}/admin/whitelist`, {
         method: 'GET',
         headers: getHeaders(),
         cache: 'no-store',
@@ -374,7 +389,7 @@ export const api = {
    */
   async addWhitelist(userId: number, addedBy = 'Admin Web'): Promise<{ user_id: number; added_by: string }> {
     try {
-      const res = await fetch(`${API_URL}/api/admin/whitelist`, {
+      const res = await fetch(`${API_BASE}/admin/whitelist`, {
         method: 'POST',
         headers: getHeaders(),
         body: JSON.stringify({ user_id: userId, added_by: addedBy }),
@@ -394,7 +409,7 @@ export const api = {
    */
   async removeWhitelist(userId: number): Promise<{ removed: boolean; user_id: number }> {
     try {
-      const res = await fetch(`${API_URL}/api/admin/whitelist/${userId}`, {
+      const res = await fetch(`${API_BASE}/admin/whitelist/${userId}`, {
         method: 'DELETE',
         headers: getHeaders(),
       });
@@ -413,7 +428,7 @@ export const api = {
    */
   async checkWhitelist(userId: number): Promise<WhitelistCheckResponse> {
     try {
-      const res = await fetch(`${API_URL}/api/admin/whitelist/${userId}/check`, {
+      const res = await fetch(`${API_BASE}/admin/whitelist/${userId}/check`, {
         method: 'GET',
         headers: getHeaders(),
         cache: 'no-store',

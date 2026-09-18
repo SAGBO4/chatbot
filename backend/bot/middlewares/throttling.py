@@ -2,7 +2,7 @@ import time
 import logging
 from typing import Any, Awaitable, Callable, Dict, List
 from aiogram import BaseMiddleware
-from aiogram.types import Message, TelegramObject
+from aiogram.types import CallbackQuery, Message, TelegramObject
 
 logger = logging.getLogger(__name__)
 
@@ -35,7 +35,7 @@ class ThrottlingMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: Dict[str, Any],
     ) -> Any:
-        if not isinstance(event, Message):
+        if not isinstance(event, (Message, CallbackQuery)):
             return await handler(event, data)
 
         user = event.from_user
@@ -52,13 +52,22 @@ class ThrottlingMiddleware(BaseMiddleware):
         if len(current_timestamps) >= self.rate_limit:
             # User exceeded rate limit
             logger.warning("Throttling rate limit reached for user %s (%s messages in %ss)", user_id, len(current_timestamps), self.window_seconds)
-            
+
             # Send warning message if cooldown has elapsed
             last_warn = self.last_warning_time.get(user_id, 0.0)
             if now - last_warn >= self.warning_cooldown:
                 self.last_warning_time[user_id] = now
                 try:
-                    await event.answer("⚠️ Veuillez patienter quelques secondes avant d'envoyer un nouveau message.")
+                    if isinstance(event, CallbackQuery):
+                        # A toast, not a new message - callback queries are
+                        # answered once via .answer(text=..., show_alert=...),
+                        # never via the Message-style positional text arg.
+                        await event.answer(
+                            "⚠️ Veuillez patienter quelques secondes avant de réessayer.",
+                            show_alert=False,
+                        )
+                    else:
+                        await event.answer("⚠️ Veuillez patienter quelques secondes avant d'envoyer un nouveau message.")
                 except Exception as exc:
                     logger.warning("Failed to send throttling notice to user %s: %s", user_id, exc)
             return None

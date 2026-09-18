@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { KnowledgeArticle } from '@/types';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
+import { useTelegram } from '@/lib/telegram/TelegramContext';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Alert } from '@/components/ui/Alert';
@@ -20,17 +21,19 @@ import {
   Tag,
   HelpCircle,
   ArrowLeft,
+  ShieldCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 
 export default function KnowledgePage() {
   const { t, locale } = useTranslation();
+  const { isAdmin } = useTelegram();
   const [articles, setArticles] = useState<KnowledgeArticle[]>([]);
   const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Ingest Modal state
+  // Ingest Modal state (Admin only)
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [newQuestion, setNewQuestion] = useState('');
   const [newSolution, setNewSolution] = useState('');
@@ -43,7 +46,8 @@ export default function KnowledgePage() {
     setIsLoading(true);
     setError(null);
     try {
-      const articlesData = await api.getKnowledgeArticles(100, 0);
+      const limit = isAdmin ? 100 : 10;
+      const articlesData = await api.getKnowledgeArticles(limit, 0);
       setArticles(articlesData);
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || 'Erreur lors du chargement de la base de connaissances.';
@@ -57,7 +61,8 @@ export default function KnowledgePage() {
     let ignore = false;
     const initData = async () => {
       try {
-        const articlesData = await api.getKnowledgeArticles(100, 0);
+        const limit = isAdmin ? 100 : 10;
+        const articlesData = await api.getKnowledgeArticles(limit, 0);
         if (!ignore) {
           setArticles(articlesData);
           setIsLoading(false);
@@ -74,7 +79,7 @@ export default function KnowledgePage() {
     return () => {
       ignore = true;
     };
-  }, []);
+  }, [isAdmin]);
 
   const handleSearchSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -129,28 +134,40 @@ export default function KnowledgePage() {
           </Link>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-              {t.kbTitle}
+              {isAdmin ? t.kbTitle : (locale === 'fr' ? 'Foire Aux Questions (FAQ)' : 'Frequently Asked Questions (FAQ)')}
             </h1>
-            <span className="rounded-full bg-white/10 border border-white/20 px-2.5 py-0.5 text-[10px] font-medium text-white">
-              Documentation
+            <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-medium ${
+              isAdmin
+                ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                : 'bg-white/10 border-white/20 text-white'
+            }`}>
+              {isAdmin ? 'Admin • Documentation' : (locale === 'fr' ? 'Top 10 FAQ' : 'Top 10 FAQ')}
             </span>
           </div>
-          <p className="text-xs sm:text-sm text-neutral-400 mt-1">{t.kbSub}</p>
+          <p className="text-xs sm:text-sm text-neutral-400 mt-1">
+            {isAdmin
+              ? t.kbSub
+              : (locale === 'fr'
+                  ? 'Consultez les réponses aux 10 questions les plus fréquemment posées sur Stack Wallet.'
+                  : 'Check the answers to the top 10 most frequently asked questions about Stack Wallet.')}
+          </p>
         </div>
 
-        <Button
-          variant="primary"
-          size="sm"
-          className="w-full sm:w-auto justify-center"
-          onClick={() => {
-            setIsModalOpen(true);
-            setModalError(null);
-            setIngestSuccess(false);
-          }}
-        >
-          <Plus className="h-3.5 w-3.5 mr-1.5" />
-          {t.btnAddArticle}
-        </Button>
+        {isAdmin && (
+          <Button
+            variant="primary"
+            size="sm"
+            className="w-full sm:w-auto justify-center"
+            onClick={() => {
+              setIsModalOpen(true);
+              setModalError(null);
+              setIngestSuccess(false);
+            }}
+          >
+            <Plus className="h-3.5 w-3.5 mr-1.5" />
+            {t.btnAddArticle}
+          </Button>
+        )}
       </div>
 
       {/* Stats Cards - Compact 3-col on all screens */}
@@ -161,19 +178,23 @@ export default function KnowledgePage() {
           </div>
           <div>
             <div className="text-base sm:text-xl font-bold text-white">{articles.length}</div>
-            <div className="text-[10px] sm:text-xs text-neutral-400 font-medium leading-tight truncate">{t.statTotalArticles}</div>
+            <div className="text-[10px] sm:text-xs text-neutral-400 font-medium leading-tight truncate">
+              {isAdmin ? t.statTotalArticles : (locale === 'fr' ? 'FAQ disponibles' : 'Available FAQs')}
+            </div>
           </div>
         </Card>
 
         <Card elevated className="p-2.5 sm:p-4 border-white/[0.08] flex flex-col sm:flex-row items-center sm:gap-3.5 text-center sm:text-left">
           <div className="flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-xl bg-white/[0.06] text-white border border-white/[0.12] mb-1 sm:mb-0 shrink-0">
-            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" />
+            {isAdmin ? <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5" /> : <ShieldCheck className="h-4 w-4 sm:h-5 sm:w-5" />}
           </div>
           <div>
             <div className="text-base sm:text-xl font-bold text-white">
-              {articles.filter((a) => a.source_ticket_id).length}
+              {isAdmin ? articles.filter((a) => a.source_ticket_id).length : '10 max'}
             </div>
-            <div className="text-[10px] sm:text-xs text-neutral-400 font-medium leading-tight truncate">{t.statResolvedTickets}</div>
+            <div className="text-[10px] sm:text-xs text-neutral-400 font-medium leading-tight truncate">
+              {isAdmin ? t.statResolvedTickets : (locale === 'fr' ? 'Sélection essentielle' : 'Essential limit')}
+            </div>
           </div>
         </Card>
 
@@ -183,7 +204,9 @@ export default function KnowledgePage() {
           </div>
           <div>
             <div className="text-base sm:text-xl font-bold text-white">100%</div>
-            <div className="text-[10px] sm:text-xs text-neutral-400 font-medium leading-tight truncate">{t.statCoverage}</div>
+            <div className="text-[10px] sm:text-xs text-neutral-400 font-medium leading-tight truncate">
+              {isAdmin ? t.statCoverage : (locale === 'fr' ? 'Vérifiées' : 'Verified')}
+            </div>
           </div>
         </Card>
       </div>
@@ -286,8 +309,8 @@ export default function KnowledgePage() {
         </div>
       )}
 
-      {/* Modal: Ingest New Article */}
-      {isModalOpen && (
+      {/* Modal: Ingest New Article (Admin Only) */}
+      {isAdmin && isModalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-3.5 sm:p-4 bg-black/80 backdrop-blur-md">
           <div className="w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-2xl bg-black/95 border border-white/[0.12] p-5 sm:p-6 shadow-2xl relative">
             <button
