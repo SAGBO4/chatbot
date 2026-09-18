@@ -149,7 +149,7 @@ docker compose -f docker-compose.prod.yml up --build -d
 To safeguard credentials passed via webhooks:
 - **Application Level**: The backend includes `SensitiveDataFilter` and `sanitize_access_logging_middleware` which automatically redact sensitive parameters (`?token=[REDACTED]`, `?api_key=[REDACTED]`) from server traces and access logs.
 - **Nginx**: Use the template provided in [backend/deploy/nginx.conf](deploy/nginx.conf) with custom log format `redacted_combined` logging `$uri` without query strings.
-- **Caddy**: Use the template provided in [backend/deploy/Caddyfile](deploy/Caddyfile) with the `format filter` log directive.
+- **Caddy**: Use the template provided in [backend/deploy/Caddyfile](deploy/Caddyfile): its `format filter` log directive redacts the `token`, `secret`, `api_key` and `password` query parameters and the `X-Webhook-Token`, `X-Brevo-Token` and `X-Api-Key` headers (Caddy only masks `Authorization` and `Cookie` by default).
 
 ## 7. Production Monitoring & Anti-Spam Rate Limiting
 
