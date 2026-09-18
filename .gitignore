@@ -1,11 +1,15 @@
 .venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
+mutants/
+.mutmut-cache
 *.db
 *.db-shm
 *.db-wal
