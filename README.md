@@ -8,13 +8,20 @@
   <img src="frontend/public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
 </p>
 
-# Telegram Support Bot with Knowledge Base & AI Feedback Loop
+<h1 align="center">Telegram Support Bot with Knowledge Base & AI Feedback Loop</h1>
 
-This project implements a complete automated support system on Telegram, connected to a FastAPI Backend API, an evolving knowledge base, and a configurable AI module.
+<p align="center">
+  <img alt="License" src="https://img.shields.io/badge/license-MIT-blue.svg">
+  <img alt="Python" src="https://img.shields.io/badge/python-3.13-blue.svg">
+  <img alt="Node" src="https://img.shields.io/badge/node-%3E%3D18.18-339933.svg">
+  <img alt="Tests" src="https://img.shields.io/badge/tests-414%20passing-brightgreen.svg">
+</p>
+
+A support bot for Telegram that gets smarter over time: it answers questions from a knowledge base, escalates to your team the moment it's stuck, and learns from every resolution — so the next person asking the same thing gets an instant answer instead of another ticket.
 
 ---
 
-## System Architecture
+## How it works
 
 ```
                     TELEGRAM
@@ -54,22 +61,20 @@ This project implements a complete automated support system on Telegram, connect
                         Knowledge Base
 ```
 
-### Key Features:
-1. **Automated Telegram Support**: Users ask questions and receive instant answers.
-2. **Two-step Confirmation (YES / NO)**: Interactive buttons under each response to validate resolution.
-3. **Automatic Escalation (NO)**: Immediate ticket creation and notification in a private Telegram support group.
-4. **Resolution via Telegram Reply**: Support agents simply reply to the ticket card message in the group to forward the solution to the user.
-5. **Continuous Learning (Feedback Loop)**: Every solution provided by a support agent is automatically indexed into the knowledge base.
-6. **Pluggable AI / Zero Extra Cost**: Operates 100% autonomously without AI using lexical/semantic similarity search, or with an LLM (OpenAI, Gemini, DeepSeek) if an API key is configured.
-7. **Robust Background Isolation**: Asynchronous email dispatches and Telegram notifications run inside fault-isolated task wrappers, ensuring third-party network drops never crash the HTTP response lifecycle.
-8. **IDOR Access Control**: User-scoped ticket retrieval (`?user_id=`) prevents unauthorized cross-user inspection while preserving administrative master access.
-9. **Dual-Mode Webhook Security**: Brevo inbound emails authenticate via `X-Webhook-Token` / `X-Brevo-Token` headers or query parameters with automated access log token redaction.
-10. **Community Group Q&A**: Members ask questions directly in a public community group via `/ask <question>`; the bot answers publicly, tagging the asker, with YES/NO resolution buttons that auto-expire after inactivity. Escalated tickets and all resolution/agent traffic stay confined to the private admin/support group or email — never posted to the community group.
-11. **Crypto Market Data**: `/btc`, `/eth`, `/firo`, and other mapped asset commands return live price, 24h change, market cap, and 24h volume from CoinGecko, usable in DM or the community group.
-12. **Community Moderation**: Admin-only `/mute`, `/unmute`, `/ban`, `/kick`, and `/warn` commands scoped to the community group, with admin status verified live against the Telegram Bot API. `/purge` lets a community-group admin delete recent bot messages without needing admin-group access.
-13. **Dynamic Community Group Setup**: No redeploy needed to point the bot at a community — an env-defined owner (`BOT_OWNER_TELEGRAM_ID`) or an admin they whitelist runs `/setup_community` directly in the target group at any time. The admin/support group stays fixed via `.env` so ticket/moderation traffic can never be redirected by a chat command.
-14. **Bilingual Bot (FR/EN)**: All bot-authored messages are available in French (default) and English; the owner or a whitelisted admin switches with `/language fr` or `/language en`.
-15. **Telegram WebApp & Web Portal (Mobile-First)**: Dedicated Next.js web application styled with the official **Stack Wallet** monochrome branding and frosted glassmorphism. Designed mobile-first for seamless integration as a Telegram Mini App (Web App) with haptic feedback, safe area insets, compact header with drawer, and bottom navigation bar.
+A user asks a question, the bot searches the knowledge base (optionally backed by an LLM), and shows a YES/NO button to confirm it actually helped. A "no" opens a ticket in your private support group — an agent just replies to that message, the user gets the answer, and it's indexed back into the knowledge base for next time.
+
+## Highlights
+
+- **Instant Telegram support** — ask a question, get an answer pulled straight from a knowledge base that keeps learning from every ticket a human resolves.
+- **One-tap escalation** — if the bot's answer doesn't help, a single "No" opens a ticket in your private support group; agents resolve it by just replying.
+- **Optional AI** — works out of the box with free lexical/semantic search, or plug in OpenAI, Gemini, or DeepSeek for LLM-powered answers.
+- **Public community Q&A** — members ask `/ask <question>` right in a group chat; the bot answers publicly and only escalates privately when needed.
+- **Moderation & crypto, built in** — `/mute`, `/ban`, `/warn`, `/purge`, plus live prices via `/btc`, `/eth`, `/firo`, and more.
+- **No-redeploy setup** — point the bot at a new community group anytime with `/setup_community`, right from Telegram.
+- **Bilingual out of the box** — every bot message ships in French and English, switchable with `/language`.
+- **A real web portal** — a mobile-first Next.js WebApp (Telegram Mini App-ready) styled after Stack Wallet, for browsing tickets, the knowledge base, and settings.
+
+The security and reliability details (webhook auth, IDOR protection, rate limiting, background task isolation...) live in [backend/README.md](backend/README.md), alongside setup instructions.
 
 ---
 
