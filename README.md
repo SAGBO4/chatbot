@@ -1,12 +1,10 @@
 <p align="center">
-  <img src="frontend/public/stack-wallet-bot.png" width="160" alt="Stack Wallet Bot">
-</p>
-
-<p align="center">
+  <img src="frontend/public/stack-wallet-bot.png" width="100" alt="Stack Wallet Bot" valign="middle">
+  &nbsp;&nbsp;&nbsp;
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="frontend/public/stack-logo-white.png">
     <source media="(prefers-color-scheme: light)" srcset="frontend/public/stack-logo-full.png">
-    <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="300">
+    <img alt="Stack Wallet" src="frontend/public/stack-logo-full.png" width="260" valign="middle">
   </picture>
 </p>
 
