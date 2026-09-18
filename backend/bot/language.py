@@ -8,13 +8,12 @@ logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 30.0
 
-# Mirrors bot/group_scope.py's cache pattern: short TTL, eagerly invalidated
-# right after a successful language change (design.md decision 3's pattern
-# applied to the language setting).
+# Same cache pattern as bot/group_scope.py: short TTL, cleared right after a successful language change.
 _cached_language: Optional[Tuple[str, float]] = None
 
 
 def invalidate_language_cache() -> None:
+    """Forget the cached language so the next call reads it again."""
     global _cached_language
     _cached_language = None
 

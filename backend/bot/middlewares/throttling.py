@@ -46,22 +46,17 @@ class ThrottlingMiddleware(BaseMiddleware):
         now = time.time()
         window_start = now - self.window_seconds
 
-        # Clean timestamps older than sliding window
         current_timestamps = [t for t in self.user_timestamps.get(user_id, []) if t > window_start]
 
         if len(current_timestamps) >= self.rate_limit:
-            # User exceeded rate limit
             logger.warning("Throttling rate limit reached for user %s (%s messages in %ss)", user_id, len(current_timestamps), self.window_seconds)
 
-            # Send warning message if cooldown has elapsed
             last_warn = self.last_warning_time.get(user_id, 0.0)
             if now - last_warn >= self.warning_cooldown:
                 self.last_warning_time[user_id] = now
                 try:
                     if isinstance(event, CallbackQuery):
-                        # A toast, not a new message - callback queries are
-                        # answered once via .answer(text=..., show_alert=...),
-                        # never via the Message-style positional text arg.
+                        # A toast, not a new message: callback queries are answered with .answer(text=...)
                         await event.answer(
                             "⚠️ Veuillez patienter quelques secondes avant de réessayer.",
                             show_alert=False,

@@ -42,11 +42,11 @@ UNMUTED_PERMISSIONS = ChatPermissions(
 
 def _resolve_target(message: Message, command: CommandObject) -> Tuple[Optional[int], Optional[str], List[str]]:
     """
-    Resolves the target member of a moderation command either from the
-    message being replied to, or from an explicit numeric Telegram user id
-    as the command's first argument. Returns (user_id, display_name, rest_args)
-    where rest_args are the remaining whitespace-separated argument tokens
-    (e.g. a mute duration or a warn reason).
+    Who a moderation command targets: the author of the replied-to message, or a numeric Telegram
+    user id given as the first argument.
+
+    Returns `(user_id, display_name, rest_args)`; `rest_args` are the remaining arguments (a mute
+    duration, a warn reason). `(None, None, [])` when there is no target.
     """
     args = (command.args or "").split()
 
@@ -62,6 +62,7 @@ def _resolve_target(message: Message, command: CommandObject) -> Tuple[Optional[
 
 
 async def _check_admin(message: Message, bot: Bot, lang: str) -> bool:
+    """Check the sender is a group admin (live, via Telegram); reply with a refusal if not."""
     if not await is_group_admin(bot, message.chat.id, message.from_user.id):
         await message.reply(t("moderation_not_admin", lang))
         return False
@@ -75,6 +76,7 @@ async def handle_mute(
     bot: Bot,
     backend_client: Optional[BackendClient] = None,
 ):
+    """`/mute [seconds]` (reply or user id): stop a member from writing, for a duration or until unmuted."""
     if not await is_community_group_chat(message.chat.id, backend_client=backend_client):
         return
     lang = await get_active_language(backend_client=backend_client)
@@ -125,6 +127,7 @@ async def handle_unmute(
     bot: Bot,
     backend_client: Optional[BackendClient] = None,
 ):
+    """`/unmute` (reply or user id): give a muted member their permissions back."""
     if not await is_community_group_chat(message.chat.id, backend_client=backend_client):
         return
     lang = await get_active_language(backend_client=backend_client)
@@ -158,6 +161,7 @@ async def handle_ban(
     bot: Bot,
     backend_client: Optional[BackendClient] = None,
 ):
+    """`/ban` (reply or user id): remove a member and stop them from rejoining."""
     if not await is_community_group_chat(message.chat.id, backend_client=backend_client):
         return
     lang = await get_active_language(backend_client=backend_client)
@@ -187,6 +191,7 @@ async def handle_kick(
     bot: Bot,
     backend_client: Optional[BackendClient] = None,
 ):
+    """`/kick` (reply or user id): remove a member who may rejoin later."""
     if not await is_community_group_chat(message.chat.id, backend_client=backend_client):
         return
     lang = await get_active_language(backend_client=backend_client)
@@ -219,6 +224,7 @@ async def handle_warn(
     bot: Bot,
     backend_client: Optional[BackendClient] = None,
 ):
+    """`/warn [reason]` (reply or user id): record a warning and report the member's total."""
     if not await is_community_group_chat(message.chat.id, backend_client=backend_client):
         return
     lang = await get_active_language(backend_client=backend_client)

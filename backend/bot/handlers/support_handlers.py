@@ -23,15 +23,10 @@ WHISPER_MAX_BYTES = 25 * 1024 * 1024
 
 async def _transcribe_voice_message(message: Message, bot: Bot) -> Optional[str]:
     """
-    Best-effort speech-to-text for a voice/audio agent reply, via OpenAI's
-    Whisper API (`audio/transcriptions`).
+    Best-effort speech-to-text for a voice/audio reply, using OpenAI's Whisper API.
 
-    Only attempted when AI_PROVIDER is "openai" with an API key configured -
-    Whisper is OpenAI-specific, so Gemini/DeepSeek deployments fall back to
-    asking the agent to reply with text instead. Never raises: any failure
-    (unsupported provider, download error, API error) returns None so the
-    caller falls through to that same "please reply with text" message
-    rather than crashing.
+    Only tried with AI_PROVIDER "openai" and an API key (Whisper is OpenAI-specific). Never raises:
+    any failure returns None and the caller asks the agent to reply with text instead.
     """
     media = message.voice or message.audio
     if media is None:
@@ -69,12 +64,7 @@ async def _transcribe_voice_message(message: Message, bot: Bot) -> Optional[str]
 
 
 def _is_support_group_chat(chat_id: Union[int, str]) -> bool:
-    """
-    Returns True only if chat_id matches the configured Telegram Support Group.
-
-    Returns False when TELEGRAM_SUPPORT_GROUP_ID is unconfigured (falsy or the
-    "0" sentinel), so an unconfigured group can never accidentally match.
-    """
+    """True only if chat_id is the configured support group; False while it is unconfigured (unset or 0)."""
     if not settings.support_group_is_configured():
         return False
     return str(chat_id) == str(settings.TELEGRAM_SUPPORT_GROUP_ID)
@@ -87,29 +77,23 @@ async def handle_support_agent_reply(
     backend_client: Optional[BackendClient] = None,
 ):
     """
-    Captures replies made by support team agents to ticket cards posted in the support group.
+    Turn a support agent's reply to a ticket card into the ticket's resolution.
 
-    Only replies sent in the configured Telegram Support Group are treated as
-    agent resolutions; replies from any other chat (private DMs included) are
-    ignored to prevent unauthenticated users from resolving arbitrary tickets,
-    messaging arbitrary Telegram users, or injecting content into the
-    knowledge base.
+    Only replies inside the configured support group count, and only from a verified group admin;
+    otherwise anyone could resolve tickets, message arbitrary users or feed the knowledge base.
     """
     if not _is_support_group_chat(message.chat.id):
         return
 
-    # Being in the right group is not enough: only a verified admin/agent of
-    # that group may resolve tickets, message arbitrary users on their
-    # behalf, or feed the knowledge base. Re-checked live against Telegram
-    # (see is_group_admin), never trusted from client-controlled state.
+    # Being in the group is not enough: only a verified admin may resolve tickets, message users on
+    # the bot's behalf or feed the knowledge base (checked live with Telegram, see is_group_admin).
     if not message.from_user or not await is_group_admin(bot, message.chat.id, message.from_user.id):
         return
 
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
 
-    # 1. Primary: resolve by the replied-to message's identity, so wording
-    # changes to the card's text can never break matching.
+    # Primary match: the replied-to message's id, immune to changes in the card's wording.
     ticket_id: Optional[int] = None
     target_user_id: Optional[int] = None
 
@@ -128,12 +112,9 @@ async def handle_support_agent_reply(
         ticket_id = matched_ticket["id"]
         target_user_id = matched_ticket.get("user_id")
     elif replied_from_bot:
-        # 2. Fallback: parse the card's text (covers tickets created before
-        # this lookup existed, or a card whose id was never recorded). Only
-        # trusted when the replied-to message was actually posted by the bot
-        # itself - otherwise an admin replying to any other message in the
-        # group (or a message crafted by a non-admin to look like a card)
-        # could be parsed as a ticket/user id pair that was never real.
+        # Fallback: parse the card's text (tickets created before the id lookup existed, or whose id
+        # was never stored). Only trusted when the bot itself posted the replied-to message, or any
+        # message crafted to look like a card would pass for a ticket.
         replied_text = message.reply_to_message.text or message.reply_to_message.caption or ""
         ticket_match = TICKET_ID_REGEX.search(replied_text)
         user_match = USER_ID_REGEX.search(replied_text)
@@ -142,17 +123,13 @@ async def handle_support_agent_reply(
             ticket_id = int(ticket_match.group(1))
             target_user_id = int(user_match.group(1)) if user_match else None
 
-    # 3. Neither the id-based lookup nor the text fallback found a ticket:
-    # tell the agent explicitly instead of silently doing nothing.
+    # No match: tell the agent instead of doing nothing.
     if ticket_id is None:
         await message.reply(t("support_no_matching_ticket", lang))
         return
 
-    # `message.text` is None for any non-text reply (photo, sticker, voice,
-    # video, animation, ...) - `.strip()` on it used to crash the handler.
-    # Fall back to the media's caption (an agent attaching a screenshot with
-    # an explanation is a normal workflow), then to a Whisper transcription
-    # for a voice/audio reply, before giving up.
+    # message.text is None for non-text replies: use the caption (a screenshot with an explanation is
+    # a normal reply), then a voice transcription.
     solution_text = (message.text or message.caption or "").strip()
 
     if not solution_text and (message.voice or message.audio):
@@ -176,7 +153,7 @@ async def handle_support_agent_reply(
     )
 
     try:
-        # Resolve ticket and trigger KB ingestion (strictly capped to 5000 chars matching backend schema)
+        # The backend rejects solutions over 5000 characters
         api_solution = truncate_telegram_text(solution_text, max_length=5000)
         resolved_ticket = await client.resolve_ticket(
             ticket_id=ticket_id,
@@ -195,7 +172,7 @@ async def handle_support_agent_reply(
 
         user_id = target_user_id or resolved_ticket.get("user_id")
 
-        # 1. Forward the solution to the user via Telegram
+        # Forward the solution to the user
         if user_id:
             capped_solution = truncate_telegram_text(solution_text, max_length=3500)
             safe_solution = escape_telegram_markdown(capped_solution)
@@ -219,7 +196,7 @@ async def handle_support_agent_reply(
                 except Exception as plain_err:
                     logger.error("Failed to send plain text user notification: %s", plain_err)
 
-        # 2. Confirm to the support team in group
+        # Confirm in the support group
         await message.reply(
             t("support_resolved_confirmation", lang, ticket_id=ticket_id, user_id=user_id),
             parse_mode="Markdown",

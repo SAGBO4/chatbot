@@ -20,22 +20,19 @@ def create_dispatcher(
     backend_client: Optional[BackendClient] = None,
     throttling_middleware: Optional[ThrottlingMiddleware] = None,
 ) -> Dispatcher:
+    """Build the dispatcher: shared backend client, throttling on messages and button clicks, and the routers."""
     dp = Dispatcher()
     if backend_client is not None:
         dp["backend_client"] = backend_client
 
     throttler = throttling_middleware or ThrottlingMiddleware()
     dp.message.middleware(throttler)
-    # Callback queries (inline button clicks, e.g. "resolve:yes/no") each
-    # trigger a backend call just like a message does, so they must be rate
-    # limited the same way - otherwise a user can bypass all message
-    # throttling by rapid-clicking a button instead of typing.
+    # Button clicks call the backend like messages do: throttle them too, or a user could bypass
+    # the message throttling by rapid-clicking a button.
     dp.callback_query.middleware(throttler)
 
-    # Command-specific routers are registered before user_router: its
-    # handle_user_query matches any text in a private chat (no command
-    # exclusion), so it would otherwise swallow "/btc", "/mute", etc. before
-    # a more specific router ever saw them.
+    # Command routers come before user_router, whose handle_user_query matches any text in a private
+    # chat and would otherwise swallow "/btc", "/mute", etc.
     dp.include_router(setup_router)
     dp.include_router(support_router)
     dp.include_router(community_router)
@@ -46,6 +43,7 @@ def create_dispatcher(
 
 
 async def main():
+    """Entry point: optional Sentry, refuse to start without a bot token, set the WebApp menu button, then poll."""
     if getattr(settings, "SENTRY_DSN", None):
         try:
             import sentry_sdk
@@ -64,7 +62,7 @@ async def main():
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
     dp = create_dispatcher(backend_client=backend_client)
 
-    # Configure persistent WebApp menu button if HTTPS URL is provided
+    # Telegram only accepts an https:// URL for the menu button
     webapp_url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
     if webapp_url and webapp_url.startswith("https://"):
         try:

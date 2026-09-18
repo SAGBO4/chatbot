@@ -23,14 +23,13 @@ community_router = Router()
 DEFAULT_PURGE_COUNT = 5
 MAX_PURGE_COUNT = 50
 
-# Bounded in-memory record of message ids the bot has posted in each
-# community group, so /purge can delete recent bot messages without a
-# persistent store. Lost on restart, same trade-off as the throttling
-# middleware's in-memory state - worst case /purge finds nothing to delete.
+# Ids of the last 200 /ask answers posted per community group, so /purge can delete them without a
+# database. Lost on restart: the worst case is that /purge finds nothing to delete.
 _recent_bot_messages: Dict[int, Deque[int]] = defaultdict(lambda: deque(maxlen=200))
 
 
 def _track_bot_message(chat_id: int, message_id: int) -> None:
+    """Remember a bot message so /purge can delete it later."""
     _recent_bot_messages[chat_id].append(message_id)
 
 
@@ -46,10 +45,8 @@ async def _expire_resolution_buttons(
     bot: Bot, state: FSMContext, chat_id: int, message_id: int, expected_timestamp: float
 ) -> None:
     """
-    Disables a group-triggered answer's YES/NO keyboard once its inactivity
-    timeout has elapsed, unless the answer was already resolved/escalated or
-    superseded by a newer question in the meantime (state no longer carries
-    the same timestamp).
+    Remove an answer's YES/NO buttons once the timeout has passed, unless it was resolved, escalated
+    or replaced by a newer question meanwhile (the state no longer holds the same timestamp).
     """
     data = await state.get_data()
     if data.get("last_answer_timestamp") != expected_timestamp:
@@ -65,11 +62,13 @@ async def _expire_resolution_buttons(
 
 
 async def _schedule_expiry(bot: Bot, state: FSMContext, chat_id: int, message_id: int, timestamp: float) -> None:
+    """Wait for the timeout, then expire the buttons."""
     await asyncio.sleep(settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS)
     await _expire_resolution_buttons(bot, state, chat_id, message_id, timestamp)
 
 
 def _is_answer_expired(timestamp: Optional[float]) -> bool:
+    """Whether an answer is older than COMMUNITY_RESOLUTION_TIMEOUT_SECONDS (a missing timestamp counts as expired)."""
     if timestamp is None:
         return True
     return (time.time() - timestamp) > settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS
@@ -83,11 +82,7 @@ async def handle_community_ask(
     bot: Bot,
     backend_client: Optional[BackendClient] = None,
 ):
-    """
-    Group-triggered question intake: `/ask <question>` in the configured
-    Telegram Community Group is submitted to the same backend query pipeline
-    as the private-DM flow, and answered publicly, tagging the asking member.
-    """
+    """`/ask <question>` in the community group: answer publicly through the same pipeline as private chats, tagging the asker."""
     if not await _is_community_group_chat(message.chat.id, backend_client=backend_client):
         return
 
@@ -136,6 +131,7 @@ async def handle_community_ask(
 async def handle_community_resolve_yes(
     callback: CallbackQuery, state: FSMContext, backend_client: Optional[BackendClient] = None
 ):
+    """YES on a community answer: mark it resolved (or say it expired)."""
     lang = await get_active_language(backend_client=backend_client)
     user_data = await state.get_data()
     last_question = user_data.get("last_question")
@@ -174,10 +170,10 @@ async def handle_community_resolve_no(
     backend_client: Optional[BackendClient] = None,
 ):
     """
-    Escalates an unresolved group-triggered question to a ticket, exactly
-    like the DM flow, but the community-group message is only ever updated
-    with a neutral acknowledgement - the ticket card, question, and answer
-    are posted solely to the admin/support group (create_ticket_and_notify_admin_group).
+    NO on a community answer: open a ticket like the private flow does.
+
+    The community message only gets a neutral acknowledgement; the ticket card, question and answer
+    go to the admin/support group only.
     """
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
@@ -232,6 +228,7 @@ async def handle_community_resolve_no(
 
 
 def _parse_purge_count(text: str) -> int:
+    """Number after `/purge`, clamped to 1..MAX_PURGE_COUNT; DEFAULT_PURGE_COUNT if missing or not a number."""
     parts = (text or "").split()
     if len(parts) >= 2:
         try:
@@ -249,10 +246,11 @@ async def handle_purge(
     backend_client: Optional[BackendClient] = None,
 ):
     """
-    Admin-only community-group cleanup: deletes up to N of the bot's most
-    recent messages in the group (default DEFAULT_PURGE_COUNT, capped at
-    MAX_PURGE_COUNT), so an admin can remove an unwanted bot reply without
-    needing admin-group access.
+    Admin only: delete up to N of the bot's latest `/ask` answers in the community group
+    (default DEFAULT_PURGE_COUNT, at most MAX_PURGE_COUNT).
+
+    Only answers tracked by `_track_bot_message` can be deleted, i.e. `/ask` answers; other bot
+    messages (moderation or crypto replies) are not tracked.
     """
     if not await _is_community_group_chat(message.chat.id, backend_client=backend_client):
         return

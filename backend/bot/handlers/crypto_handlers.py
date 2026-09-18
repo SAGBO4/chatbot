@@ -14,6 +14,7 @@ crypto_router = Router()
 
 
 def _format_price_reply(symbol: str, data: dict, lang: str) -> str:
+    """Format a price reply, with a chart arrow for the sign of the 24h change."""
     change = data["change_24h_pct"]
     arrow = "📈" if change >= 0 else "📉"
     return t(
@@ -29,6 +30,7 @@ def _format_price_reply(symbol: str, data: dict, lang: str) -> str:
 
 
 async def _handle_asset_command(message: Message, symbol: str, backend_client: Optional[BackendClient] = None):
+    """Answer `/<symbol>` with the live price: a 404 means an unknown asset, anything else "unavailable"."""
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
     try:
@@ -49,13 +51,13 @@ async def _handle_asset_command(message: Message, symbol: str, backend_client: O
 
 
 def _make_handler(symbol: str):
+    """Build the handler for one symbol (a closure, because aiogram handlers are registered per command)."""
     async def handler(message: Message, backend_client: Optional[BackendClient] = None):
         await _handle_asset_command(message, symbol, backend_client=backend_client)
     return handler
 
 
-# Registers one command per curated asset symbol (e.g. /btc, /eth, /firo),
-# usable in both private chats and the community group - crypto lookups are
-# not ticket/moderation content, so no group scoping is needed here.
+# One command per known symbol (/btc, /eth, /firo...), usable in private chats and the community group:
+# prices are public data, so no group scoping.
 for _symbol in SYMBOL_TO_COINGECKO_ID:
     crypto_router.message(Command(_symbol))(_make_handler(_symbol))

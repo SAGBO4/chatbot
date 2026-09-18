@@ -18,11 +18,14 @@ user_router = Router()
 
 
 class UserQueryState(StatesGroup):
+    """Set once the bot has answered, while it waits for the user's YES / NO."""
+
     waiting_for_resolution = State()
 
 
 @user_router.message(CommandStart())
 async def handle_start(message: Message, state: FSMContext, backend_client: Optional[BackendClient] = None):
+    """/start: welcome message, with the WebApp button when TELEGRAM_WEBAPP_URL is set."""
     await state.clear()
     lang = await get_active_language(backend_client=backend_client)
     url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
@@ -32,6 +35,7 @@ async def handle_start(message: Message, state: FSMContext, backend_client: Opti
 
 @user_router.message(Command("webapp", "app"))
 async def handle_webapp(message: Message):
+    """/webapp: a button that opens the Mini App."""
     url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
     if not url:
         await message.answer(
@@ -46,6 +50,7 @@ async def handle_webapp(message: Message):
 
 @user_router.message(Command("help"))
 async def handle_help(message: Message, backend_client: Optional[BackendClient] = None):
+    """/help: how to use the bot."""
     lang = await get_active_language(backend_client=backend_client)
     url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
     keyboard = get_webapp_keyboard(url) if url else None
@@ -58,6 +63,7 @@ async def handle_user_query(
     state: FSMContext,
     backend_client: Optional[BackendClient] = None,
 ):
+    """Answer a private-chat question from the knowledge base, then ask whether it solved the problem."""
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
     user_query = message.text.strip()
@@ -72,7 +78,7 @@ async def handle_user_query(
         data = await client.query(query=user_query, user_id=user_id, user_handle=user_handle)
         answer = data.get("answer", "")
 
-        # Save context in state for ticket creation if user clicks NON
+        # Remembered so that clicking NO can open a ticket with this question and answer
         await state.update_data(
             last_question=user_query,
             last_answer=answer,
@@ -96,6 +102,7 @@ async def handle_user_query(
 async def handle_resolve_yes(
     callback: CallbackQuery, state: FSMContext, backend_client: Optional[BackendClient] = None
 ):
+    """YES: mark the answer as resolved and remove the buttons."""
     await state.clear()
     lang = await get_active_language(backend_client=backend_client)
     await callback.answer(t("resolve_yes_ack", lang))
@@ -122,6 +129,7 @@ async def handle_resolve_no(
     bot: Bot,
     backend_client: Optional[BackendClient] = None,
 ):
+    """NO: open a ticket, post its card to the support group and tell the user."""
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
     user_data = await state.get_data()
@@ -138,7 +146,6 @@ async def handle_resolve_no(
     user_handle = callback.from_user.username or callback.from_user.first_name or f"User_{user_id}"
 
     try:
-        # Create ticket in backend and post its card to the admin/support group
         ticket = await create_ticket_and_notify_admin_group(
             client=client,
             bot=bot,
@@ -151,7 +158,7 @@ async def handle_resolve_no(
 
         await callback.answer(t("ticket_created_ack", lang))
 
-        # Isolate message editing so that any display/markdown error never prevents group escalation
+        # Editing the message can fail (Markdown, deleted message); the ticket is already created by now
         base_text = callback.message.text or ""
         if len(base_text) > 3700:
             base_text = base_text[:3700] + "...(tronqué)"

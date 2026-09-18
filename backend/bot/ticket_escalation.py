@@ -16,16 +16,11 @@ async def create_ticket_and_notify_admin_group(
     automated_answer: str,
 ) -> dict:
     """
-    Creates a support ticket via the backend and posts its card to the
-    configured Telegram admin/support group (TELEGRAM_SUPPORT_GROUP_ID).
+    Create a ticket through the backend and post its card to the admin/support group.
 
-    Shared by the private-DM escalation flow (bot/handlers/user_handlers.py)
-    and the community-group escalation flow (bot/handlers/community_handlers.py)
-    so the ticket card and its Markdown-fallback handling only exist once.
-    Ticket internals are only ever posted to the admin group here - callers
-    are responsible for what (if anything) they show back in their own chat.
-
-    Returns the created ticket dict (as returned by the backend API).
+    Shared by the private-chat and community-group escalation flows, so the card and its
+    Markdown-to-plain-text fallback exist once. Ticket details only ever go to the admin group here;
+    callers decide what to show in their own chat. Returns the ticket dict from the backend.
     """
     ticket = await client.create_ticket(
         user_id=user_id,
@@ -39,7 +34,7 @@ async def create_ticket_and_notify_admin_group(
     if not settings.support_group_is_configured():
         return ticket
 
-    # Truncate fields if excessively long to ensure group card never overflows Telegram 4096 limit
+    # Cut long fields so the card stays under Telegram's 4096-character limit
     card_question = truncate_telegram_text(question, max_length=1000, suffix="...")
     card_answer = truncate_telegram_text(automated_answer, max_length=1800, suffix="...")
 
@@ -81,8 +76,7 @@ async def create_ticket_and_notify_admin_group(
         except Exception as plain_err:
             logger.error("Failed to send plain text group card: %s", plain_err)
 
-    # Best-effort: record the card's message id so a reply can later
-    # be matched by message identity rather than by parsing its text.
+    # Best effort: store the card's message id so a reply can be matched to the ticket by identity
     if sent_card and hasattr(sent_card, "message_id"):
         try:
             await client.attach_support_card(

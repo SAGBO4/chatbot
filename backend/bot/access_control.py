@@ -8,10 +8,8 @@ logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 30.0
 
-# In-memory cache of recent whitelist-check results, keyed by user_id.
-# Mirrors bot/admin_check.py's pattern. Eagerly invalidated by
-# invalidate_whitelist_cache() right after a successful /whitelist change,
-# so a cache hit never masks a just-made change in the same process.
+# Recent whitelist-check results by user_id (same pattern as bot/admin_check.py). Cleared right after
+# every /whitelist change, so a cached answer never hides a change made in this process.
 _whitelist_cache: Dict[int, Tuple[bool, float]] = {}
 
 
@@ -25,12 +23,11 @@ def invalidate_whitelist_cache(user_id: Optional[int] = None) -> None:
 
 async def is_authorized(user_id: int, backend_client: Optional[BackendClient] = None) -> bool:
     """
-    Whether user_id may configure the community group, manage the whitelist
-    entry point, or change the bot language.
+    Whether user_id may run /setup_community and /language: the bot owner, or a whitelisted admin.
 
-    Checks the env-defined owner id first (a plain in-memory comparison, no
-    I/O, so owner authority can never be affected by whitelist data
-    corruption), then falls back to a short-TTL cached whitelist lookup.
+    Managing the whitelist itself is owner-only (see `is_owner`). The owner (from the env) is checked
+    first, in memory, so owner authority never depends on whitelist data; the whitelist lookup is
+    cached for 30 seconds.
     """
     if settings.is_bot_owner(user_id):
         return True
@@ -52,4 +49,5 @@ async def is_authorized(user_id: int, backend_client: Optional[BackendClient] = 
 
 
 async def is_owner(user_id: int) -> bool:
+    """Whether user_id is the bot owner from the env, the only user who can manage the whitelist."""
     return settings.is_bot_owner(user_id)

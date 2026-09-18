@@ -5,9 +5,8 @@ logger = logging.getLogger(__name__)
 DEFAULT_LANGUAGE = "fr"
 SUPPORTED_LANGUAGES = ("fr", "en")
 
-# Flat {key: {"fr": ..., "en": ...}} translation table for every bot-authored
-# user-facing message (see bot-localization spec: "Full message coverage").
-# `{placeholder}` tokens are substituted via str.format in t().
+# {key: {"fr": ..., "en": ...}} for the messages the bot writes to users.
+# `{placeholder}` tokens are filled with str.format in t().
 TRANSLATIONS = {
     # --- user_handlers.py ---
     "welcome": {
@@ -293,10 +292,10 @@ TRANSLATIONS = {
 
 def t(key: str, lang: str = DEFAULT_LANGUAGE, **kwargs) -> str:
     """
-    Resolves the translation for `key` in `lang`, falling back to French if
-    the language is unknown, and to the bare key (logged as a warning) if
-    the key itself doesn't exist - so a missing translation degrades to
-    visible-but-not-crashing rather than raising.
+    Translation of `key` in `lang`, with `{placeholders}` filled from kwargs.
+
+    Never raises: an unknown language falls back to French, and a missing key or a bad placeholder
+    is logged as a warning and returns the bare key or the unformatted text.
     """
     entry = TRANSLATIONS.get(key)
     if entry is None:

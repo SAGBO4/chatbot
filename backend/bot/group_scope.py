@@ -7,15 +7,13 @@ logger = logging.getLogger(__name__)
 
 _CACHE_TTL_SECONDS = 30.0
 
-# In-memory cache of the persisted community group id, refreshed on a short
-# TTL. Mirrors bot/admin_check.py and bot/access_control.py's pattern:
-# invalidate_community_group_cache() is called right after a successful
-# /setup_community so the same process picks up the change immediately,
-# without waiting out the TTL (design.md decision 3).
+# The persisted community group id, cached briefly (same pattern as bot/admin_check.py). Cleared right
+# after a successful /setup_community so this process sees the change without waiting for the TTL.
 _cached_community_group_id: Optional[Tuple[Optional[int], float]] = None
 
 
 def invalidate_community_group_cache() -> None:
+    """Forget the cached community group id so the next call reads it again."""
     global _cached_community_group_id
     _cached_community_group_id = None
 
@@ -45,11 +43,8 @@ async def is_community_group_chat(
     chat_id: Union[int, str], backend_client: Optional[BackendClient] = None
 ) -> bool:
     """
-    Returns True only if chat_id matches the currently configured community
-    group (resolved dynamically per community-group-setup - see
-    get_community_group_id - not a fixed environment value). Returns False
-    when no community group is configured yet, so an unconfigured deployment
-    can never accidentally match.
+    True only if chat_id is the configured community group (read from the persisted setting, not the
+    env). False while none is configured, so an unconfigured bot never matches.
     """
     community_group_id = await get_community_group_id(backend_client=backend_client)
     if community_group_id is None:

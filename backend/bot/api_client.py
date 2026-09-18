@@ -4,6 +4,8 @@ from app.config import settings
 
 
 class BackendClient:
+    """Async HTTP client the bot uses to call the backend API; each request carries `X-API-Key`."""
+
     def __init__(
         self,
         base_url: Optional[str] = None,
@@ -14,6 +16,7 @@ class BackendClient:
         self._owns_client = client is None
 
     async def _get_client(self) -> httpx.AsyncClient:
+        """The shared client, recreated if it was never opened or has been closed."""
         if self._client is None or self._client.is_closed:
             self._client = httpx.AsyncClient(timeout=15.0)
             self._owns_client = True
@@ -25,15 +28,14 @@ class BackendClient:
             await self._client.aclose()
 
     def _headers(self) -> Dict[str, str]:
-        # Authenticates this client to the backend API (see backend/main.py
-        # verify_api_key). Sent even if empty/unset so a misconfigured bot
-        # fails loudly (401/503) instead of silently talking to an unprotected
-        # backend.
+        # Auth for the backend (see verify_api_key in app/main.py). With no API_KEY no header is sent,
+        # so a misconfigured bot gets a 401/503 instead of silently working.
         return {"X-API-Key": settings.API_KEY} if settings.API_KEY else {}
 
     async def query(
         self, query: str, user_id: int, user_handle: Optional[str] = None
     ) -> Dict[str, Any]:
+        """Ask the knowledge base (`POST /api/query`)."""
         client = await self._get_client()
         resp = await client.post(
             f"{self.base_url}/api/query",
@@ -50,6 +52,7 @@ class BackendClient:
         question: str,
         automated_answer: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Open a support ticket (`POST /api/tickets`)."""
         client = await self._get_client()
         resp = await client.post(
             f"{self.base_url}/api/tickets",
@@ -71,6 +74,7 @@ class BackendClient:
         resolved_by: Optional[str] = None,
         add_to_knowledge_base: bool = True,
     ) -> Dict[str, Any]:
+        """Resolve a ticket (`POST /api/tickets/{id}/resolve`)."""
         client = await self._get_client()
         resp = await client.post(
             f"{self.base_url}/api/tickets/{ticket_id}/resolve",
@@ -122,6 +126,7 @@ class BackendClient:
         warned_by: str,
         reason: Optional[str] = None,
     ) -> Dict[str, Any]:
+        """Record a moderation warning (`POST /api/moderation/warnings`)."""
         client = await self._get_client()
         resp = await client.post(
             f"{self.base_url}/api/moderation/warnings",
@@ -137,6 +142,7 @@ class BackendClient:
         return resp.json()
 
     async def list_warnings(self, user_id: int, group_id: int) -> Dict[str, Any]:
+        """A user's warnings in a group, with their count (`GET /api/moderation/warnings`)."""
         client = await self._get_client()
         resp = await client.get(
             f"{self.base_url}/api/moderation/warnings",
@@ -150,10 +156,8 @@ class BackendClient:
         """
         Fetches market data for a crypto asset symbol.
 
-        Raises httpx.HTTPStatusError with response.status_code == 404 for an
-        unrecognized symbol, or 503 when the market-data provider is
-        temporarily unavailable - callers distinguish the two to match the
-        crypto-market-data spec's separate scenarios.
+        Raises httpx.HTTPStatusError: status 404 for an unknown symbol, 503 when the price provider
+        is temporarily unavailable. Callers tell the two apart to show different messages.
         """
         client = await self._get_client()
         resp = await client.get(
@@ -164,6 +168,7 @@ class BackendClient:
         return resp.json()
 
     async def get_setting(self, key: str) -> Optional[str]:
+        """The value of a persisted bot setting, or None if it was never set."""
         client = await self._get_client()
         resp = await client.get(
             f"{self.base_url}/api/admin/settings/{key}",
@@ -173,6 +178,7 @@ class BackendClient:
         return resp.json().get("value")
 
     async def set_setting(self, key: str, value: Optional[str], updated_by: Optional[str] = None) -> Dict[str, Any]:
+        """Create or update a persisted bot setting."""
         client = await self._get_client()
         resp = await client.put(
             f"{self.base_url}/api/admin/settings/{key}",
@@ -183,6 +189,7 @@ class BackendClient:
         return resp.json()
 
     async def whitelist_add(self, user_id: int, added_by: str) -> Dict[str, Any]:
+        """Add a user to the admin whitelist."""
         client = await self._get_client()
         resp = await client.post(
             f"{self.base_url}/api/admin/whitelist",
@@ -193,6 +200,7 @@ class BackendClient:
         return resp.json()
 
     async def whitelist_remove(self, user_id: int) -> bool:
+        """Remove a user from the whitelist; False if they were not listed."""
         client = await self._get_client()
         resp = await client.delete(
             f"{self.base_url}/api/admin/whitelist/{user_id}",
@@ -204,6 +212,7 @@ class BackendClient:
         return True
 
     async def is_whitelisted(self, user_id: int) -> bool:
+        """Whether the backend counts this user as admin (the bot owner, or whitelisted)."""
         client = await self._get_client()
         resp = await client.get(
             f"{self.base_url}/api/admin/whitelist/{user_id}/check",

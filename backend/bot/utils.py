@@ -1,5 +1,6 @@
 import re
 
+# Telegram rejects messages over 4096 characters; 4000 keeps a safety margin
 TELEGRAM_MAX_MESSAGE_LENGTH = 4000
 
 
