@@ -171,17 +171,10 @@ class Settings(BaseSettings):
 
     def is_email_configured(self) -> bool:
         """
-        Whether outgoing email support is enabled and minimally configured with valid parameters.
-        Returns False if EMAIL_ENABLED is False, or if SMTP_HOST or SUPPORT_EMAIL_RECIPIENT
-        are unset or match default example placeholders.
+        Whether outgoing email support is enabled.
+        Returns True when EMAIL_ENABLED is set to True in configuration, False otherwise.
         """
-        if not self.EMAIL_ENABLED:
-            return False
-        if not self.SMTP_HOST or self.SMTP_HOST.strip() in ("", "smtp.example.com"):
-            return False
-        if not self.SUPPORT_EMAIL_RECIPIENT or self.SUPPORT_EMAIL_RECIPIENT.strip() in ("", "support-team@example.com"):
-            return False
-        return True
+        return bool(self.EMAIL_ENABLED)
 
     def is_email_inbound_configured(self) -> bool:
         """

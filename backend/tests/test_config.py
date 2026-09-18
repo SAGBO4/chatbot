@@ -92,35 +92,13 @@ def test_is_email_configured():
     s_default = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
     assert s_default.is_email_configured() is False
 
-    # Enabled but with placeholder host
-    s_placeholder = Settings(
-        _env_file=None,
-        TELEGRAM_BOT_TOKEN="t",
-        EMAIL_ENABLED=True,
-        SMTP_HOST="smtp.example.com",
-        SUPPORT_EMAIL_RECIPIENT="real@stackwallet.com",
-    )
-    assert s_placeholder.is_email_configured() is False
+    # Disabled explicitly
+    s_disabled = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=False)
+    assert s_disabled.is_email_configured() is False
 
-    # Enabled but with placeholder recipient
-    s_placeholder_recip = Settings(
-        _env_file=None,
-        TELEGRAM_BOT_TOKEN="t",
-        EMAIL_ENABLED=True,
-        SMTP_HOST="smtp.mailgun.org",
-        SUPPORT_EMAIL_RECIPIENT="support-team@example.com",
-    )
-    assert s_placeholder_recip.is_email_configured() is False
-
-    # Fully configured
-    s_valid = Settings(
-        _env_file=None,
-        TELEGRAM_BOT_TOKEN="t",
-        EMAIL_ENABLED=True,
-        SMTP_HOST="smtp.brevo.com",
-        SUPPORT_EMAIL_RECIPIENT="support@stackwallet.com",
-    )
-    assert s_valid.is_email_configured() is True
+    # Enabled
+    s_enabled = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", EMAIL_ENABLED=True)
+    assert s_enabled.is_email_configured() is True
 
 
 def test_is_email_inbound_configured():
