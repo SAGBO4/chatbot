@@ -63,24 +63,50 @@ Mobile-first web frontend for the [Telegram Support Bot](../README.md) and Knowl
 
 ---
 
+## How the frontend talks to the backend
+
+The browser never calls the backend directly. Every request goes through a same-origin proxy (`src/app/api/backend/[...path]/route.ts`), so the backend `API_KEY` only ever exists in the Next.js server process and is never shipped to visitors' browsers.
+
+The proxy also enforces who can do what, using the signed `initData` string Telegram gives a Mini App (verified server-side with the bot token, and rejected after 24 hours):
+
+- **Admin-only** (must be a whitelisted admin): the `admin` endpoints, knowledge ingestion, moderation warnings, and resolving tickets.
+- **Everyone else** only sees and creates their own tickets: the verified Telegram user id always overrides any id sent by the client.
+- **Local development:** under `npm run dev`, requests without a Telegram session are let through so the app can be tried outside Telegram. A production build (`npm run build` + `npm start`) always enforces the verification, with no bypass.
+
+---
+
 ## Getting Started
 
 ### 1. Prerequisites
 
 - Node.js >= 18.18.0
-- Backend FastAPI running on `http://localhost:8000`
+- Backend FastAPI running on `http://localhost:8000`, with `API_KEY` set (see [backend/README.md](../backend/README.md))
 
-### 2. Install & Run
+### 2. Configure the environment
 
 ```bash
 cd frontend
+cp .env.example .env.local
+```
+
+These variables are read by the Next.js **server** only, never by the browser:
+
+| Variable | Purpose |
+|---|---|
+| `BACKEND_API_URL` | Where the FastAPI backend is reachable from the Next.js server (defaults to `http://127.0.0.1:8000`). |
+| `BACKEND_API_KEY` | Must equal the backend's `API_KEY`; the proxy sends it as the `X-API-Key` header. |
+| `TELEGRAM_BOT_TOKEN` | Must be the same bot token as the backend's; used to verify that Telegram really signed the Mini App session. |
+
+### 3. Install & Run
+
+```bash
 npm install
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### 3. Port Management
+### 4. Port Management
 
 ```bash
 # Free port 3000 if occupied
