@@ -72,6 +72,9 @@ TELEGRAM_SUPPORT_GROUP_ID=
 # Your own Telegram user id - message @userinfobot to find it
 BOT_OWNER_TELEGRAM_ID=
 
+# Shared secret between the backend and the bot (see the note below)
+API_KEY=
+
 # Optional: Enable AI Module
 AI_ENABLED=false
 AI_API_KEY=
@@ -81,6 +84,8 @@ AI_PROVIDER=gemini
 > **Tip to find `TELEGRAM_SUPPORT_GROUP_ID`:**
 > 1. Create the admin/support Telegram group and add your bot as a member.
 > 2. Send any message in the group, then call `https://api.telegram.org/bot<TOKEN>/getUpdates` to inspect `chat.id` (a negative integer starting with `-100`).
+
+> **`API_KEY` is required.** The backend refuses every `/api/*` request with `503 Backend API is not configured (API_KEY missing)` until it is set — this is deliberate (fail-closed), not a bug. Generate a long random value with `openssl rand -hex 32`, use a different one per environment, and set the same value wherever the bot runs: it sends it as the `X-API-Key` header.
 
 **The community group is not set in `.env`.** Instead, configure it from inside Telegram, at any time, without a redeploy:
 
