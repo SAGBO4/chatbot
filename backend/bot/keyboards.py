@@ -1,4 +1,4 @@
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
 
 
 def get_resolution_keyboard(ticket_id: int = 0) -> InlineKeyboardMarkup:
@@ -24,6 +24,16 @@ def get_community_resolution_keyboard() -> InlineKeyboardMarkup:
         [
             InlineKeyboardButton(text="✅ OUI", callback_data="cresolve:yes"),
             InlineKeyboardButton(text="❌ NON", callback_data="cresolve:no"),
+        ]
+    ]
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def get_webapp_keyboard(url: str, text: str = "📱 Centre d'Assistance Stack") -> InlineKeyboardMarkup:
+    """Inline keyboard with a WebApp button for opening the Next.js Mini App."""
+    buttons = [
+        [
+            InlineKeyboardButton(text=text, web_app=WebAppInfo(url=url)),
         ]
     ]
     return InlineKeyboardMarkup(inline_keyboard=buttons)
