@@ -1,21 +1,23 @@
-# NestSupport Portal (Next.js Frontend - NestJS Design System)
+# Stack Wallet Support Portal (Telegram WebApp & Web Portal)
 
-Modern, developer-centric web frontend for the Telegram Support Bot and Knowledge Base, inspired by the official **NestJS** (`nestjs.com`) graphic identity.
+Mobile-first web frontend for the Telegram Support Bot and Knowledge Base, styled with the official **Stack Wallet** monochrome design system and frosted glassmorphism.
 
 ---
 
-## NestJS Design System
+## Stack Wallet Monochrome Glassmorphism & Mobile-First Design
 
-- **Brand Palette**:
-  - Signature Crimson: `#ea2845`
-  - Ruby Glow: `#ff318c` / `#c0138a`
-  - Gradient Backgrounds: `linear-gradient(135deg, #ea2845 0%, #c0138a 100%)`
-  - Dark Onyx Foundations: `#0b0e14`, `#07090d`, `#131722`
-  - Surface Cards: `#181c28` / `#1f2536` with ruby border glows
-- **Typography & Aesthetics**:
-  - Clean sans-serif typography (`Manrope` / system sans)
-  - Monospace code and terminal-styled outputs (`Geist Mono`)
-  - Glassmorphic top navigation bar with live API status badge
+- **Brand Palette & Theme**:
+  - Deep Black foundations: `#000000` / `#050505`
+  - Crisp White typography and icons: `#ffffff`
+  - Subtle frosted translucent glass: `bg-white/[0.04]`, `backdrop-blur-2xl`
+  - Translucent borders: `border-white/[0.08]` to `border-white/[0.2]`
+  - Solid White primary buttons with deep black typography
+- **Telegram Mini App (Web App) Optimization**:
+  - Compact top header with official Stack Wallet icon and "Support" label
+  - Slide-over mobile drawer navigation with background lock
+  - Fixed bottom thumb-navigation dock (`BottomNav`) with safe area insets support
+  - Integrated Telegram haptic feedback (`impactOccurred('light')`)
+  - Input styling preventing unwanted auto-zoom on mobile browsers
 
 ---
 

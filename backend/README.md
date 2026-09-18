@@ -59,7 +59,7 @@ This project implements a complete automated support system on Telegram, connect
 12. **Community Moderation**: Admin-only `/mute`, `/unmute`, `/ban`, `/kick`, and `/warn` commands scoped to the community group, with admin status verified live against the Telegram Bot API. `/purge` lets a community-group admin delete recent bot messages without needing admin-group access.
 13. **Dynamic Community Group Setup**: No redeploy needed to point the bot at a community — an env-defined owner (`BOT_OWNER_TELEGRAM_ID`) or an admin they whitelist runs `/setup_community` directly in the target group at any time. The admin/support group stays fixed via `.env` so ticket/moderation traffic can never be redirected by a chat command.
 14. **Bilingual Bot (FR/EN)**: All bot-authored messages are available in French (default) and English; the owner or a whitelisted admin switches with `/language fr` or `/language en`.
-15. **Next.js Web Frontend**: Dedicated web portal styled with the official **Stack Wallet** graphic charter for natural language knowledge search, ticket escalation, and live tracking.
+15. **Telegram WebApp & Web Portal (Mobile-First)**: Dedicated Next.js web application styled with the official **Stack Wallet** monochrome branding and frosted glassmorphism. Designed mobile-first for seamless integration as a Telegram Mini App (Web App) with haptic feedback, safe area insets, compact header with drawer, and bottom navigation bar.
 
 ---
 
@@ -84,19 +84,20 @@ This project implements a complete automated support system on Telegram, connect
 │   ├── tests/                    # 414 test cases (unit, integration, resilience, E2E)
 │   ├── scripts/                  # Management scripts (e.g. seed_knowledge_base.py)
 │   ├── data/                     # Persistent storage directory
+│   ├── deploy/                   # Reverse proxy configurations (Caddy / Nginx)
 │   ├── Dockerfile                # Production multi-stage Docker image
+│   ├── docker-compose.yml        # Multi-service local orchestrator
+│   ├── docker-compose.prod.yml   # Production stack with PostgreSQL 16
 │   ├── requirements.txt          # Python dependencies
 │   └── pytest.ini                # Pytest configuration
-├── frontend/                     # Modern Next.js Web Frontend (NestJS Theme)
+├── frontend/                     # Modern Next.js Mobile-First WebApp (B&W Glassmorphism)
 │   ├── src/
 │   │   ├── app/                  # App Router routes (/, /tickets, /knowledge, /crypto, /settings)
-│   │   ├── components/           # UI primitives, layout (FR/EN toggle), cards
-│   │   ├── lib/                  # Backend API client, i18n dictionaries
+│   │   ├── components/           # UI primitives, layout (Header, BottomNav, Drawer), cards
+│   │   ├── lib/                  # Backend API client, i18n dictionaries, Telegram WebApp SDK
 │   │   └── types/                # TypeScript shared models
-│   └── package.json              # Next.js 16, React 19, Tailwind CSS
-├── deploy/                       # Reverse proxy configurations (Caddy / Nginx)
-├── docker-compose.yml            # Multi-service local orchestrator
-├── docker-compose.prod.yml       # Production stack with PostgreSQL 16
+│   ├── public/                   # Static assets & Stack Wallet icons
+│   └── package.json              # Next.js 16, React 19, Tailwind CSS v4
 └── .env.example                  # Environment variables template
 ```
 
@@ -115,16 +116,18 @@ cd chatbot
 virtualenv .venv
 source .venv/bin/activate
 
-# Install dependencies
+# Install backend dependencies
+cd backend
 pip install -r requirements.txt
+cd ..
 
 # Copy configuration template
-cp .env.example .env
+cp .env.example backend/.env
 ```
 
 ### 2. Configure the `.env` File
 
-Edit the `.env` file with your Telegram bot credentials:
+Edit `backend/.env` with your Telegram bot credentials:
 ```ini
 TELEGRAM_BOT_TOKEN=
 TELEGRAM_SUPPORT_GROUP_ID=
@@ -156,13 +159,15 @@ Run `/setup_community` again at any time to point the bot at a different group �
 
 ### 3. Database Migrations & Initial Data Seeding
 
-Apply database schema migrations using Alembic:
-```bash
-alembic upgrade head
-```
+From the `backend/` directory:
 
-Seed the knowledge base with initial Stack Wallet bilingual FAQs:
 ```bash
+cd backend
+
+# Apply database schema migrations using Alembic
+alembic upgrade head
+
+# Seed the knowledge base with initial Stack Wallet bilingual FAQs
 python -m scripts.seed_knowledge_base
 ```
 
@@ -187,7 +192,7 @@ uvicorn backend.main:app --reload --port 8000
 cd backend
 python -m bot.main
 
-# Terminal 3: Start the Next.js Frontend (NestJS theme)
+# Terminal 3: Start the Next.js Frontend (Mobile-First Telegram WebApp)
 cd frontend
 npm install
 npm run dev
@@ -195,12 +200,14 @@ npm run dev
 
 #### Docker Compose Mode (Default SQLite WAL):
 ```bash
+cd backend
 docker compose up --build -d
 ```
 
 #### Docker Compose Mode (Production PostgreSQL 16):
 For high-volume production deployments with multiple concurrent support agents, use the dedicated PostgreSQL stack:
 ```bash
+cd backend
 docker compose -f docker-compose.prod.yml up --build -d
 ```
 
@@ -208,8 +215,8 @@ docker compose -f docker-compose.prod.yml up --build -d
 
 To safeguard credentials passed via webhooks:
 - **Application Level**: The backend includes `SensitiveDataFilter` and `sanitize_access_logging_middleware` which automatically redact sensitive parameters (`?token=[REDACTED]`, `?api_key=[REDACTED]`) from server traces and access logs.
-- **Nginx**: Use the template provided in [deploy/nginx.conf](deploy/nginx.conf) with custom log format `redacted_combined` logging `$uri` without query strings.
-- **Caddy**: Use the template provided in [deploy/Caddyfile](deploy/Caddyfile) with the `format filter` log directive.
+- **Nginx**: Use the template provided in [backend/deploy/nginx.conf](backend/deploy/nginx.conf) with custom log format `redacted_combined` logging `$uri` without query strings.
+- **Caddy**: Use the template provided in [backend/deploy/Caddyfile](backend/deploy/Caddyfile) with the `format filter` log directive.
 
 ### 7. Production Monitoring & Anti-Spam Rate Limiting
 
@@ -231,12 +238,14 @@ To safeguard credentials passed via webhooks:
 
 ## Testing & Verification
 
-The automated test suite contains **376 tests** across 46 modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
+The automated test suite contains **414 tests** across modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
 
 All tests run hermetically using isolated SQLite databases and mock external boundaries (Brevo SMTP and Telegram Bot API) to guarantee safety, zero external network leaks, and rapid execution (~16s):
 
 ```bash
-# Run all tests
+cd backend
+
+# Run all 414 tests
 pytest -v
 
 # Run with module coverage report (HTML report + >=85% threshold check)
@@ -246,10 +255,22 @@ pytest --cov=backend --cov=bot --cov-report=html --cov-fail-under=85
 mutmut run
 
 # Static security analysis & linting
+ruff check .
 bandit -r backend/ bot/                 # Python AST security linter (0 issues)
 semgrep scan --config=auto backend/ bot/ # Semantic AST multi-rule security analysis (0 issues)
 trivy fs --file-patterns "pip:requirements.lock" requirements.lock # Dependency vulnerabilities & secret scanning (0 issues)
 pip-audit                               # PyPA advisory vulnerability scanner (0 issues)
+```
+
+For the frontend:
+```bash
+cd frontend
+
+# Linting
+npm run lint
+
+# Production build
+npm run build
 ```
 
 
