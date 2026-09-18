@@ -70,7 +70,18 @@ def _is_support_group_chat(chat_id: Union[int, str]) -> bool:
     return str(chat_id) == str(settings.TELEGRAM_SUPPORT_GROUP_ID)
 
 
-@support_router.message(F.reply_to_message)
+async def _is_reply_in_support_group(message: Message) -> bool:
+    """
+    Filter: only replies sent in the support group reach `handle_support_agent_reply`.
+
+    In aiogram a handler whose filters pass consumes the event even when it returns nothing. Matching
+    every reply (`F.reply_to_message` alone) would swallow replies in other chats before the
+    moderation and user routers see them: `/mute` sent as a reply, or a question asked as a reply.
+    """
+    return _is_support_group_chat(message.chat.id)
+
+
+@support_router.message(F.reply_to_message, _is_reply_in_support_group)
 async def handle_support_agent_reply(
     message: Message,
     bot: Bot,
