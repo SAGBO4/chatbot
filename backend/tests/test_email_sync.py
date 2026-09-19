@@ -9,7 +9,9 @@ from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
 from app.config import settings
-from app.main import app, clean_email_reply_body, escape_telegram_markdown
+from app.main import app
+from app.email_parsing import clean_email_reply_body
+from app.telegram_text import escape_telegram_markdown
 from app.database import get_db, init_db
 from app.models import TicketStatus
 from app.services.email_service import EmailService

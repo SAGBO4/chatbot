@@ -149,8 +149,8 @@ async def test_brevo_batch_exception_on_later_item_preserves_earlier_resolved_ti
     monkeypatch.setattr(TelegramRelay, "send_message_to_user", AsyncMock(return_value=True))
     monkeypatch.setattr(TelegramRelay, "notify_support_group", AsyncMock(return_value=True))
 
-    from app import main as backend_main
-    real_resolve = backend_main._resolve_inbound_email
+    from app import inbound_email
+    real_resolve = inbound_email.resolve_inbound_email
 
     call_count = 0
 
@@ -161,7 +161,7 @@ async def test_brevo_batch_exception_on_later_item_preserves_earlier_resolved_ti
             raise RuntimeError("Database connection drop on item 2")
         return await real_resolve(*args, **kwargs)
 
-    monkeypatch.setattr(backend_main, "_resolve_inbound_email", flaky_resolve)
+    monkeypatch.setattr(inbound_email, "resolve_inbound_email", flaky_resolve)
 
     payload = {
         "items": [

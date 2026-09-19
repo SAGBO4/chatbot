@@ -1,6 +1,6 @@
 import pytest
 
-from app.observability import redact_secrets, sanitize_url_query, scrub
+from app.observability import redact_secrets, scrub
 
 BOT_TOKEN = "123456789:AAH-Secret_Token-Value123"
 
@@ -21,12 +21,6 @@ def test_redact_secrets_removes_the_secret(text, forbidden):
 def test_redact_secrets_keeps_harmless_parts_readable():
     redacted = redact_secrets(f"POST https://api.telegram.org/bot{BOT_TOKEN}/sendMessage?keep=yes")
     assert redacted == "POST https://api.telegram.org/bot[REDACTED]/sendMessage?keep=yes"
-
-
-def test_sanitize_url_query_is_still_exposed_from_main():
-    from app.main import sanitize_url_query as from_main
-
-    assert from_main is sanitize_url_query
 
 
 def test_scrub_recurses_into_nested_structures():

@@ -7,7 +7,7 @@ from sqlalchemy.exc import OperationalError
 from sqlalchemy import text
 
 from app.config import settings
-from app.main import verify_api_key
+from app.security import verify_api_key
 from tests.conftest import TEST_API_KEY
 
 

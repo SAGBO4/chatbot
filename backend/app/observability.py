@@ -48,6 +48,19 @@ class SensitiveDataFilter(logging.Filter):
         return True
 
 
+def get_logger(name: str) -> logging.Logger:
+    """
+    Logger that redacts secrets, for code that logs URLs, headers or exception texts.
+
+    A logger filter only applies to records logged directly by that logger, so each module that
+    handles request data creates its logger through here instead of sharing one.
+    """
+    logger = logging.getLogger(name)
+    if not any(isinstance(existing, SensitiveDataFilter) for existing in logger.filters):
+        logger.addFilter(SensitiveDataFilter())
+    return logger
+
+
 def scrub(value: Any) -> Any:
     """Return `value` with secrets redacted in every string, recursing into dicts and lists."""
     if isinstance(value, str):

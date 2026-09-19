@@ -463,9 +463,9 @@ async def test_webhooks_brevo_exception_in_single_item_handled_as_internal_error
         t1 = await TicketService.create_ticket(session, 1, "u1", "Q1")
         t2 = await TicketService.create_ticket(session, 2, "u2", "Q2")
 
-    # Patch _resolve_inbound_email pour crasher uniquement sur le ticket 1
-    from app.main import _resolve_inbound_email
-    orig_fn = _resolve_inbound_email
+    # Patch resolve_inbound_email pour crasher uniquement sur le ticket 1
+    from app.inbound_email import resolve_inbound_email
+    orig_fn = resolve_inbound_email
 
     async def mock_resolve_item(*args, **kwargs):
         subject = kwargs.get("subject", "")
@@ -480,7 +480,7 @@ async def test_webhooks_brevo_exception_in_single_item_handled_as_internal_error
         ]
     }
 
-    with patch("app.main._resolve_inbound_email", side_effect=mock_resolve_item):
+    with patch("app.inbound_email.resolve_inbound_email", side_effect=mock_resolve_item):
         resp = await client.post(
             f"/api/webhooks/email-inbound/brevo?token={TEST_BREVO_INBOUND_SECRET}",
             json=payload,
