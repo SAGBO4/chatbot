@@ -86,9 +86,9 @@ def prevent_real_external_network_calls(request, monkeypatch):
     during tests unless explicitly tested in a dedicated service test file.
     """
     path = request.node.fspath.strpath
-    if "test_email_service" not in path and "test_feature_email_service" not in path:
+    if "test_email_service" not in path:
         monkeypatch.setattr("app.services.email_service.EmailService._send_smtp_sync", lambda msg: True)
-    if "telegram_relay" not in path and "test_feature_telegram_relay" not in path:
+    if "telegram_relay" not in path:
         from unittest.mock import AsyncMock
         monkeypatch.setattr("app.services.telegram_relay.TelegramRelay._send_telegram_message", AsyncMock(return_value=True))
 
