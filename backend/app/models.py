@@ -2,7 +2,7 @@
 import enum
 from datetime import datetime, timezone
 from typing import Optional
-from sqlalchemy import String, Text, Integer, BigInteger, DateTime, Enum
+from sqlalchemy import String, Text, Integer, BigInteger, DateTime
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
 

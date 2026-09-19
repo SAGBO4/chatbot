@@ -13,7 +13,6 @@ logger = logging.getLogger(__name__)
 
 engine_kwargs = {
     "echo": False,
-    "future": True,
     "pool_pre_ping": True,
 }
 if "sqlite" not in settings.DATABASE_URL:
