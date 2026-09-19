@@ -109,10 +109,10 @@ async def handle_community_ask(
     reply_text = t("community_answer_prompt", lang, mention=mention, answer=answer)
     reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix="...(tronqué)")
     try:
-        sent = await message.answer(reply_text, reply_markup=get_community_resolution_keyboard(), parse_mode="Markdown")
+        sent = await message.answer(reply_text, reply_markup=get_community_resolution_keyboard(lang), parse_mode="Markdown")
     except Exception as send_err:
         logger.warning("Failed to send community answer in markdown, falling back to plain text: %s", send_err)
-        sent = await message.answer(reply_text, reply_markup=get_community_resolution_keyboard())
+        sent = await message.answer(reply_text, reply_markup=get_community_resolution_keyboard(lang))
 
     _track_bot_message(message.chat.id, sent.message_id)
 

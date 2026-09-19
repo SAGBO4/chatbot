@@ -39,6 +39,24 @@ TRANSLATIONS = {
             "or **NO** to automatically create a ticket with our support team."
         ),
     },
+    "button_yes": {"fr": "✅ OUI", "en": "✅ YES"},
+    "button_no": {"fr": "❌ NON", "en": "❌ NO"},
+    "button_webapp": {
+        "fr": "📱 Centre d'Assistance Stack",
+        "en": "📱 Stack Support Center",
+    },
+    "button_open_webapp": {
+        "fr": "📱 Ouvrir l'Application Support",
+        "en": "📱 Open the Support App",
+    },
+    "webapp_prompt": {
+        "fr": "Accédez au centre d'assistance officiel Stack Wallet :",
+        "en": "Open the official Stack Wallet support center:",
+    },
+    "webapp_not_configured": {
+        "fr": "L'URL de la WebApp n'est pas encore configurée dans le fichier `.env` (variable `TELEGRAM_WEBAPP_URL`).",
+        "en": "The WebApp URL is not configured yet in the `.env` file (`TELEGRAM_WEBAPP_URL` variable).",
+    },
     "question_too_long": {
         "fr": "⚠️ Votre question est trop longue (maximum {max_length} caractères). Veuillez raccourcir votre message et réessayer.",
         "en": "⚠️ Your question is too long (maximum {max_length} characters). Please shorten your message and try again.",

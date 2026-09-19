@@ -29,22 +29,21 @@ async def handle_start(message: Message, state: FSMContext, backend_client: Opti
     await state.clear()
     lang = await get_active_language(backend_client=backend_client)
     url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
-    keyboard = get_webapp_keyboard(url) if url else None
+    keyboard = get_webapp_keyboard(url, lang=lang) if url else None
     await message.answer(t("welcome", lang), parse_mode="Markdown", reply_markup=keyboard)
 
 
 @user_router.message(Command("webapp", "app"))
-async def handle_webapp(message: Message):
+async def handle_webapp(message: Message, backend_client: Optional[BackendClient] = None):
     """/webapp: a button that opens the Mini App."""
+    lang = await get_active_language(backend_client=backend_client)
     url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
     if not url:
-        await message.answer(
-            "L'URL de la WebApp n'est pas encore configurée dans le fichier `.env` (variable `TELEGRAM_WEBAPP_URL`)."
-        )
+        await message.answer(t("webapp_not_configured", lang))
         return
     await message.answer(
-        "Accédez au centre d'assistance officiel Stack Wallet :",
-        reply_markup=get_webapp_keyboard(url, text="📱 Ouvrir l'Application Support"),
+        t("webapp_prompt", lang),
+        reply_markup=get_webapp_keyboard(url, text=t("button_open_webapp", lang)),
     )
 
 
@@ -53,7 +52,7 @@ async def handle_help(message: Message, backend_client: Optional[BackendClient] 
     """/help: how to use the bot."""
     lang = await get_active_language(backend_client=backend_client)
     url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
-    keyboard = get_webapp_keyboard(url) if url else None
+    keyboard = get_webapp_keyboard(url, lang=lang) if url else None
     await message.answer(t("help", lang), parse_mode="Markdown", reply_markup=keyboard)
 
 
@@ -87,10 +86,10 @@ async def handle_user_query(
         reply_text = t("answer_prompt", lang, answer=answer)
         reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix="...(tronqué)")
         try:
-            await message.answer(reply_text, reply_markup=get_resolution_keyboard(), parse_mode="Markdown")
+            await message.answer(reply_text, reply_markup=get_resolution_keyboard(lang=lang), parse_mode="Markdown")
         except Exception as send_err:
             logger.warning("Failed to send answer in markdown, falling back to plain text: %s", send_err)
-            await message.answer(reply_text, reply_markup=get_resolution_keyboard())
+            await message.answer(reply_text, reply_markup=get_resolution_keyboard(lang=lang))
         await state.set_state(UserQueryState.waiting_for_resolution)
 
     except Exception as exc:
