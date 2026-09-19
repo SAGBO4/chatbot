@@ -42,6 +42,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - `frontend/README.md` listed six backend endpoints that do not exist; it now lists the ones the frontend calls.
 - Bot: `/mute`, `/unmute`, `/ban`, `/kick` and `/warn` sent as a reply to a member's message were ignored, and so was a question asked as a reply in a private chat. The support-group reply handler was consuming every reply in every chat.
 - `deploy/Caddyfile` did not redact anything: the `token` query parameter was written to the access log in clear text (tested with Caddy 2.11). It now redacts the query secrets and the `X-Webhook-Token`, `X-Brevo-Token` and `X-Api-Key` headers.
+- The Telegram bot token could leak: it is part of every Bot API URL (`/bot<token>/sendMessage`), `httpx` logs that URL at INFO, and with `SENTRY_DSN` set every Sentry event that followed a Telegram call carried it in an HTTP breadcrumb (reproduced, then covered by tests). Logs and Sentry payloads (events, transactions, breadcrumbs) are now scrubbed by the new `app/observability.py`, which also replaces the two copies of the Sentry initialisation. If the token was ever sent to Sentry, rotate it with @BotFather.
 - Five routing tests passed without checking anything because the bot's throttling was dropping their messages; they now use separate users and assert no throttling happened.
 
 ## Earlier history (2026-09-12 to 2026-09-18)

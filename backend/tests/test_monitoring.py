@@ -79,10 +79,13 @@ async def test_sentry_initialization_when_dsn_provided():
             async with lifespan(test_app):
                 pass
 
-            mock_sentry.init.assert_called_once_with(
-                dsn="https://mockkey@sentry.io/123456",
-                traces_sample_rate=1.0,
-            )
+            mock_sentry.init.assert_called_once()
+            kwargs = mock_sentry.init.call_args.kwargs
+            assert kwargs["dsn"] == "https://mockkey@sentry.io/123456"
+            assert kwargs["traces_sample_rate"] == 1.0
+            # Secrets must be scrubbed from every kind of payload Sentry sends
+            for hook in ("before_send", "before_send_transaction", "before_breadcrumb"):
+                assert callable(kwargs[hook])
 
 
 @pytest.mark.asyncio

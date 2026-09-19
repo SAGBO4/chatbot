@@ -3,6 +3,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from typing import Optional
 from app.config import settings
+from app.observability import setup_observability
 from bot.api_client import BackendClient
 from bot.handlers.user_handlers import user_router
 from bot.handlers.support_handlers import support_router
@@ -43,14 +44,8 @@ def create_dispatcher(
 
 
 async def main():
-    """Entry point: optional Sentry, refuse to start without a bot token, set the WebApp menu button, then poll."""
-    if getattr(settings, "SENTRY_DSN", None):
-        try:
-            import sentry_sdk
-            sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=1.0)
-            logger.info("Sentry monitoring initialized for Telegram Bot.")
-        except ImportError:
-            logger.warning("SENTRY_DSN is configured but sentry_sdk is not installed.")
+    """Entry point: log redaction and optional Sentry, refuse to start without a bot token, set the WebApp menu button, then poll."""
+    setup_observability("Telegram Bot")
 
     if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":  # nosec B105
         logger.error(

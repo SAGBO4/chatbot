@@ -14,44 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 logger = logging.getLogger(__name__)
 
 
-def sanitize_url_query(url: str) -> str:
-    """
-    Redacts values of sensitive query parameters (such as token, secret, api_key)
-    from URL strings so they are never printed in access logs or debug traces.
-    """
-    return re.sub(
-        r"([?&](?:token|secret|api_key|password)=)[^&]+",
-        r"\1[REDACTED]",
-        url,
-        flags=re.IGNORECASE,
-    )
-
-
-class SensitiveDataFilter(logging.Filter):
-    """
-    Log filter that intercepts and redacts sensitive query parameters (e.g. ?token=...)
-    from log records and arguments, preventing credential leakage in log files.
-    """
-    def filter(self, record: logging.LogRecord) -> bool:
-        if isinstance(record.msg, str):
-            record.msg = sanitize_url_query(record.msg)
-        if record.args:
-            if isinstance(record.args, tuple):
-                record.args = tuple(
-                    sanitize_url_query(arg) if isinstance(arg, str) else arg
-                    for arg in record.args
-                )
-            elif isinstance(record.args, dict):
-                record.args = {
-                    k: sanitize_url_query(v) if isinstance(v, str) else v
-                    for k, v in record.args.items()
-                }
-        return True
-
-
-logger.addFilter(SensitiveDataFilter())
-
-
 async def _safe_background_task(coro_fn, *args, **kwargs):
     """Run a background task and log any exception (timeout, network drop...) instead of letting it reach Starlette."""
     try:
@@ -70,6 +32,7 @@ async def _safe_background_task(coro_fn, *args, **kwargs):
         )
 
 from app.config import settings
+from app.observability import SensitiveDataFilter, sanitize_url_query, setup_observability
 from app.database import get_db, init_db, async_session_maker
 from app.models import Ticket, TicketStatus
 from bot.utils import escape_telegram_markdown, truncate_telegram_text
@@ -107,6 +70,8 @@ from app.services.crypto_service import CryptoService
 from app.services.bot_settings_service import BotSettingsService, WhitelistService
 from app.limiter import limiter, RateLimitExceeded, _rate_limit_exceeded_handler
 import httpx
+
+logger.addFilter(SensitiveDataFilter())
 
 TICKET_SUBJECT_REGEX = re.compile(r"Ticket\s*#(\d+)", re.IGNORECASE)
 
@@ -251,16 +216,10 @@ def clean_email_reply_body(body: Optional[str]) -> str:
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
-    Startup: Sentry (if configured), database schema, the legacy community group seed, and one
+    Startup: log redaction and Sentry (if configured), database schema, the legacy community group seed, and one
     shared HTTP client for the Telegram relay, AI and crypto services. Shutdown closes that client.
     """
-    if getattr(settings, "SENTRY_DSN", None):
-        try:
-            import sentry_sdk
-            sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=1.0)
-            logger.info("Sentry monitoring initialized for Backend API.")
-        except ImportError:
-            logger.warning("SENTRY_DSN is configured but sentry_sdk is not installed.")
+    setup_observability("Backend API")
     await init_db()
     if settings.community_group_is_configured():
         async with async_session_maker() as seed_session:
