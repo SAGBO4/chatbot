@@ -16,7 +16,12 @@ from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
 from bot.messaging import call_with_markdown_fallback
 from app.i18n import t
-from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
+from app.telegram_text import (
+    escape_telegram_markdown,
+    truncate_telegram_text,
+    TELEGRAM_MAX_MESSAGE_LENGTH,
+    EDITED_MESSAGE_BASE_LENGTH,
+)
 
 logger = logging.getLogger(__name__)
 community_router = Router()
@@ -135,7 +140,7 @@ async def handle_community_ask(
         return
 
     reply_text = t("community_answer_prompt", lang, mention=mention, answer=answer)
-    reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix=t("truncated_suffix", lang))
+    reply_text = truncate_telegram_text(reply_text, max_length=TELEGRAM_MAX_MESSAGE_LENGTH, suffix=t("truncated_suffix", lang))
     sent = await call_with_markdown_fallback(
         message.answer, reply_text, reply_markup=get_community_resolution_keyboard(lang), what="Community answer"
     )
@@ -166,7 +171,7 @@ async def handle_community_resolve_yes(
 
     await state.clear()
     await callback.answer(t("resolve_yes_ack", lang))
-    base_text = truncate_telegram_text(callback.message.text or "", max_length=3700, suffix=t("truncated_suffix", lang))
+    base_text = truncate_telegram_text(callback.message.text or "", max_length=EDITED_MESSAGE_BASE_LENGTH, suffix=t("truncated_suffix", lang))
     resolved_notice = t("community_resolved_notice", lang, base_text=base_text)
     await call_with_markdown_fallback(
         callback.message.edit_text, resolved_notice, reply_markup=None,
@@ -213,8 +218,8 @@ async def handle_community_resolve_no(
         await callback.answer(t("ticket_created_ack", lang))
 
         base_text = callback.message.text or ""
-        if len(base_text) > 3700:
-            base_text = base_text[:3700] + t("truncated_suffix", lang)
+        if len(base_text) > EDITED_MESSAGE_BASE_LENGTH:
+            base_text = base_text[:EDITED_MESSAGE_BASE_LENGTH] + t("truncated_suffix", lang)
         ack_text = t("community_ticket_ack", lang, base_text=base_text)
         await call_with_markdown_fallback(
             callback.message.edit_text, ack_text, reply_markup=None,

@@ -11,7 +11,7 @@ from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
 from bot.messaging import call_with_markdown_fallback
 from app.i18n import t
-from app.telegram_text import truncate_telegram_text, TELEGRAM_MAX_MESSAGE_LENGTH
+from app.telegram_text import truncate_telegram_text, TELEGRAM_MAX_MESSAGE_LENGTH, EDITED_MESSAGE_BASE_LENGTH
 from app.config import settings
 
 logger = logging.getLogger(__name__)
@@ -85,7 +85,7 @@ async def handle_user_query(
         )
 
         reply_text = t("answer_prompt", lang, answer=answer)
-        reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix=t("truncated_suffix", lang))
+        reply_text = truncate_telegram_text(reply_text, max_length=TELEGRAM_MAX_MESSAGE_LENGTH, suffix=t("truncated_suffix", lang))
         await call_with_markdown_fallback(
             message.answer, reply_text, reply_markup=get_resolution_keyboard(lang=lang), what="Answer"
         )
@@ -104,7 +104,7 @@ async def handle_resolve_yes(
     await state.clear()
     lang = await get_active_language(backend_client=backend_client)
     await callback.answer(t("resolve_yes_ack", lang))
-    base_text = truncate_telegram_text(callback.message.text or "", max_length=3700, suffix=t("truncated_suffix", lang))
+    base_text = truncate_telegram_text(callback.message.text or "", max_length=EDITED_MESSAGE_BASE_LENGTH, suffix=t("truncated_suffix", lang))
     resolved_notice = t("resolved_notice", lang, base_text=base_text)
     await call_with_markdown_fallback(
         callback.message.edit_text, resolved_notice, reply_markup=None,
@@ -151,8 +151,8 @@ async def handle_resolve_no(
 
         # Editing the message can fail (Markdown, deleted message); the ticket is already created by now
         base_text = callback.message.text or ""
-        if len(base_text) > 3700:
-            base_text = base_text[:3700] + t("truncated_suffix", lang)
+        if len(base_text) > EDITED_MESSAGE_BASE_LENGTH:
+            base_text = base_text[:EDITED_MESSAGE_BASE_LENGTH] + t("truncated_suffix", lang)
         confirmation_text = t("ticket_escalated_notice", lang, base_text=base_text, ticket_id=ticket_id)
         await call_with_markdown_fallback(
             callback.message.edit_text, confirmation_text, reply_markup=None,

@@ -11,7 +11,7 @@ from bot.language import get_active_language
 from bot.messaging import call_with_markdown_fallback
 from app.i18n import t
 from app.schemas import MAX_SOLUTION_LENGTH
-from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
+from app.telegram_text import escape_telegram_markdown, truncate_telegram_text, FORWARDED_SOLUTION_MAX_LENGTH
 
 logger = logging.getLogger(__name__)
 support_router = Router()
@@ -196,7 +196,7 @@ async def handle_support_agent_reply(
 
         # Forward the solution to the user
         if user_id:
-            capped_solution = truncate_telegram_text(solution_text, max_length=3500, lang=lang)
+            capped_solution = truncate_telegram_text(solution_text, max_length=FORWARDED_SOLUTION_MAX_LENGTH, lang=lang)
             safe_solution = escape_telegram_markdown(capped_solution)
             safe_agent = escape_telegram_markdown(agent_name)
             user_notification = t(

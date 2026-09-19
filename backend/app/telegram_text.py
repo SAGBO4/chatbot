@@ -6,6 +6,10 @@ from app.i18n import DEFAULT_LANGUAGE, t
 
 # Telegram rejects messages over 4096 characters; 4000 keeps a safety margin
 TELEGRAM_MAX_MESSAGE_LENGTH = 4000
+# When an answer's buttons are removed, its text is quoted inside a longer notice: leave room for it.
+EDITED_MESSAGE_BASE_LENGTH = 3700
+# The share of a support agent's solution copied into the notification sent to the user.
+FORWARDED_SOLUTION_MAX_LENGTH = 3500
 
 
 def escape_telegram_markdown(text: str) -> str:

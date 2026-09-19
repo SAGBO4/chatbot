@@ -13,7 +13,7 @@ from app.schemas import MAX_SOLUTION_LENGTH, BrevoInboundItem
 from app.services.bot_settings_service import BotSettingsService
 from app.services.telegram_relay import TelegramRelay
 from app.services.ticket_service import TicketService
-from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
+from app.telegram_text import escape_telegram_markdown, truncate_telegram_text, TELEGRAM_MAX_MESSAGE_LENGTH
 
 
 async def resolve_inbound_email(
@@ -100,7 +100,7 @@ async def resolve_inbound_email(
 
     lang = await BotSettingsService.get_language(session)
     user_text = t("email_reply_to_user", lang, ticket_id=ticket_id, solution=safe_solution, sender=safe_sender)
-    user_text = truncate_telegram_text(user_text, max_length=4000, lang=lang)
+    user_text = truncate_telegram_text(user_text, max_length=TELEGRAM_MAX_MESSAGE_LENGTH, lang=lang)
     background_tasks.add_task(
         safe_background_task,
         TelegramRelay.send_message_to_user,
