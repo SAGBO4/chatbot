@@ -951,3 +951,23 @@ async def test_voice_transcription_accepts_any_casing_of_the_openai_provider(mon
 
     with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
         assert await _transcribe_voice_message(message, mock_bot) == "Redemarrez le service."
+
+
+@pytest.mark.asyncio
+async def test_already_resolved_notice_names_another_agent_in_english_when_the_name_is_missing(monkeypatch):
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    agent_user = MagicMock(spec=User, id=99, username="agent_late", first_name="Late", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+    card = MagicMock(spec=Message)
+    card.message_id = 555
+    message = _make_support_agent_message(group_chat, agent_user, card)
+    message.text = "A late solution."
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "en"
+    mock_client.get_ticket_by_support_message.return_value = {"id": 33, "user_id": 1234}
+    mock_client.resolve_ticket.return_value = {"id": 33, "user_id": 1234, "resolved_by": None, "is_newly_resolved": False}
+
+    await handle_support_agent_reply(message, bot=AsyncMock(), backend_client=mock_client)
+
+    assert "another agent" in message.reply.call_args[0][0]

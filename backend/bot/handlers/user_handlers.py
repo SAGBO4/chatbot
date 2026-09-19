@@ -84,7 +84,7 @@ async def handle_user_query(
         )
 
         reply_text = t("answer_prompt", lang, answer=answer)
-        reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix="...(tronqué)")
+        reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix=t("truncated_suffix", lang))
         try:
             await message.answer(reply_text, reply_markup=get_resolution_keyboard(lang=lang), parse_mode="Markdown")
         except Exception as send_err:
@@ -105,7 +105,7 @@ async def handle_resolve_yes(
     await state.clear()
     lang = await get_active_language(backend_client=backend_client)
     await callback.answer(t("resolve_yes_ack", lang))
-    base_text = truncate_telegram_text(callback.message.text or "", max_length=3700, suffix="...(tronqué)")
+    base_text = truncate_telegram_text(callback.message.text or "", max_length=3700, suffix=t("truncated_suffix", lang))
     resolved_notice = t("resolved_notice", lang, base_text=base_text)
     try:
         await callback.message.edit_text(
@@ -139,7 +139,7 @@ async def handle_resolve_no(
 
     # Clear context upfront to prevent concurrent double-click ticket creation
     await state.clear()
-    last_answer = user_data.get("last_answer", "Aucune réponse")
+    last_answer = user_data.get("last_answer", t("no_answer", lang))
 
     user_id = callback.from_user.id
     user_handle = callback.from_user.username or callback.from_user.first_name or f"User_{user_id}"
@@ -152,6 +152,7 @@ async def handle_resolve_no(
             user_handle=user_handle,
             question=last_question,
             automated_answer=last_answer,
+            lang=lang,
         )
         ticket_id = ticket["id"]
 
@@ -160,7 +161,7 @@ async def handle_resolve_no(
         # Editing the message can fail (Markdown, deleted message); the ticket is already created by now
         base_text = callback.message.text or ""
         if len(base_text) > 3700:
-            base_text = base_text[:3700] + "...(tronqué)"
+            base_text = base_text[:3700] + t("truncated_suffix", lang)
         confirmation_text = t("ticket_escalated_notice", lang, base_text=base_text, ticket_id=ticket_id)
         try:
             await callback.message.edit_text(

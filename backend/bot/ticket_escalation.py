@@ -1,6 +1,7 @@
 import logging
 from aiogram import Bot
 from app.config import settings
+from app.i18n import DEFAULT_LANGUAGE, t
 from bot.api_client import BackendClient
 from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
 
@@ -14,6 +15,7 @@ async def create_ticket_and_notify_admin_group(
     user_handle: str,
     question: str,
     automated_answer: str,
+    lang: str = DEFAULT_LANGUAGE,
 ) -> dict:
     """
     Create a ticket through the backend and post its card to the admin/support group.
@@ -41,14 +43,9 @@ async def create_ticket_and_notify_admin_group(
     safe_handle = escape_telegram_markdown(user_handle)
     safe_question = escape_telegram_markdown(card_question)
     safe_answer = escape_telegram_markdown(card_answer)
-    group_card = (
-        f"🚨 **NOUVEAU TICKET SUPPORT #{ticket_id}**\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 **Utilisateur :** @{safe_handle} (`ID: {user_id}`)\n"
-        f"❓ **Question :**\n{safe_question}\n\n"
-        f"🤖 **Réponse automatique :**\n{safe_answer}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"👉 *Pour répondre, répondez directement à ce message avec votre solution.*"
+    group_card = t(
+        "admin_ticket_card", lang,
+        ticket_id=ticket_id, handle=safe_handle, user_id=user_id, question=safe_question, answer=safe_answer,
     )
     sent_card = None
     try:
@@ -59,14 +56,9 @@ async def create_ticket_and_notify_admin_group(
         )
     except Exception as send_err:
         logger.warning("Failed to send markdown group card, falling back to plain text: %s", send_err)
-        plain_card = (
-            f"🚨 NOUVEAU TICKET SUPPORT #{ticket_id}\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"👤 Utilisateur : @{user_handle} (ID: {user_id})\n"
-            f"❓ Question :\n{card_question}\n\n"
-            f"🤖 Réponse automatique :\n{card_answer}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"👉 Pour répondre, répondez directement à ce message avec votre solution."
+        plain_card = t(
+            "admin_ticket_card_plain", lang,
+            ticket_id=ticket_id, handle=user_handle, user_id=user_id, question=card_question, answer=card_answer,
         )
         try:
             sent_card = await bot.send_message(

@@ -40,6 +40,59 @@ TRANSLATIONS = {
             "or **NO** to automatically create a ticket with our support team."
         ),
     },
+    "truncated_suffix": {"fr": "...(tronqué)", "en": "...(truncated)"},
+    "no_answer": {"fr": "Aucune réponse", "en": "No answer"},
+    "another_agent": {"fr": "un autre agent", "en": "another agent"},
+    "throttle_wait_callback": {
+        "fr": "⚠️ Veuillez patienter quelques secondes avant de réessayer.",
+        "en": "⚠️ Please wait a few seconds before trying again.",
+    },
+    "throttle_wait_message": {
+        "fr": "⚠️ Veuillez patienter quelques secondes avant d'envoyer un nouveau message.",
+        "en": "⚠️ Please wait a few seconds before sending a new message.",
+    },
+    # The support group card. "TICKET #<id>" and "ID: <user id>" must stay in every language: the
+    # support handler parses them from the card text when a ticket has no stored message id.
+    "admin_ticket_card": {
+        "fr": (
+            "🚨 **NOUVEAU TICKET SUPPORT #{ticket_id}**\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "👤 **Utilisateur :** @{handle} (`ID: {user_id}`)\n"
+            "❓ **Question :**\n{question}\n\n"
+            "🤖 **Réponse automatique :**\n{answer}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "👉 *Pour répondre, répondez directement à ce message avec votre solution.*"
+        ),
+        "en": (
+            "🚨 **NEW SUPPORT TICKET #{ticket_id}**\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "👤 **User:** @{handle} (`ID: {user_id}`)\n"
+            "❓ **Question:**\n{question}\n\n"
+            "🤖 **Automatic answer:**\n{answer}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "👉 *To reply, answer this message directly with your solution.*"
+        ),
+    },
+    "admin_ticket_card_plain": {
+        "fr": (
+            "🚨 NOUVEAU TICKET SUPPORT #{ticket_id}\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "👤 Utilisateur : @{handle} (ID: {user_id})\n"
+            "❓ Question :\n{question}\n\n"
+            "🤖 Réponse automatique :\n{answer}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "👉 Pour répondre, répondez directement à ce message avec votre solution."
+        ),
+        "en": (
+            "🚨 NEW SUPPORT TICKET #{ticket_id}\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "👤 User: @{handle} (ID: {user_id})\n"
+            "❓ Question:\n{question}\n\n"
+            "🤖 Automatic answer:\n{answer}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "👉 To reply, answer this message directly with your solution."
+        ),
+    },
     "button_yes": {"fr": "✅ OUI", "en": "✅ YES"},
     "button_no": {"fr": "❌ NON", "en": "❌ NO"},
     "button_webapp": {

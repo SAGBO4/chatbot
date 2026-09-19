@@ -165,7 +165,7 @@ async def handle_support_agent_reply(
 
     try:
         # The backend rejects solutions over 5000 characters
-        api_solution = truncate_telegram_text(solution_text, max_length=5000)
+        api_solution = truncate_telegram_text(solution_text, max_length=5000, lang=lang)
         resolved_ticket = await client.resolve_ticket(
             ticket_id=ticket_id,
             solution=api_solution,
@@ -174,7 +174,7 @@ async def handle_support_agent_reply(
         )
 
         if resolved_ticket.get("is_newly_resolved") is False:
-            already_by = escape_telegram_markdown(resolved_ticket.get("resolved_by") or "un autre agent")
+            already_by = escape_telegram_markdown(resolved_ticket.get("resolved_by") or t("another_agent", lang))
             await message.reply(
                 t("support_already_resolved", lang, ticket_id=ticket_id, resolved_by=already_by),
                 parse_mode="Markdown",
@@ -185,7 +185,7 @@ async def handle_support_agent_reply(
 
         # Forward the solution to the user
         if user_id:
-            capped_solution = truncate_telegram_text(solution_text, max_length=3500)
+            capped_solution = truncate_telegram_text(solution_text, max_length=3500, lang=lang)
             safe_solution = escape_telegram_markdown(capped_solution)
             safe_agent = escape_telegram_markdown(agent_name)
             user_notification = t(

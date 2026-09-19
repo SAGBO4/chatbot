@@ -111,7 +111,7 @@ async def handle_community_ask(
         return
 
     reply_text = t("community_answer_prompt", lang, mention=mention, answer=answer)
-    reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix="...(tronqué)")
+    reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix=t("truncated_suffix", lang))
     try:
         sent = await message.answer(reply_text, reply_markup=get_community_resolution_keyboard(lang), parse_mode="Markdown")
     except Exception as send_err:
@@ -156,7 +156,7 @@ async def handle_community_resolve_yes(
 
     await state.clear()
     await callback.answer(t("resolve_yes_ack", lang))
-    base_text = truncate_telegram_text(callback.message.text or "", max_length=3700, suffix="...(tronqué)")
+    base_text = truncate_telegram_text(callback.message.text or "", max_length=3700, suffix=t("truncated_suffix", lang))
     resolved_notice = t("community_resolved_notice", lang, base_text=base_text)
     try:
         await callback.message.edit_text(resolved_notice, reply_markup=None, parse_mode="Markdown")
@@ -199,7 +199,7 @@ async def handle_community_resolve_no(
         return
 
     await state.clear()
-    last_answer = user_data.get("last_answer", "Aucune réponse")
+    last_answer = user_data.get("last_answer", t("no_answer", lang))
     user_id = callback.from_user.id
     user_handle = user_data.get("asking_user_handle") or callback.from_user.username or f"User_{user_id}"
 
@@ -211,13 +211,14 @@ async def handle_community_resolve_no(
             user_handle=user_handle,
             question=last_question,
             automated_answer=last_answer,
+            lang=lang,
         )
         ticket_id = ticket["id"]
         await callback.answer(t("ticket_created_ack", lang))
 
         base_text = callback.message.text or ""
         if len(base_text) > 3700:
-            base_text = base_text[:3700] + "...(tronqué)"
+            base_text = base_text[:3700] + t("truncated_suffix", lang)
         ack_text = t("community_ticket_ack", lang, base_text=base_text)
         try:
             await callback.message.edit_text(ack_text, reply_markup=None, parse_mode="Markdown")

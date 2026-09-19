@@ -3,6 +3,8 @@ import logging
 from typing import Any, Awaitable, Callable, Dict, List
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
+from app.i18n import DEFAULT_LANGUAGE, t
+from bot.language import get_active_language
 
 logger = logging.getLogger(__name__)
 
@@ -64,7 +66,7 @@ class ThrottlingMiddleware(BaseMiddleware):
         self._prune(now)
         window_start = now - self.window_seconds
 
-        current_timestamps = [t for t in self.user_timestamps.get(user_id, []) if t > window_start]
+        current_timestamps = [stamp for stamp in self.user_timestamps.get(user_id, []) if stamp > window_start]
 
         if len(current_timestamps) >= self.rate_limit:
             logger.warning("Throttling rate limit reached for user %s (%s messages in %ss)", user_id, len(current_timestamps), self.window_seconds)
@@ -73,14 +75,14 @@ class ThrottlingMiddleware(BaseMiddleware):
             if now - last_warn >= self.warning_cooldown:
                 self.last_warning_time[user_id] = now
                 try:
+                    # Only with the dispatcher's backend client can the bot language be read; otherwise French
+                    backend_client = data.get("backend_client")
+                    lang = await get_active_language(backend_client=backend_client) if backend_client else DEFAULT_LANGUAGE
                     if isinstance(event, CallbackQuery):
                         # A toast, not a new message: callback queries are answered with .answer(text=...)
-                        await event.answer(
-                            "⚠️ Veuillez patienter quelques secondes avant de réessayer.",
-                            show_alert=False,
-                        )
+                        await event.answer(t("throttle_wait_callback", lang), show_alert=False)
                     else:
-                        await event.answer("⚠️ Veuillez patienter quelques secondes avant d'envoyer un nouveau message.")
+                        await event.answer(t("throttle_wait_message", lang))
                 except Exception as exc:
                     logger.warning("Failed to send throttling notice to user %s: %s", user_id, exc)
             return None
