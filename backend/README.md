@@ -15,17 +15,30 @@ FastAPI backend, Telegram bot (aiogram 3), and supporting infrastructure for the
 ```
 backend/
 ├── app/                  # FastAPI Application & Services
+│   ├── main.py           # App wiring only: lifespan, middleware, includes the routers
+│   ├── routers/          # REST endpoints, one module per area (tickets, query, webhooks, ...)
+│   ├── services/         # Core business logic services
 │   ├── config.py         # Pydantic settings & env resolution
-│   ├── database.py       # Async SQLAlchemy engine (SQLite / PostgreSQL)
+│   ├── database.py       # Async SQLAlchemy engine (SQLite / PostgreSQL), Alembic at startup
 │   ├── models.py         # ORM models (Tickets, Knowledge Base, Moderation)
 │   ├── schemas.py        # Pydantic request/response schemas
-│   ├── main.py           # FastAPI application & REST endpoints
-│   └── services/         # Core business logic services
-├── bot/                   # Telegram Bot (aiogram 3)
+│   ├── security.py       # API key and webhook authentication
+│   ├── inbound_email.py  # Turns an inbound email into a ticket resolution
+│   ├── email_parsing.py  # Ticket id in subjects, quoted-reply stripping
+│   ├── background.py     # Fire-and-forget tasks whose failures are logged
+│   ├── observability.py  # Sentry setup, secret redaction in logs and events
+│   ├── i18n.py           # fr / en message table, shared by the API and the bot
+│   ├── telegram_text.py  # Markdown escaping and truncation for Telegram
+│   └── limiter.py        # Rate limiting (slowapi)
+├── bot/                   # Telegram Bot (aiogram 3); never imported by app/
+│   ├── main.py           # Telegram bot entrypoint
 │   ├── api_client.py     # Async HTTP client targeting FastAPI
 │   ├── keyboards.py      # Interactive inline keyboards (YES / NO)
-│   ├── main.py           # Telegram bot entrypoint
-│   └── handlers/         # Bot handlers (user, support, community, crypto)
+│   ├── messaging.py      # Send with a plain-text fallback when Markdown is rejected
+│   ├── ttl_cache.py      # Small expiring cache used by the bot
+│   ├── access_control.py, admin_check.py, group_scope.py, language.py, ticket_escalation.py
+│   ├── middlewares/      # Throttling
+│   └── handlers/         # Bot handlers (user, support, community, moderation, crypto)
 ├── alembic/               # Database schema migration revisions
 ├── alembic.ini            # Alembic configuration
 ├── tests/                 # 400+ test cases (unit, integration, resilience, E2E)
