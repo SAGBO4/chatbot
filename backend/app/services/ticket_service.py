@@ -1,5 +1,5 @@
 from typing import Optional, List, Tuple
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import Ticket, TicketStatus, utc_now
 from app.services.knowledge_base import KnowledgeBaseService
@@ -111,11 +111,25 @@ class TicketService:
         if ticket.status == TicketStatus.RESOLVED.value:
             return ticket, False
 
-        ticket.status = TicketStatus.RESOLVED.value
-        ticket.solution = solution.strip()
-        ticket.resolved_by = resolved_by
-        ticket.resolution_channel = resolution_channel
-        ticket.resolved_at = utc_now()
+        # Claim the ticket with a conditional UPDATE instead of trusting the status read above: two
+        # agents answering at the same time both read OPEN, and only one UPDATE can still match
+        # `status != RESOLVED` (the database serialises them on the row). The loser is handed the
+        # winner's resolution and `False`, so nobody is notified twice or overwritten.
+        claim = await session.execute(
+            update(Ticket)
+            .where(Ticket.id == ticket.id, Ticket.status != TicketStatus.RESOLVED.value)
+            .values(
+                status=TicketStatus.RESOLVED.value,
+                solution=solution.strip(),
+                resolved_by=resolved_by,
+                resolution_channel=resolution_channel,
+                resolved_at=utc_now(),
+            )
+        )
+        if claim.rowcount == 0:
+            await session.refresh(ticket)
+            return ticket, False
+        await session.refresh(ticket)  # take the stored values (the UPDATE bypassed the object)
 
         # Feedback loop: dynamically ingest new solution into Knowledge Base
         if add_to_knowledge_base:
