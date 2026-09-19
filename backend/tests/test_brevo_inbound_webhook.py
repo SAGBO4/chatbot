@@ -183,6 +183,8 @@ async def test_brevo_batch_exception_on_later_item_preserves_earlier_resolved_ti
     assert len(data["results"]) == 2
     assert data["results"][0]["status"] == "resolved"
     assert data["results"][1]["status"] == "internal_error"
+    # The cause is logged server-side; it must not be echoed to whoever called the webhook
+    assert "Database connection drop" not in resp.text
 
     # Confirm ticket 1 was NOT rolled back - it remains RESOLVED in DB
     resp_t1 = await client.get(f"/api/tickets/{t1}")

@@ -262,3 +262,18 @@ async def test_agent_reply_inside_the_support_group_still_resolves_the_ticket(di
 
     mock_client.resolve_ticket.assert_called_once()
     assert mock_client.resolve_ticket.call_args.kwargs["ticket_id"] == 5
+
+
+@pytest.mark.parametrize("command_text,user_id", [("/BTC", 511), ("/Btc", 512), ("/btc", 513)])
+@pytest.mark.asyncio
+async def test_crypto_commands_are_case_insensitive(dispatcher, command_text, user_id):
+    dp, bot, mock_client = dispatcher
+    mock_client.get_crypto_price.return_value = {
+        "symbol": "btc", "price_usd": 1.0, "change_24h_pct": 0.0,
+        "market_cap_usd": 1.0, "volume_24h_usd": 1.0,
+    }
+    update = make_command_update(30, 12345, user_id=user_id, command_text=command_text, chat_type="private")
+
+    await dp.feed_update(bot, update)
+
+    mock_client.get_crypto_price.assert_called_once_with("btc")

@@ -1,4 +1,6 @@
 import time
+import asyncio
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from aiogram.types import User, Chat, Message, CallbackQuery
@@ -38,6 +40,8 @@ def configure_community_group(monkeypatch):
     community_handlers._recent_bot_messages.clear()
     yield
     community_handlers._recent_bot_messages.clear()
+    for task in list(getattr(community_handlers, "_background_tasks", ())):
+        task.cancel()
 
 
 def make_group_message(chat_id, user_id, text, username="alice"):
@@ -98,6 +102,27 @@ async def test_ask_triggers_query_and_tags_asker(memory_storage):
     assert state_data["last_question"] == "comment reset mdp"
     assert state_data["last_answer_message_id"] == 777
     assert 777 in community_handlers._recent_bot_messages[COMMUNITY_GROUP_ID]
+
+
+@pytest.mark.asyncio
+async def test_ask_keeps_a_reference_to_the_button_expiry_task(memory_storage):
+    """asyncio only keeps weak references to tasks: an unreferenced expiry task can be garbage-collected mid-sleep."""
+    message = make_group_message(chat_id=COMMUNITY_GROUP_ID, user_id=42, text="/ask question")
+    state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
+    mock_client = AsyncMock()
+    mock_client.query.return_value = {"found": True, "answer": "Reponse."}
+    message.answer.return_value = MagicMock(message_id=778)
+    command = CommandObject(prefix="/", command="ask", args="question")
+
+    await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=mock_client)
+
+    tasks = list(community_handlers._background_tasks)
+    assert len(tasks) == 1 and not tasks[0].done()
+
+    tasks[0].cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    await asyncio.sleep(0)
+    assert not community_handlers._background_tasks, "finished tasks must be dropped from the set"
 
 
 def make_callback(storage, chat_id, user_id, data, text="Réponse précédente"):

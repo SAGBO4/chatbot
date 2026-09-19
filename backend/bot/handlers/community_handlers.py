@@ -2,7 +2,7 @@ import time
 import asyncio
 import logging
 from collections import defaultdict, deque
-from typing import Deque, Dict, Optional
+from typing import Deque, Dict, Optional, Set
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import Command, CommandObject
@@ -26,6 +26,10 @@ MAX_PURGE_COUNT = 50
 # Ids of the last 200 /ask answers posted per community group, so /purge can delete them without a
 # database. Lost on restart: the worst case is that /purge finds nothing to delete.
 _recent_bot_messages: Dict[int, Deque[int]] = defaultdict(lambda: deque(maxlen=200))
+
+# asyncio keeps only weak references to tasks, so an unreferenced expiry task could be garbage-collected
+# while it sleeps and its buttons would never expire.
+_background_tasks: Set[asyncio.Task] = set()
 
 
 def _track_bot_message(chat_id: int, message_id: int) -> None:
@@ -124,7 +128,9 @@ async def handle_community_ask(
         last_answer_message_id=sent.message_id,
         asking_user_handle=user_handle,
     )
-    asyncio.create_task(_schedule_expiry(bot, state, message.chat.id, sent.message_id, timestamp))
+    task = asyncio.create_task(_schedule_expiry(bot, state, message.chat.id, sent.message_id, timestamp))
+    _background_tasks.add(task)
+    task.add_done_callback(_background_tasks.discard)
 
 
 @community_router.callback_query(F.data == "cresolve:yes")

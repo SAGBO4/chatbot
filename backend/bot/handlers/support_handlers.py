@@ -31,7 +31,7 @@ async def _transcribe_voice_message(message: Message, bot: Bot) -> Optional[str]
     media = message.voice or message.audio
     if media is None:
         return None
-    if settings.AI_PROVIDER != "openai" or not settings.AI_API_KEY:
+    if (settings.AI_PROVIDER or "").strip().lower() != "openai" or not settings.AI_API_KEY:
         logger.info("Voice reply received but speech-to-text needs AI_PROVIDER=openai with AI_API_KEY set.")
         return None
     if media.file_size and media.file_size > WHISPER_MAX_BYTES:

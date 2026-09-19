@@ -734,7 +734,7 @@ async def handle_brevo_inbound_email(
             result = {
                 "status": "internal_error",
                 "ticket_id": ticket_id,
-                "message": f"Unexpected error processing item: {exc}",
+                "message": "Unexpected error processing this item; see the server logs.",
             }
         results.append(result)
 

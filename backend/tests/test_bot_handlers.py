@@ -930,3 +930,24 @@ async def test_handle_user_query_rejects_questions_exceeding_telegram_limit():
 
 
 
+
+
+@pytest.mark.parametrize("provider", ["openai", "OpenAI", " OPENAI "])
+@pytest.mark.asyncio
+async def test_voice_transcription_accepts_any_casing_of_the_openai_provider(monkeypatch, provider):
+    """AIAssistantService lower-cases AI_PROVIDER, so AI_PROVIDER=OpenAI enables AI answers; speech-to-text must too."""
+    from bot.handlers.support_handlers import _transcribe_voice_message
+
+    monkeypatch.setattr("app.config.settings.AI_PROVIDER", provider)
+    monkeypatch.setattr("app.config.settings.AI_API_KEY", "sk-test-key")
+    message = MagicMock(spec=Message)
+    message.voice = MagicMock(file_id="voice123", file_size=1000)
+    message.audio = None
+    mock_bot = AsyncMock()
+    mock_bot.get_file.return_value = MagicMock(file_path="voice/file_123.oga")
+    mock_bot.download_file.return_value = MagicMock(read=MagicMock(return_value=b"ogg"))
+    response = MagicMock(status_code=200)
+    response.json.return_value = {"text": "Redemarrez le service."}
+
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
+        assert await _transcribe_voice_message(message, mock_bot) == "Redemarrez le service."

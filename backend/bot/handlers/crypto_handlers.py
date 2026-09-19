@@ -60,4 +60,4 @@ def _make_handler(symbol: str):
 # One command per known symbol (/btc, /eth, /firo...), usable in private chats and the community group:
 # prices are public data, so no group scoping.
 for _symbol in SYMBOL_TO_COINGECKO_ID:
-    crypto_router.message(Command(_symbol))(_make_handler(_symbol))
+    crypto_router.message(Command(_symbol, ignore_case=True))(_make_handler(_symbol))
