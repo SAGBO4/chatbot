@@ -1,5 +1,5 @@
 from typing import Optional, Union
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -48,6 +48,8 @@ class Settings(BaseSettings):
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/chatbot.db"
 
     SENTRY_DSN: Optional[str] = None
+    # Share of requests Sentry traces (0 to 1). 1.0 traces everything: lower it on a busy deployment.
+    SENTRY_TRACES_SAMPLE_RATE: float = Field(default=1.0, ge=0.0, le=1.0)
 
     # AI: AI_PROVIDER is "openai", "gemini" or "deepseek"; leave AI_MODEL unset for the
     # provider's default (see AIAssistantService.DEFAULT_MODELS).

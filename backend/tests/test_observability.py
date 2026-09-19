@@ -29,3 +29,29 @@ def test_scrub_recurses_into_nested_structures():
     assert BOT_TOKEN not in str(cleaned)
     assert cleaned["n"] == 3
     assert BOT_TOKEN in str(event), "the input must not be mutated"
+
+
+def test_sentry_uses_the_configured_trace_sample_rate(monkeypatch):
+    """SENTRY_TRACES_SAMPLE_RATE reaches sentry_sdk.init (it used to be hard-coded to 1.0)."""
+    from unittest.mock import MagicMock
+
+    import sentry_sdk
+    from app.config import settings
+    from app.observability import setup_observability
+
+    init = MagicMock()
+    monkeypatch.setattr(sentry_sdk, "init", init)
+    monkeypatch.setattr(settings, "SENTRY_DSN", "https://key@example.invalid/1")
+    monkeypatch.setattr(settings, "SENTRY_TRACES_SAMPLE_RATE", 0.25)
+
+    setup_observability("Backend API")
+
+    assert init.call_args.kwargs["traces_sample_rate"] == 0.25
+
+
+def test_trace_sample_rate_must_be_a_probability():
+    from pydantic import ValidationError
+    from app.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(SENTRY_TRACES_SAMPLE_RATE=5)

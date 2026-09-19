@@ -95,7 +95,7 @@ def setup_observability(service: str) -> None:
         return
     sentry_sdk.init(
         dsn=settings.SENTRY_DSN,
-        traces_sample_rate=1.0,
+        traces_sample_rate=settings.SENTRY_TRACES_SAMPLE_RATE,
         before_send=_scrub_event,
         before_send_transaction=_scrub_event,
         before_breadcrumb=_scrub_event,
