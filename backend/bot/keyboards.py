@@ -1,6 +1,6 @@
 from typing import Optional
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, WebAppInfo
-from bot.i18n import DEFAULT_LANGUAGE, t
+from app.i18n import DEFAULT_LANGUAGE, t
 
 
 def get_resolution_keyboard(ticket_id: int = 0, lang: str = DEFAULT_LANGUAGE) -> InlineKeyboardMarkup:

@@ -1,3 +1,4 @@
+"""Text helpers for Telegram messages, shared by the API and the bot."""
 import re
 
 # Telegram rejects messages over 4096 characters; 4000 keeps a safety margin

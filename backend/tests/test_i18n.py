@@ -1,4 +1,4 @@
-from bot.i18n import t
+from app.i18n import t
 
 
 def test_known_key_french():

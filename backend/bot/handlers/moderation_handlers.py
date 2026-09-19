@@ -8,8 +8,8 @@ from bot.admin_check import is_group_admin, invalidate_admin_cache
 from bot.group_scope import is_community_group_chat
 from bot.api_client import BackendClient
 from bot.language import get_active_language
-from bot.i18n import t
-from bot.utils import escape_telegram_markdown
+from app.i18n import t
+from app.telegram_text import escape_telegram_markdown
 
 logger = logging.getLogger(__name__)
 moderation_router = Router()

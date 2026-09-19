@@ -9,8 +9,8 @@ from bot.keyboards import get_resolution_keyboard, get_webapp_keyboard
 from bot.api_client import BackendClient
 from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
-from bot.i18n import t
-from bot.utils import truncate_telegram_text, TELEGRAM_MAX_MESSAGE_LENGTH
+from app.i18n import t
+from app.telegram_text import truncate_telegram_text, TELEGRAM_MAX_MESSAGE_LENGTH
 from app.config import settings
 
 logger = logging.getLogger(__name__)

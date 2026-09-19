@@ -2,7 +2,7 @@
 Representative per-handler-module English-language coverage (task 4.3): for
 each handler module, confirm at least one bot-authored message renders in
 English when the active language is "en", proving the module is wired
-through bot.i18n.t() rather than hardcoded French.
+through app.i18n.t() rather than hardcoded French.
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock

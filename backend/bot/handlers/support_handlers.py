@@ -8,8 +8,8 @@ from app.config import settings
 from bot.admin_check import is_group_admin
 from bot.api_client import BackendClient
 from bot.language import get_active_language
-from bot.i18n import t
-from bot.utils import escape_telegram_markdown, truncate_telegram_text
+from app.i18n import t
+from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
 
 logger = logging.getLogger(__name__)
 support_router = Router()

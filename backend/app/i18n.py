@@ -1,3 +1,4 @@
+"""Translations (French and English) of the messages written to users, shared by the API and the bot."""
 import logging
 
 logger = logging.getLogger(__name__)

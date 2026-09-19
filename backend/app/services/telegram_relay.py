@@ -2,7 +2,7 @@ import logging
 from typing import Optional, Tuple, Union
 import httpx
 from app.config import settings
-from bot.utils import truncate_telegram_text
+from app.telegram_text import truncate_telegram_text
 
 logger = logging.getLogger(__name__)
 

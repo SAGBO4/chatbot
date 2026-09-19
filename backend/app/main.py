@@ -35,7 +35,7 @@ from app.config import settings
 from app.observability import SensitiveDataFilter, sanitize_url_query, setup_observability
 from app.database import get_db, init_db, async_session_maker
 from app.models import Ticket, TicketStatus
-from bot.utils import escape_telegram_markdown, truncate_telegram_text
+from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
 from app.schemas import (
     QueryRequest,
     QueryResponse,

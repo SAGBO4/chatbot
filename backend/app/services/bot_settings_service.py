@@ -2,13 +2,13 @@ import logging
 from typing import List, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.i18n import DEFAULT_LANGUAGE
 from app.models import BotSetting, BotAdminWhitelist
 
 logger = logging.getLogger(__name__)
 
 COMMUNITY_GROUP_ID_KEY = "community_group_id"
 LANGUAGE_KEY = "language"
-DEFAULT_LANGUAGE = "fr"
 
 
 class BotSettingsService:

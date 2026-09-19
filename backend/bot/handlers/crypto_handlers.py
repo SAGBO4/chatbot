@@ -6,7 +6,7 @@ from aiogram.filters import Command
 from app.services.crypto_service import SYMBOL_TO_COINGECKO_ID
 from bot.api_client import BackendClient
 from bot.language import get_active_language
-from bot.i18n import t
+from app.i18n import t
 from typing import Optional
 
 logger = logging.getLogger(__name__)

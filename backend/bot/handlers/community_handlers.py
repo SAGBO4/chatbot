@@ -14,8 +14,8 @@ from bot.admin_check import is_group_admin
 from bot.group_scope import is_community_group_chat as _is_community_group_chat
 from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
-from bot.i18n import t
-from bot.utils import escape_telegram_markdown, truncate_telegram_text
+from app.i18n import t
+from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
 
 logger = logging.getLogger(__name__)
 community_router = Router()

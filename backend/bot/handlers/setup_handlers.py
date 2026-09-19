@@ -8,7 +8,7 @@ from bot.access_control import is_authorized, is_owner, invalidate_whitelist_cac
 from bot.api_client import BackendClient
 from bot.group_scope import invalidate_community_group_cache, get_community_group_id
 from bot.language import get_active_language, invalidate_language_cache
-from bot.i18n import t, SUPPORTED_LANGUAGES
+from app.i18n import t, SUPPORTED_LANGUAGES
 
 logger = logging.getLogger(__name__)
 setup_router = Router()

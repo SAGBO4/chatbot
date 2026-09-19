@@ -2,7 +2,7 @@ import time
 import logging
 from typing import Optional, Tuple
 from bot.api_client import BackendClient
-from bot.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES
+from app.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES
 
 logger = logging.getLogger(__name__)
 
