@@ -1,9 +1,9 @@
 import re
 import logging
-from typing import Optional, Union
+from typing import Optional, Tuple, Union
 import httpx
 from aiogram import Router, F, Bot
-from aiogram.types import Message
+from aiogram.types import Message, User
 from app.config import settings
 from bot.admin_check import is_group_admin
 from bot.api_client import BackendClient
@@ -72,6 +72,62 @@ def _is_support_group_chat(chat_id: Union[int, str]) -> bool:
     return str(chat_id) == str(settings.TELEGRAM_SUPPORT_GROUP_ID)
 
 
+async def _find_ticket(message: Message, bot: Bot, client: BackendClient) -> Tuple[Optional[int], Optional[int]]:
+    """
+    The ticket an agent's reply is about: `(ticket_id, user_id)`, `(None, None)` when none is found.
+
+    First by the replied-to message's id, which is immune to changes in the card's wording. Otherwise by
+    parsing the card's text (tickets created before the id lookup existed, or whose id was never stored),
+    which is only trusted when the bot itself posted the replied-to message: any message crafted to look
+    like a card would otherwise pass for a ticket.
+    """
+    try:
+        matched_ticket = await client.get_ticket_by_support_message(message.reply_to_message.message_id)
+    except Exception as exc:
+        logger.warning("Support-card lookup by message id failed, falling back to text: %s", exc)
+        matched_ticket = None
+
+    if matched_ticket:
+        return matched_ticket["id"], matched_ticket.get("user_id")
+
+    replied_author = getattr(message.reply_to_message, "from_user", None)
+    if replied_author is None or replied_author.id != bot.id:
+        return None, None
+
+    replied_text = message.reply_to_message.text or message.reply_to_message.caption or ""
+    ticket_match = TICKET_ID_REGEX.search(replied_text)
+    if not ticket_match:
+        return None, None
+    user_match = USER_ID_REGEX.search(replied_text)
+    return int(ticket_match.group(1)), int(user_match.group(1)) if user_match else None
+
+
+async def _solution_text(message: Message, bot: Bot, lang: str) -> str:
+    """
+    The solution an agent wrote: the text, else the caption (a screenshot with an explanation is a normal
+    reply), else a transcription of a voice message, which is echoed back to the agent. "" if none.
+    """
+    solution_text = (message.text or message.caption or "").strip()
+    if not solution_text and (message.voice or message.audio):
+        transcribed = await _transcribe_voice_message(message, bot)
+        if transcribed:
+            solution_text = transcribed
+            await message.reply(
+                t("support_voice_transcribed", lang, transcribed=escape_telegram_markdown(solution_text)),
+                parse_mode="Markdown",
+            )
+    return solution_text
+
+
+def _agent_name(user: User) -> str:
+    """How the agent is named in the ticket and to the user: username, else full name, else `Agent_<id>`."""
+    return (
+        user.username
+        or f"{user.first_name} {user.last_name or ''}".strip()
+        or f"Agent_{user.id}"
+    )
+
+
 async def _is_reply_in_support_group(message: Message) -> bool:
     """
     Filter: only replies sent in the support group reach `handle_support_agent_reply`.
@@ -106,64 +162,17 @@ async def handle_support_agent_reply(
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
 
-    # Primary match: the replied-to message's id, immune to changes in the card's wording.
-    ticket_id: Optional[int] = None
-    target_user_id: Optional[int] = None
-
-    try:
-        matched_ticket = await client.get_ticket_by_support_message(
-            message.reply_to_message.message_id
-        )
-    except Exception as exc:
-        logger.warning("Support-card lookup by message id failed, falling back to text: %s", exc)
-        matched_ticket = None
-
-    replied_author = getattr(message.reply_to_message, "from_user", None)
-    replied_from_bot = replied_author is not None and replied_author.id == bot.id
-
-    if matched_ticket:
-        ticket_id = matched_ticket["id"]
-        target_user_id = matched_ticket.get("user_id")
-    elif replied_from_bot:
-        # Fallback: parse the card's text (tickets created before the id lookup existed, or whose id
-        # was never stored). Only trusted when the bot itself posted the replied-to message, or any
-        # message crafted to look like a card would pass for a ticket.
-        replied_text = message.reply_to_message.text or message.reply_to_message.caption or ""
-        ticket_match = TICKET_ID_REGEX.search(replied_text)
-        user_match = USER_ID_REGEX.search(replied_text)
-
-        if ticket_match:
-            ticket_id = int(ticket_match.group(1))
-            target_user_id = int(user_match.group(1)) if user_match else None
-
-    # No match: tell the agent instead of doing nothing.
+    ticket_id, target_user_id = await _find_ticket(message, bot, client)
     if ticket_id is None:
         await message.reply(t("support_no_matching_ticket", lang))
         return
 
-    # message.text is None for non-text replies: use the caption (a screenshot with an explanation is
-    # a normal reply), then a voice transcription.
-    solution_text = (message.text or message.caption or "").strip()
-
-    if not solution_text and (message.voice or message.audio):
-        transcribed = await _transcribe_voice_message(message, bot)
-        if transcribed:
-            solution_text = transcribed
-            safe_transcribed = escape_telegram_markdown(solution_text)
-            await message.reply(
-                t("support_voice_transcribed", lang, transcribed=safe_transcribed),
-                parse_mode="Markdown",
-            )
-
+    solution_text = await _solution_text(message, bot, lang)
     if not solution_text:
         await message.reply(t("support_no_text_content", lang))
         return
 
-    agent_name = (
-        message.from_user.username
-        or f"{message.from_user.first_name} {message.from_user.last_name or ''}".strip()
-        or f"Agent_{message.from_user.id}"
-    )
+    agent_name = _agent_name(message.from_user)
 
     try:
         # The backend rejects longer solutions
