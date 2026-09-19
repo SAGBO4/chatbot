@@ -27,10 +27,12 @@ This is a small project maintained on a best-effort basis — there's no guarant
 
 ## What's already in place
 
-The backend is checked on every change with:
+CI runs `ruff` and the test suite on every change, and the suite covers the security-relevant behavior (authentication that fails closed, IDOR scoping, webhook signatures, rate limiting, secrets kept out of logs and error responses).
+
+These scanners are run by the maintainers, not by CI yet:
 - `bandit` — Python AST security linter
 - `semgrep` — semantic multi-rule security analysis
 - `trivy` — dependency vulnerability and secret scanning
 - `pip-audit` — PyPA advisory vulnerability scanner
 
-See [backend/README.md](backend/README.md#testing--verification) for how to run these locally. Application-level protections (IDOR access control, webhook signature verification, rate limiting, access log redaction) are documented in the same file.
+See [backend/README.md](backend/README.md#testing--verification) for how to run them locally. Application-level protections (IDOR access control, webhook signature verification, rate limiting, access log redaction) are documented in the same file.

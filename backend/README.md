@@ -41,7 +41,7 @@ backend/
 │   └── handlers/         # Bot handlers (user, support, community, moderation, crypto)
 ├── alembic/               # Database schema migration revisions
 ├── alembic.ini            # Alembic configuration
-├── tests/                 # 400+ test cases (unit, integration, resilience, E2E)
+├── tests/                 # 500+ test cases (unit, integration, resilience, E2E)
 ├── scripts/               # Management scripts (e.g. seed_knowledge_base.py)
 ├── data/                  # Persistent storage directory
 ├── deploy/                # Reverse proxy configurations (Caddy / Nginx)
@@ -161,6 +161,9 @@ docker compose -f docker-compose.prod.yml up --build -d
 ```
 The API is published on `127.0.0.1:8000` only, so put the reverse proxy described in the next section in front of it; that is also what keeps secrets out of the access logs.
 
+#### Dokku and other Heroku-style platforms:
+`Procfile` declares two processes, `web` (the API, on `$PORT`) and `bot` (the Telegram bot), and `CHECKS` points the platform's health check at `/health`. A `DATABASE_URL` written as `postgres://` or `postgresql://` is accepted and rewritten to the `postgresql+asyncpg://` form the async driver needs.
+
 ## 6. Production Reverse Proxy & Webhook Hardening
 
 To safeguard credentials passed via webhooks:
@@ -176,7 +179,8 @@ To safeguard credentials passed via webhooks:
 - **Diagnostics & Health**:
   - Endpoint `GET /health` runs an active `SELECT 1` ping against the database and returns HTTP 503 if unreachable.
 - **Sentry Integration**:
-  - Set `SENTRY_DSN=https://...` in `.env` to automatically capture unhandled exceptions with full tracebacks.
+  - Set `SENTRY_DSN=https://...` in `.env` to automatically capture unhandled exceptions with full tracebacks. `SENTRY_TRACES_SAMPLE_RATE` (0 to 1, default 1.0) sets the share of requests traced; lower it on a busy deployment.
+  - Bot tokens and secret query parameters are redacted from logs and from what is sent to Sentry.
 
 ## 8. User Ownership & IDOR Protection
 
@@ -188,9 +192,9 @@ To safeguard credentials passed via webhooks:
 
 ## Testing & Verification
 
-The automated test suite contains **400+ tests** across modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
+The automated test suite contains **500+ tests** across modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
 
-All tests run hermetically using isolated SQLite databases and mock external boundaries (Brevo SMTP and Telegram Bot API) to guarantee safety, zero external network leaks, and rapid execution (~16s):
+All tests run hermetically using isolated SQLite databases and mock external boundaries (Brevo SMTP and Telegram Bot API) to guarantee safety, zero external network leaks, and rapid execution (about 10 seconds):
 
 ```bash
 cd backend
@@ -199,7 +203,7 @@ cd backend
 pytest -v
 
 # Run with module coverage report (HTML report + >=85% threshold check)
-pytest --cov=app --cov=bot --cov-report=html --cov-fail-under=85
+pytest --cov=app --cov=bot --cov-report=html --cov-fail-under=85   # about 93% today
 
 # Mutation testing (verifies that tests actively catch seeded bugs)
 mutmut run
@@ -207,7 +211,7 @@ mutmut run
 # Static security analysis & linting
 ruff check .
 bandit -r app/ bot/                     # Python AST security linter (0 issues)
-semgrep scan --config=auto app/ bot/     # Semantic AST multi-rule security analysis (0 issues)
-trivy fs --file-patterns "pip:requirements.lock" requirements.lock # Dependency vulnerabilities & secret scanning (0 issues)
+semgrep scan --config=auto app/ bot/     # Semantic AST multi-rule security analysis
+trivy fs --file-patterns "pip:requirements.lock" requirements.lock # Dependency vulnerabilities & secret scanning
 pip-audit                               # PyPA advisory vulnerability scanner (0 issues)
 ```

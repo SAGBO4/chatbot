@@ -20,6 +20,13 @@ This is a monorepo — see [README.md](README.md) for the architecture overview,
 
 Follow the "Getting Started" section in the root [README.md](README.md) to get the backend, bot, and frontend running locally.
 
+## Code conventions
+
+- Code, comments, docstrings, commit messages and tests are written in English.
+- Text shown to users lives in [`backend/app/i18n.py`](backend/app/i18n.py), in French and in English, and is read with `t(key, lang)`; don't hard-code it in a handler. A test fails if a key exists in one language only.
+- `backend/app/` never imports from `backend/bot/` (enforced by `tests/test_architecture.py`); the bot talks to the API over HTTP.
+- Test data may be French on purpose (the knowledge base is bilingual).
+
 ## Branch naming
 
 Branches follow `<type>/<short-description>`, e.g. `fix/ci-rate-limiting-test`, `feat/frontend-telegram-webapp`, `docs/contributing-guide`.

@@ -4,7 +4,7 @@
 support.example.com {
 	# Caddy only masks Authorization and Cookie on its own. In the JSON access log the URI and the
 	# headers live under `request`, so the paths below start with `request>`.
-	# The query parameters match those redacted by the backend (sanitize_url_query in app/main.py).
+	# The query parameters match those redacted by the backend (sanitize_url_query in app/observability.py).
 	log {
 		output file /var/log/caddy/access.log
 		format filter {

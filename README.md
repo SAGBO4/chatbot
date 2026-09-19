@@ -67,7 +67,7 @@ backend/
 ├── app/                  # FastAPI Application & Services
 ├── bot/                   # Telegram Bot (aiogram 3)
 ├── alembic/               # Database schema migration revisions
-├── tests/                 # 400+ test cases (unit, integration, resilience, E2E)
+├── tests/                 # 500+ test cases (unit, integration, resilience, E2E)
 ├── scripts/               # Management scripts (e.g. seed_knowledge_base.py)
 ├── data/                  # Persistent storage directory
 ├── deploy/                # Reverse proxy configurations (Caddy / Nginx)
