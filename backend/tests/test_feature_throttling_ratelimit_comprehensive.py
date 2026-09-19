@@ -201,3 +201,38 @@ async def test_ratelimit_backend_tickets_exceeding_limit_returns_429(app_test_en
     finally:
         limiter.reset()
         limiter.enabled = False
+
+
+@pytest.mark.asyncio
+async def test_throttling_forgets_users_who_have_been_idle(monkeypatch):
+    """
+    Sans purge, user_timestamps et last_warning_time grandissent avec chaque utilisateur
+    jamais vu (fuite mémoire lente sur un bot public). Un utilisateur inactif au-delà de la
+    fenêtre doit être oublié, sans changer le comportement pour les autres.
+    """
+    clock = [1000.0]
+    monkeypatch.setattr("bot.middlewares.throttling.time.time", lambda: clock[0])
+    middleware = ThrottlingMiddleware(rate_limit=2, window_seconds=10.0, warning_cooldown=5.0)
+    handler = AsyncMock(return_value="OK")
+
+    def message_from(user_id):
+        message = MagicMock(spec=Message, from_user=MagicMock(spec=User, id=user_id))
+        message.answer = AsyncMock()
+        return message
+
+    # user 1 gets throttled (warning recorded), users 2 and 3 send one message each
+    for _ in range(3):
+        await middleware(handler, message_from(1), {})
+    await middleware(handler, message_from(2), {})
+    await middleware(handler, message_from(3), {})
+    assert set(middleware.user_timestamps) == {1, 2, 3}
+    assert set(middleware.last_warning_time) == {1}
+
+    # 60 s later only user 4 writes: the three idle users are dropped
+    clock[0] += 60.0
+    assert await middleware(handler, message_from(4), {}) == "OK"
+    assert set(middleware.user_timestamps) == {4}
+    assert middleware.last_warning_time == {}
+
+    # a returning user starts from a clean slate
+    assert await middleware(handler, message_from(1), {}) == "OK"

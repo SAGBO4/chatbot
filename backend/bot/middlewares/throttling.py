@@ -28,6 +28,23 @@ class ThrottlingMiddleware(BaseMiddleware):
         self.warning_cooldown = warning_cooldown
         self.user_timestamps: Dict[int, List[float]] = {}
         self.last_warning_time: Dict[int, float] = {}
+        self._next_prune = 0.0
+
+    def _prune(self, now: float) -> None:
+        """
+        Forget users idle for longer than the window, at most once per window.
+
+        Without this both dicts grow with every user the bot has ever seen. Dropping an idle entry
+        changes nothing for that user: their next message would start from an empty window anyway.
+        """
+        if now < self._next_prune:
+            return
+        self._next_prune = now + self.window_seconds
+        window_start = now - self.window_seconds
+        for user_id in [uid for uid, stamps in self.user_timestamps.items() if not stamps or stamps[-1] <= window_start]:
+            del self.user_timestamps[user_id]
+        for user_id in [uid for uid, warned in self.last_warning_time.items() if now - warned >= self.warning_cooldown]:
+            del self.last_warning_time[user_id]
 
     async def __call__(
         self,
@@ -44,6 +61,7 @@ class ThrottlingMiddleware(BaseMiddleware):
 
         user_id = user.id
         now = time.time()
+        self._prune(now)
         window_start = now - self.window_seconds
 
         current_timestamps = [t for t in self.user_timestamps.get(user_id, []) if t > window_start]
