@@ -47,6 +47,17 @@ class Settings(BaseSettings):
     BACKEND_URL: str = "http://localhost:8000"
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/chatbot.db"
 
+    @field_validator("DATABASE_URL", mode="before")
+    @classmethod
+    def _normalize_database_url(cls, value):
+        """Converts postgres:// or postgresql:// scheme to postgresql+asyncpg:// for SQLAlchemy async engine (Dokku compatibility)."""
+        if isinstance(value, str):
+            if value.startswith("postgres://"):
+                return value.replace("postgres://", "postgresql+asyncpg://", 1)
+            if value.startswith("postgresql://") and not value.startswith("postgresql+"):
+                return value.replace("postgresql://", "postgresql+asyncpg://", 1)
+        return value
+
     SENTRY_DSN: Optional[str] = None
     # Share of requests Sentry traces (0 to 1). 1.0 traces everything: lower it on a busy deployment.
     SENTRY_TRACES_SAMPLE_RATE: float = Field(default=1.0, ge=0.0, le=1.0)

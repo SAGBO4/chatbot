@@ -46,6 +46,7 @@ backend/
 ├── data/                  # Persistent storage directory
 ├── deploy/                # Reverse proxy configurations (Caddy / Nginx)
 ├── Dockerfile             # Docker image for the API and the bot (non-root user)
+├── Procfile, CHECKS       # Process types and health check for Dokku / Heroku-style platforms
 ├── docker-compose.yml     # Multi-service local orchestrator
 ├── docker-compose.prod.yml # Production stack with PostgreSQL 16
 ├── requirements.txt       # Runtime dependencies
