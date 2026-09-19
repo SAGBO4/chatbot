@@ -79,6 +79,29 @@ def _is_answer_expired(timestamp: Optional[float]) -> bool:
     return (time.time() - timestamp) > settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS
 
 
+async def _pending_answer(callback: CallbackQuery, state: FSMContext, lang: str) -> Optional[dict]:
+    """
+    The stored question and answer that a YES / NO click refers to, or None after telling the user why not.
+
+    None when the answer was already handled (a double click, or another admin got there first), or when the
+    buttons outlived COMMUNITY_RESOLUTION_TIMEOUT_SECONDS (they are removed, and the state cleared).
+    """
+    user_data = await state.get_data()
+    if not user_data.get("last_question"):
+        await callback.answer(t("ticket_already_handled", lang), show_alert=False)
+        return None
+
+    if _is_answer_expired(user_data.get("last_answer_timestamp")):
+        await state.clear()
+        await callback.answer(t("community_resolution_expired", lang), show_alert=True)
+        try:
+            await callback.message.edit_reply_markup(reply_markup=None)
+        except Exception as exc:
+            logger.warning("Failed to clear the expired keyboard: %s", exc)
+        return None
+    return user_data
+
+
 @community_router.message(Command("ask"))
 async def handle_community_ask(
     message: Message,
@@ -138,19 +161,7 @@ async def handle_community_resolve_yes(
 ):
     """YES on a community answer: mark it resolved (or say it expired)."""
     lang = await get_active_language(backend_client=backend_client)
-    user_data = await state.get_data()
-    last_question = user_data.get("last_question")
-    if not last_question:
-        await callback.answer(t("ticket_already_handled", lang), show_alert=False)
-        return
-
-    if _is_answer_expired(user_data.get("last_answer_timestamp")):
-        await state.clear()
-        await callback.answer(t("community_resolution_expired", lang), show_alert=True)
-        try:
-            await callback.message.edit_reply_markup(reply_markup=None)
-        except Exception as exc:
-            logger.warning("Failed to clear expired keyboard in community resolve_yes: %s", exc)
+    if await _pending_answer(callback, state, lang) is None:
         return
 
     await state.clear()
@@ -178,20 +189,10 @@ async def handle_community_resolve_no(
     """
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
-    user_data = await state.get_data()
-    last_question = user_data.get("last_question")
-    if not last_question:
-        await callback.answer(t("ticket_already_handled", lang), show_alert=False)
+    user_data = await _pending_answer(callback, state, lang)
+    if user_data is None:
         return
-
-    if _is_answer_expired(user_data.get("last_answer_timestamp")):
-        await state.clear()
-        await callback.answer(t("community_resolution_expired", lang), show_alert=True)
-        try:
-            await callback.message.edit_reply_markup(reply_markup=None)
-        except Exception as exc:
-            logger.warning("Failed to clear expired keyboard in community resolve_no: %s", exc)
-        return
+    last_question = user_data["last_question"]
 
     await state.clear()
     last_answer = user_data.get("last_answer", t("no_answer", lang))
