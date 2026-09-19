@@ -11,11 +11,18 @@ from app.models import Base
 
 logger = logging.getLogger(__name__)
 
+ALEMBIC_INI = Path(__file__).resolve().parent.parent / "alembic.ini"
+
+
+def _is_sqlite() -> bool:
+    return "sqlite" in settings.DATABASE_URL
+
+
 engine_kwargs = {
     "echo": False,
     "pool_pre_ping": True,
 }
-if "sqlite" not in settings.DATABASE_URL:
+if not _is_sqlite():
     engine_kwargs.update({
         "pool_size": 10,
         "max_overflow": 20,
@@ -30,7 +37,7 @@ engine = create_async_engine(
 @event.listens_for(engine.sync_engine, "connect")
 def set_sqlite_pragma(dbapi_connection, connection_record):
     """Enables WAL mode, busy timeout and foreign keys for high concurrency on SQLite."""
-    if "sqlite" in settings.DATABASE_URL:
+    if _is_sqlite():
         cursor = dbapi_connection.cursor()
         cursor.execute("PRAGMA journal_mode=WAL")
         cursor.execute("PRAGMA synchronous=NORMAL")
@@ -71,13 +78,13 @@ def _add_missing_columns(sync_conn) -> None:
 
 
 def run_alembic_upgrade(connection_url: Optional[str] = None) -> None:
-    """Runs Alembic migrations up to head revision programmatically."""
-    ini_path = Path(__file__).resolve().parent.parent / "alembic.ini"
-    if ini_path.exists():
-        alembic_cfg = Config(str(ini_path))
-        url = connection_url or settings.DATABASE_URL
-        alembic_cfg.set_main_option("sqlalchemy.url", url)
-        command.upgrade(alembic_cfg, "head")
+    """Run the Alembic migrations up to head, on `connection_url` or else on settings.DATABASE_URL."""
+    if not ALEMBIC_INI.exists():
+        logger.warning("alembic.ini not found (looked at %s): the database migrations were not applied.", ALEMBIC_INI)
+        return
+    alembic_cfg = Config(str(ALEMBIC_INI))
+    alembic_cfg.set_main_option("sqlalchemy.url", connection_url or settings.DATABASE_URL)
+    command.upgrade(alembic_cfg, "head")
 
 
 async def init_db(db_engine=None) -> None:
@@ -88,7 +95,7 @@ async def init_db(db_engine=None) -> None:
     """
     target_engine = db_engine or engine
     if db_engine is None:
-        if "sqlite" in settings.DATABASE_URL:
+        if _is_sqlite():
             db_path_str = settings.DATABASE_URL.split(":///")[-1]
             if db_path_str:
                 Path(db_path_str).resolve().parent.mkdir(parents=True, exist_ok=True)

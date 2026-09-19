@@ -1,10 +1,12 @@
 import logging
+import sqlite3
 
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import select, inspect, text
 from app.models import Base, Ticket, KnowledgeArticle, TicketStatus
 from app.config import settings
+import app.database
 from app.database import init_db, run_alembic_upgrade
 
 
@@ -146,3 +148,24 @@ def test_alembic_upgrade_does_not_disable_application_loggers(tmp_path, monkeypa
 
     assert (tmp_path / "migrated.db").exists(), "the migration did not run: this test would pass vacuously"
     assert [logger.name for logger in existing if logger.disabled] == []
+
+
+def test_alembic_upgrade_migrates_the_database_it_is_given(tmp_path, restore_root_logging):
+    """alembic/env.py used to overwrite the URL passed by run_alembic_upgrade() with settings.DATABASE_URL."""
+    target = tmp_path / "given.db"
+
+    run_alembic_upgrade(f"sqlite+aiosqlite:///{target}")
+
+    assert target.exists(), "the URL passed to run_alembic_upgrade was ignored"
+    with sqlite3.connect(target) as connection:
+        tables = {row[0] for row in connection.execute("select name from sqlite_master where type='table'")}
+    assert {"tickets", "knowledge_articles", "alembic_version"} <= tables
+
+
+def test_missing_alembic_ini_is_reported_not_silent(tmp_path, monkeypatch, caplog):
+    monkeypatch.setattr(app.database, "ALEMBIC_INI", tmp_path / "does-not-exist.ini")
+
+    with caplog.at_level(logging.WARNING):
+        run_alembic_upgrade()
+
+    assert "alembic.ini" in caplog.text and "not applied" in caplog.text
