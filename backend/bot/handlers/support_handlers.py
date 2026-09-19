@@ -9,6 +9,7 @@ from bot.admin_check import is_group_admin
 from bot.api_client import BackendClient
 from bot.language import get_active_language
 from app.i18n import t
+from app.schemas import MAX_SOLUTION_LENGTH
 from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
 
 logger = logging.getLogger(__name__)
@@ -164,8 +165,8 @@ async def handle_support_agent_reply(
     )
 
     try:
-        # The backend rejects solutions over 5000 characters
-        api_solution = truncate_telegram_text(solution_text, max_length=5000, lang=lang)
+        # The backend rejects longer solutions
+        api_solution = truncate_telegram_text(solution_text, max_length=MAX_SOLUTION_LENGTH, lang=lang)
         resolved_ticket = await client.resolve_ticket(
             ticket_id=ticket_id,
             solution=api_solution,

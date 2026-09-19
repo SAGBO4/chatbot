@@ -6,10 +6,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.background import safe_background_task
 from app.config import settings
-from app.email_parsing import TICKET_SUBJECT_REGEX, clean_email_reply_body
+from app.email_parsing import clean_email_reply_body, find_ticket_id
 from app.i18n import t
 from app.models import Ticket
-from app.schemas import BrevoInboundItem
+from app.schemas import MAX_SOLUTION_LENGTH, BrevoInboundItem
 from app.services.bot_settings_service import BotSettingsService
 from app.services.telegram_relay import TelegramRelay
 from app.services.ticket_service import TicketService
@@ -44,15 +44,14 @@ async def resolve_inbound_email(
             "message": f"Sender '{sender}' is not authorized to resolve tickets via email.",
         }
 
-    match = TICKET_SUBJECT_REGEX.search(subject)
-    if not match:
+    ticket_id = find_ticket_id(subject)
+    if ticket_id is None:
         return {
             "status": "no_ticket_reference",
             "ticket_id": None,
             "message": "Could not identify Ticket ID in email subject (expected '[Ticket #123]').",
         }
 
-    ticket_id = int(match.group(1))
     clean_solution = clean_email_reply_body(body)
 
     if not clean_solution:
@@ -65,8 +64,8 @@ async def resolve_inbound_email(
             ),
         }
 
-    # Cap solution to max 5000 chars matching TicketResolveRequest constraint
-    clean_solution = truncate_telegram_text(clean_solution, max_length=5000, suffix="")
+    # Same cap as TicketResolveRequest.solution
+    clean_solution = truncate_telegram_text(clean_solution, max_length=MAX_SOLUTION_LENGTH, suffix="")
 
     ticket, newly_resolved = await TicketService.resolve_ticket(
         session=session,

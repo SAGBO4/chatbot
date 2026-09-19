@@ -3,9 +3,13 @@ from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel, ConfigDict, Field
 
+# Limits shared with the code that builds these values (the email and bot flows truncate to them)
+MAX_QUESTION_LENGTH = 4096
+MAX_SOLUTION_LENGTH = 5000
+
 
 class QueryRequest(BaseModel):
-    query: str = Field(..., min_length=1, max_length=4096)
+    query: str = Field(..., min_length=1, max_length=MAX_QUESTION_LENGTH)
     user_id: Optional[int] = None
     user_handle: Optional[str] = None
 
@@ -23,12 +27,12 @@ class QueryResponse(BaseModel):
 class TicketCreateRequest(BaseModel):
     user_id: int
     user_handle: Optional[str] = None
-    question: str = Field(..., min_length=1, max_length=4096)
-    automated_answer: Optional[str] = Field(default=None, max_length=5000)
+    question: str = Field(..., min_length=1, max_length=MAX_QUESTION_LENGTH)
+    automated_answer: Optional[str] = Field(default=None, max_length=MAX_SOLUTION_LENGTH)
 
 
 class TicketResolveRequest(BaseModel):
-    solution: str = Field(..., min_length=1, max_length=5000)
+    solution: str = Field(..., min_length=1, max_length=MAX_SOLUTION_LENGTH)
     resolved_by: Optional[str] = None
     # TELEGRAM or EMAIL
     resolution_channel: Optional[str] = "TELEGRAM"
@@ -81,8 +85,8 @@ class BrevoInboundWebhookRequest(BaseModel):
 
 
 class KnowledgeIngestRequest(BaseModel):
-    question: str = Field(..., min_length=1, max_length=4096)
-    solution: str = Field(..., min_length=1, max_length=5000)
+    question: str = Field(..., min_length=1, max_length=MAX_QUESTION_LENGTH)
+    solution: str = Field(..., min_length=1, max_length=MAX_SOLUTION_LENGTH)
     keywords: Optional[str] = Field(default=None, max_length=1000)
     source_ticket_id: Optional[int] = None
 

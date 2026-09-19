@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import inbound_email
 from app.database import get_db
-from app.email_parsing import TICKET_SUBJECT_REGEX
+from app.email_parsing import find_ticket_id
 from app.limiter import limiter
 from app.models import Ticket
 from app.observability import get_logger
@@ -17,6 +17,15 @@ from app.security import verify_brevo_inbound_token, verify_email_webhook_signat
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["webhooks"])
+
+# How the single-email endpoint reports the statuses of resolve_inbound_email as HTTP errors. The batch
+# endpoint returns them as data instead, so one bad item does not fail the whole batch.
+HTTP_ERROR_FOR_STATUS = {
+    "unauthorized_sender": 403,
+    "no_ticket_reference": 400,
+    "empty_body": 400,
+    "ticket_not_found": 404,
+}
 
 
 @router.post("/api/webhooks/email-inbound")
@@ -49,14 +58,8 @@ async def handle_inbound_email(
         body=payload.body,
     )
 
-    if result["status"] == "unauthorized_sender":
-        raise HTTPException(status_code=403, detail=result["message"])
-    if result["status"] == "no_ticket_reference":
-        raise HTTPException(status_code=400, detail=result["message"])
-    if result["status"] == "ticket_not_found":
-        raise HTTPException(status_code=404, detail=result["message"])
-    if result["status"] == "empty_body":
-        raise HTTPException(status_code=400, detail=result["message"])
+    if result["status"] in HTTP_ERROR_FOR_STATUS:
+        raise HTTPException(status_code=HTTP_ERROR_FOR_STATUS[result["status"]], detail=result["message"])
 
     return result
 
@@ -75,7 +78,7 @@ async def handle_brevo_inbound_email(
     Resolve tickets from Brevo's Inbound Parsing webhook: a batch (`items[]`) of parsed emails
     authenticated by one shared secret (see `verify_brevo_inbound_token`).
 
-    Each item goes through `_resolve_inbound_email` independently: one item's failure is reported
+    Each item goes through `inbound_email.resolve_inbound_email` independently: one item's failure is reported
     in its own result entry and does not abort the batch.
 
     The token is checked before the body is parsed (manual `model_validate_json` instead of a
@@ -90,24 +93,17 @@ async def handle_brevo_inbound_email(
     except ValidationError as exc:
         raise HTTPException(status_code=422, detail=exc.errors())
 
-    # Batch pre-fetch candidate tickets in one query to avoid sequential round-trips
-    candidate_ticket_ids = []
-    for item in payload.items:
-        match = TICKET_SUBJECT_REGEX.search(item.Subject or "")
-        if match:
-            candidate_ticket_ids.append(int(match.group(1)))
+    ticket_ids = [find_ticket_id(item.Subject) for item in payload.items]
 
+    # Fetch every referenced ticket in one query instead of one round-trip per item
     preloaded_tickets = {}
-    if candidate_ticket_ids:
-        ticket_stmt = select(Ticket).where(Ticket.id.in_(candidate_ticket_ids))
-        ticket_res = await session.execute(ticket_stmt)
-        for t in ticket_res.scalars().all():
-            preloaded_tickets[t.id] = t
+    referenced = [ticket_id for ticket_id in ticket_ids if ticket_id]
+    if referenced:
+        ticket_res = await session.execute(select(Ticket).where(Ticket.id.in_(referenced)))
+        preloaded_tickets = {ticket.id: ticket for ticket in ticket_res.scalars().all()}
 
     results = []
-    for item in payload.items:
-        match = TICKET_SUBJECT_REGEX.search(item.Subject or "")
-        ticket_id = int(match.group(1)) if match else None
+    for item, ticket_id in zip(payload.items, ticket_ids):
         preloaded = preloaded_tickets.get(ticket_id) if ticket_id else None
 
         try:

@@ -22,6 +22,9 @@ class AIAssistantService:
         """Configures a shared persistent httpx client for AI API calls."""
         cls._shared_client = client
 
+    # How many of the best knowledge base articles the model is shown
+    CONTEXT_ARTICLES = 3
+
     # Sane default model per provider, used when AI_MODEL is not set.
     DEFAULT_MODELS = {
         "openai": "gpt-4o-mini",
@@ -33,7 +36,7 @@ class AIAssistantService:
     def _build_prompt(query: str, retrieved_articles: List[Tuple[KnowledgeArticle, float]]) -> str:
         """Prompt telling the model to answer only from the top 3 retrieved articles, in the question's language."""
         context_snippets = []
-        for idx, (art, score) in enumerate(retrieved_articles[:3], start=1):
+        for idx, (art, score) in enumerate(retrieved_articles[:AIAssistantService.CONTEXT_ARTICLES], start=1):
             context_snippets.append(f"[{idx}] Question: {art.question}\nSolution: {art.solution}")
         context_str = "\n\n".join(context_snippets)
 

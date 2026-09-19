@@ -41,7 +41,7 @@ class QueryOrchestrator:
             session=session,
             query=clean_query,
             threshold=settings.KB_CONFIDENCE_THRESHOLD,
-            limit=3,
+            limit=AIAssistantService.CONTEXT_ARTICLES,
         )
 
         if not matches:

@@ -4,6 +4,12 @@ from typing import Optional
 
 TICKET_SUBJECT_REGEX = re.compile(r"Ticket\s*#(\d+)", re.IGNORECASE)
 
+
+def find_ticket_id(subject: Optional[str]) -> Optional[int]:
+    """The ticket number named in an email subject (`[Ticket #123]`), or None."""
+    match = TICKET_SUBJECT_REGEX.search(subject or "")
+    return int(match.group(1)) if match else None
+
 # Zero-width characters must not hide a quote marker (e.g. a zero-width space before ">").
 # They are stripped for marker detection only, never from the text that is kept.
 _INVISIBLE_CHARS_RE = re.compile("[\u200b\u200c\u200d\u2060\ufeff]")
