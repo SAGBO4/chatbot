@@ -7,6 +7,10 @@ from app.models import KnowledgeArticle
 
 logger = logging.getLogger(__name__)
 
+# Sampling for the support answers: low temperature (stay close to the article), short replies.
+AI_TEMPERATURE = 0.2
+AI_MAX_OUTPUT_TOKENS = 500
+
 
 @asynccontextmanager
 async def _borrowed_client(client: Optional[httpx.AsyncClient]) -> AsyncIterator[httpx.AsyncClient]:
@@ -133,8 +137,8 @@ class AIAssistantService:
                         },
                         {"role": "user", "content": prompt},
                     ],
-                    "temperature": 0.2,
-                    "max_tokens": 500,
+                    "temperature": AI_TEMPERATURE,
+                    "max_tokens": AI_MAX_OUTPUT_TOKENS,
                 },
             )
             if response.status_code == 200:
@@ -169,8 +173,8 @@ class AIAssistantService:
                 json={
                     "contents": [{"parts": [{"text": prompt}]}],
                     "generationConfig": {
-                        "temperature": 0.2,
-                        "maxOutputTokens": 500,
+                        "temperature": AI_TEMPERATURE,
+                        "maxOutputTokens": AI_MAX_OUTPUT_TOKENS,
                     },
                 },
             )

@@ -344,3 +344,13 @@ async def test_list_knowledge_pagination(api_env):
     assert isinstance(data, list)
     assert len(data) <= 2
 
+
+
+@pytest.mark.asyncio
+async def test_openapi_version_comes_from_the_package(api_env):
+    import app
+
+    client, _ = api_env
+    response = await client.get("/openapi.json")
+
+    assert response.json()["info"]["version"] == app.__version__ == "1.1.0"

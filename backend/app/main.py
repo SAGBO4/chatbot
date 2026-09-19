@@ -9,6 +9,7 @@ import httpx
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 
+from app import __version__
 from app.config import settings
 from app.database import async_session_maker, init_db
 from app.limiter import RateLimitExceeded, _rate_limit_exceeded_handler, limiter
@@ -55,7 +56,7 @@ async def lifespan(app: FastAPI):
 app = FastAPI(
     title="Telegram Support Bot Backend API",
     description="Backend API for telegram support bot with knowledge base, multi-channel ticketing and email sync",
-    version="1.1.0",
+    version=__version__,
     lifespan=lifespan,
 )
 
