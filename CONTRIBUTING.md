@@ -43,6 +43,7 @@ Run the checks that CI runs, so you're not waiting on a red build to find out:
 **Backend**
 ```bash
 cd backend
+pip install -r requirements-dev.txt   # once: runtime dependencies + test and QA tools
 ruff check .
 pytest -v
 ```

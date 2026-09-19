@@ -21,12 +21,12 @@ jobs:
         with:
           python-version: '3.13'
           cache: 'pip'
+          cache-dependency-path: backend/requirements*.txt
 
       - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          if [ -f backend/requirements.txt ]; then pip install -r backend/requirements.txt; fi
-          pip install ruff
+          pip install -r backend/requirements-dev.txt
 
       - name: Lint with ruff
         run: ruff check .

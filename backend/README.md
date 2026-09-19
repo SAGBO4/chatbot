@@ -35,7 +35,9 @@ backend/
 ├── Dockerfile             # Docker image for the API and the bot (non-root user)
 ├── docker-compose.yml     # Multi-service local orchestrator
 ├── docker-compose.prod.yml # Production stack with PostgreSQL 16
-├── requirements.txt       # Python dependencies
+├── requirements.txt       # Runtime dependencies
+├── requirements-dev.txt   # Test and QA tools (pytest, ruff, bandit, semgrep, ...)
+├── requirements.lock      # Pinned runtime set installed by the Docker image
 └── pytest.ini             # Pytest configuration
 ```
 
@@ -50,7 +52,7 @@ source .venv/bin/activate
 
 # Install backend dependencies
 cd backend
-pip install -r requirements.txt
+pip install -r requirements-dev.txt   # runtime dependencies + the test and QA tools
 
 # Copy configuration template (defined once at the repo root)
 cp ../.env.example .env
