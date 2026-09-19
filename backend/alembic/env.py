@@ -21,8 +21,10 @@ config = context.config
 # The database URL comes from the application settings, not from alembic.ini
 config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
+# disable_existing_loggers=False: the migration runs inside the API process at startup, and the default
+# (True) would silence every logger created before it, including the application's own.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
 # Metadata used by `alembic revision --autogenerate`
 target_metadata = Base.metadata

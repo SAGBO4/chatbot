@@ -1,8 +1,11 @@
+import logging
+
 import pytest
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import select, inspect, text
 from app.models import Base, Ticket, KnowledgeArticle, TicketStatus
-from app.database import init_db
+from app.config import settings
+from app.database import init_db, run_alembic_upgrade
 
 
 @pytest.mark.asyncio
@@ -118,3 +121,28 @@ async def test_init_db_backfills_missing_columns_on_existing_deployment(tmp_path
         assert ticket.support_group_message_id is None
 
     await test_engine.dispose()
+
+
+@pytest.fixture
+def restore_root_logging():
+    """alembic's fileConfig() rewrites the root logger; put it back so other tests are unaffected."""
+    root = logging.getLogger()
+    handlers, level = root.handlers[:], root.level
+    yield
+    root.handlers[:] = handlers
+    root.setLevel(level)
+
+
+def test_alembic_upgrade_does_not_disable_application_loggers(tmp_path, monkeypatch, restore_root_logging):
+    """
+    The migration runs in the same process as the API at startup. alembic/env.py calls
+    logging.config.fileConfig(), which by default disables every logger that already exists: after
+    startup, app.main, the services, httpx and uvicorn.error stopped logging (errors included).
+    """
+    monkeypatch.setattr(settings, "DATABASE_URL", f"sqlite+aiosqlite:///{tmp_path / 'migrated.db'}")
+    existing = [logging.getLogger(name) for name in ("app.main", "app.services.telegram_relay", "httpx")]
+
+    run_alembic_upgrade()
+
+    assert (tmp_path / "migrated.db").exists(), "the migration did not run: this test would pass vacuously"
+    assert [logger.name for logger in existing if logger.disabled] == []
