@@ -8,7 +8,7 @@ from app.services.bot_settings_service import BotSettingsService
 
 
 @pytest_asyncio.fixture
-async def test_session_maker(tmp_path):
+async def seed_session_maker(tmp_path):
     db_file = tmp_path / "startup_seed_test.db"
     engine = create_async_engine(f"sqlite+aiosqlite:///{db_file}", echo=False)
     await real_init_db(db_engine=engine)
@@ -18,11 +18,11 @@ async def test_session_maker(tmp_path):
 
 
 @pytest.mark.asyncio
-async def test_lifespan_seeds_legacy_community_group_when_env_set(test_session_maker, monkeypatch):
+async def test_lifespan_seeds_legacy_community_group_when_env_set(seed_session_maker, monkeypatch):
     import app.main as main_module
 
     monkeypatch.setattr(settings, "TELEGRAM_COMMUNITY_GROUP_ID", -100555)
-    monkeypatch.setattr(main_module, "async_session_maker", test_session_maker)
+    monkeypatch.setattr(main_module, "async_session_maker", seed_session_maker)
     monkeypatch.setattr(main_module, "init_db", AsyncMock())
     monkeypatch.setattr("app.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
     monkeypatch.setattr("app.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
@@ -31,17 +31,17 @@ async def test_lifespan_seeds_legacy_community_group_when_env_set(test_session_m
     async with main_module.lifespan(main_module.app):
         pass
 
-    async with test_session_maker() as session:
+    async with seed_session_maker() as session:
         value = await BotSettingsService.get_community_group_id(session)
     assert value == -100555
 
 
 @pytest.mark.asyncio
-async def test_lifespan_does_not_seed_when_env_unset(test_session_maker, monkeypatch):
+async def test_lifespan_does_not_seed_when_env_unset(seed_session_maker, monkeypatch):
     import app.main as main_module
 
     monkeypatch.setattr(settings, "TELEGRAM_COMMUNITY_GROUP_ID", 0)
-    monkeypatch.setattr(main_module, "async_session_maker", test_session_maker)
+    monkeypatch.setattr(main_module, "async_session_maker", seed_session_maker)
     monkeypatch.setattr(main_module, "init_db", AsyncMock())
     monkeypatch.setattr("app.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
     monkeypatch.setattr("app.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
@@ -50,20 +50,20 @@ async def test_lifespan_does_not_seed_when_env_unset(test_session_maker, monkeyp
     async with main_module.lifespan(main_module.app):
         pass
 
-    async with test_session_maker() as session:
+    async with seed_session_maker() as session:
         value = await BotSettingsService.get_community_group_id(session)
     assert value is None
 
 
 @pytest.mark.asyncio
-async def test_lifespan_never_overwrites_existing_persisted_value(test_session_maker, monkeypatch):
+async def test_lifespan_never_overwrites_existing_persisted_value(seed_session_maker, monkeypatch):
     import app.main as main_module
 
-    async with test_session_maker() as session:
+    async with seed_session_maker() as session:
         await BotSettingsService.set_community_group_id(session, -100111, updated_by="owner")
 
     monkeypatch.setattr(settings, "TELEGRAM_COMMUNITY_GROUP_ID", -100999)
-    monkeypatch.setattr(main_module, "async_session_maker", test_session_maker)
+    monkeypatch.setattr(main_module, "async_session_maker", seed_session_maker)
     monkeypatch.setattr(main_module, "init_db", AsyncMock())
     monkeypatch.setattr("app.services.telegram_relay.TelegramRelay.set_shared_client", lambda *a, **k: None)
     monkeypatch.setattr("app.services.ai_assistant.AIAssistantService.set_shared_client", lambda *a, **k: None)
@@ -72,6 +72,6 @@ async def test_lifespan_never_overwrites_existing_persisted_value(test_session_m
     async with main_module.lifespan(main_module.app):
         pass
 
-    async with test_session_maker() as session:
+    async with seed_session_maker() as session:
         value = await BotSettingsService.get_community_group_id(session)
     assert value == -100111
