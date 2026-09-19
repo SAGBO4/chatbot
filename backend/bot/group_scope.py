@@ -1,31 +1,26 @@
-import time
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 from bot.api_client import BackendClient
+from bot.ttl_cache import MISSING, TTLCache
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_SECONDS = 30.0
-
-# The persisted community group id, cached briefly (same pattern as bot/admin_check.py). Cleared right
-# after a successful /setup_community so this process sees the change without waiting for the TTL.
-_cached_community_group_id: Optional[Tuple[Optional[int], float]] = None
+# The persisted community group id (None when unset), cached briefly. Cleared right after a successful
+# /setup_community so this process sees the change without waiting for the TTL.
+_group_cache = TTLCache(30.0)
+_KEY = "community_group_id"
 
 
 def invalidate_community_group_cache() -> None:
     """Forget the cached community group id so the next call reads it again."""
-    global _cached_community_group_id
-    _cached_community_group_id = None
+    _group_cache.clear()
 
 
 async def get_community_group_id(backend_client: Optional[BackendClient] = None) -> Optional[int]:
     """Returns the currently configured community group id, or None if unset."""
-    global _cached_community_group_id
-    now = time.time()
-    if _cached_community_group_id is not None:
-        value, fetched_at = _cached_community_group_id
-        if (now - fetched_at) < _CACHE_TTL_SECONDS:
-            return value
+    cached = _group_cache.get(_KEY)
+    if cached is not MISSING:
+        return cached
 
     client = backend_client or BackendClient()
     try:
@@ -35,7 +30,7 @@ async def get_community_group_id(backend_client: Optional[BackendClient] = None)
         logger.warning("Failed to resolve the configured community group id: %s", exc)
         value = None
 
-    _cached_community_group_id = (value, now)
+    _group_cache.set(_KEY, value)
     return value
 
 

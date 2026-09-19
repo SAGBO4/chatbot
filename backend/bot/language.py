@@ -1,31 +1,26 @@
-import time
 import logging
-from typing import Optional, Tuple
+from typing import Optional
 from bot.api_client import BackendClient
+from bot.ttl_cache import MISSING, TTLCache
 from app.i18n import DEFAULT_LANGUAGE, SUPPORTED_LANGUAGES
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_SECONDS = 30.0
-
-# Same cache pattern as bot/group_scope.py: short TTL, cleared right after a successful language change.
-_cached_language: Optional[Tuple[str, float]] = None
+# The active language, cached briefly and cleared right after a successful language change
+_language_cache = TTLCache(30.0)
+_KEY = "language"
 
 
 def invalidate_language_cache() -> None:
     """Forget the cached language so the next call reads it again."""
-    global _cached_language
-    _cached_language = None
+    _language_cache.clear()
 
 
 async def get_active_language(backend_client: Optional[BackendClient] = None) -> str:
     """Returns the currently configured bot language, defaulting to French."""
-    global _cached_language
-    now = time.time()
-    if _cached_language is not None:
-        value, fetched_at = _cached_language
-        if (now - fetched_at) < _CACHE_TTL_SECONDS:
-            return value
+    cached = _language_cache.get(_KEY)
+    if cached is not MISSING:
+        return cached
 
     client = backend_client or BackendClient()
     try:
@@ -35,5 +30,5 @@ async def get_active_language(backend_client: Optional[BackendClient] = None) ->
         logger.warning("Failed to resolve the active bot language: %s", exc)
         value = DEFAULT_LANGUAGE
 
-    _cached_language = (value, now)
+    _language_cache.set(_KEY, value)
     return value

@@ -1,16 +1,14 @@
-import time
 import logging
-from typing import Dict, Optional, Tuple
+from typing import Optional
 from app.config import settings
 from bot.api_client import BackendClient
+from bot.ttl_cache import MISSING, TTLCache
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_SECONDS = 30.0
-
-# Recent whitelist-check results by user_id (same pattern as bot/admin_check.py). Cleared right after
-# every /whitelist change, so a cached answer never hides a change made in this process.
-_whitelist_cache: Dict[int, Tuple[bool, float]] = {}
+# Recent whitelist-check results by user_id. Cleared right after every /whitelist change, so a cached
+# answer never hides a change made in this process.
+_whitelist_cache = TTLCache(30.0)
 
 
 def invalidate_whitelist_cache(user_id: Optional[int] = None) -> None:
@@ -18,7 +16,7 @@ def invalidate_whitelist_cache(user_id: Optional[int] = None) -> None:
     if user_id is None:
         _whitelist_cache.clear()
     else:
-        _whitelist_cache.pop(user_id, None)
+        _whitelist_cache.discard(user_id)
 
 
 async def is_authorized(user_id: int, backend_client: Optional[BackendClient] = None) -> bool:
@@ -33,9 +31,8 @@ async def is_authorized(user_id: int, backend_client: Optional[BackendClient] = 
         return True
 
     cached = _whitelist_cache.get(user_id)
-    now = time.time()
-    if cached is not None and (now - cached[1]) < _CACHE_TTL_SECONDS:
-        return cached[0]
+    if cached is not MISSING:
+        return cached
 
     client = backend_client or BackendClient()
     try:
@@ -44,7 +41,7 @@ async def is_authorized(user_id: int, backend_client: Optional[BackendClient] = 
         logger.warning("Failed to check whitelist status for user %s: %s", user_id, exc)
         result = False
 
-    _whitelist_cache[user_id] = (result, now)
+    _whitelist_cache.set(user_id, result)
     return result
 
 
