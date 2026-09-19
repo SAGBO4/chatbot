@@ -2,7 +2,8 @@ import asyncio
 import logging
 from aiogram import Bot, Dispatcher
 from typing import Optional
-from backend.config import settings
+from app.config import settings
+from app.observability import setup_observability
 from bot.api_client import BackendClient
 from bot.handlers.user_handlers import user_router
 from bot.handlers.support_handlers import support_router
@@ -20,22 +21,19 @@ def create_dispatcher(
     backend_client: Optional[BackendClient] = None,
     throttling_middleware: Optional[ThrottlingMiddleware] = None,
 ) -> Dispatcher:
+    """Build the dispatcher: shared backend client, throttling on messages and button clicks, and the routers."""
     dp = Dispatcher()
     if backend_client is not None:
         dp["backend_client"] = backend_client
 
     throttler = throttling_middleware or ThrottlingMiddleware()
     dp.message.middleware(throttler)
-    # Callback queries (inline button clicks, e.g. "resolve:yes/no") each
-    # trigger a backend call just like a message does, so they must be rate
-    # limited the same way - otherwise a user can bypass all message
-    # throttling by rapid-clicking a button instead of typing.
+    # Button clicks call the backend like messages do: throttle them too, or a user could bypass
+    # the message throttling by rapid-clicking a button.
     dp.callback_query.middleware(throttler)
 
-    # Command-specific routers are registered before user_router: its
-    # handle_user_query matches any text in a private chat (no command
-    # exclusion), so it would otherwise swallow "/btc", "/mute", etc. before
-    # a more specific router ever saw them.
+    # Command routers come before user_router, whose handle_user_query matches any text in a private
+    # chat and would otherwise swallow "/btc", "/mute", etc.
     dp.include_router(setup_router)
     dp.include_router(support_router)
     dp.include_router(community_router)
@@ -46,13 +44,8 @@ def create_dispatcher(
 
 
 async def main():
-    if getattr(settings, "SENTRY_DSN", None):
-        try:
-            import sentry_sdk
-            sentry_sdk.init(dsn=settings.SENTRY_DSN, traces_sample_rate=1.0)
-            logger.info("Sentry monitoring initialized for Telegram Bot.")
-        except ImportError:
-            logger.warning("SENTRY_DSN is configured but sentry_sdk is not installed.")
+    """Entry point: log redaction and optional Sentry, refuse to start without a bot token, set the WebApp menu button, then poll."""
+    setup_observability("Telegram Bot")
 
     if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":  # nosec B105
         logger.error(
@@ -64,8 +57,8 @@ async def main():
     bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
     dp = create_dispatcher(backend_client=backend_client)
 
-    # Configure persistent WebApp menu button if HTTPS URL is provided
-    webapp_url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    # Telegram only accepts an https:// URL for the menu button
+    webapp_url = settings.TELEGRAM_WEBAPP_URL
     if webapp_url and webapp_url.startswith("https://"):
         try:
             from aiogram.types import MenuButtonWebApp, WebAppInfo

@@ -1,8 +1,8 @@
 import pytest
 import httpx
-from backend.main import app
-from backend.database import get_db
-from backend.config import settings
+from app.main import app
+from app.database import get_db
+from app.config import settings
 from bot.api_client import BackendClient
 
 TEST_API_KEY = "test-api-key-admin-settings"

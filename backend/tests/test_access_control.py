@@ -12,7 +12,7 @@ def clear_cache():
 
 @pytest.mark.asyncio
 async def test_owner_is_authorized_without_whitelist_lookup(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
     mock_client = AsyncMock()
 
     result = await access_control.is_authorized(999, backend_client=mock_client)
@@ -23,7 +23,7 @@ async def test_owner_is_authorized_without_whitelist_lookup(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_whitelisted_non_owner_is_authorized(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
     mock_client = AsyncMock()
     mock_client.is_whitelisted.return_value = True
 
@@ -35,7 +35,7 @@ async def test_whitelisted_non_owner_is_authorized(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_non_owner_non_whitelisted_is_rejected(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
     mock_client = AsyncMock()
     mock_client.is_whitelisted.return_value = False
 
@@ -46,7 +46,7 @@ async def test_non_owner_non_whitelisted_is_rejected(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_whitelist_result_is_cached_and_avoids_second_call(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
     mock_client = AsyncMock()
     mock_client.is_whitelisted.return_value = True
 
@@ -60,7 +60,7 @@ async def test_whitelist_result_is_cached_and_avoids_second_call(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_invalidate_whitelist_cache_forces_recheck(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
     mock_client = AsyncMock()
     mock_client.is_whitelisted.return_value = True
     await access_control.is_authorized(42, backend_client=mock_client)
@@ -73,10 +73,20 @@ async def test_invalidate_whitelist_cache_forces_recheck(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_whitelist_lookup_error_defaults_to_unauthorized(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
     mock_client = AsyncMock()
     mock_client.is_whitelisted.side_effect = Exception("network error")
 
     result = await access_control.is_authorized(42, backend_client=mock_client)
 
     assert result is False
+
+
+def test_is_owner_is_a_plain_synchronous_check(monkeypatch):
+    """It reads the env-defined owner only (no I/O), so it must not need to be awaited."""
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+
+    assert access_control.is_owner(999) is True
+    assert access_control.is_owner(1000) is False
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", None)
+    assert access_control.is_owner(999) is False

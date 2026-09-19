@@ -10,32 +10,27 @@ from alembic import context
 import sys
 from pathlib import Path
 
-# Add project root to sys.path
+# Make the `app` package importable whatever directory alembic is run from
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from backend.config import settings
-from backend.models import Base
+from app.config import settings
+from app.models import Base
 
-# this is the Alembic Config object, which provides
-# access to the values within the .ini file in use.
 config = context.config
 
-# Dynamically set the database URL from application settings
-config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
+# A URL set by the caller (run_alembic_upgrade passes one) wins. alembic.ini only holds a placeholder,
+# so with the plain `alembic` command the URL comes from the application settings.
+_url = config.get_main_option("sqlalchemy.url")
+if not _url or _url.startswith("driver://"):
+    config.set_main_option("sqlalchemy.url", settings.DATABASE_URL)
 
-# Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# disable_existing_loggers=False: the migration runs inside the API process at startup, and the default
+# (True) would silence every logger created before it, including the application's own.
 if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
+    fileConfig(config.config_file_name, disable_existing_loggers=False)
 
-# add your model's MetaData object here
-# for 'autogenerate' support
+# Metadata used by `alembic revision --autogenerate`
 target_metadata = Base.metadata
-
-# other values from the config, defined by the needs of env.py,
-# can be acquired:
-# my_important_option = config.get_main_option("my_important_option")
-# ... etc.
 
 
 def run_migrations_offline() -> None:

@@ -1,0 +1,57 @@
+name: Bug report
+description: Something doesn't work as expected
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug. For security vulnerabilities, do **not** open an issue: see the [security policy](https://github.com/SAGBO4/chatbot/security/policy).
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options:
+        - Telegram bot
+        - Backend API
+        - Web frontend
+        - Docker / deployment
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you do, and what went wrong? Include the Telegram command or the endpoint called.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. ...
+        2. ...
+    validations:
+      required: false
+  - type: input
+    id: version
+    attributes:
+      label: Commit or branch
+      description: Output of `git rev-parse --short HEAD`, or the branch you are running.
+    validations:
+      required: false
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant logs
+      description: Redact tokens, API keys and personal data before pasting.
+      render: shell
+    validations:
+      required: false

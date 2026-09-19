@@ -65,7 +65,7 @@ export default function HomePage() {
         setShowEscalation(true);
       }
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de la recherche dans la documentation.';
+      const msg = (err as { message?: string })?.message || t.errSearch;
       setError(msg);
       setResult(null);
     } finally {
@@ -112,7 +112,7 @@ export default function HomePage() {
                   onClick={() => setQuery('')}
                   className="absolute right-24 p-1.5 text-neutral-400 hover:text-white transition-colors cursor-pointer"
                   title="Effacer"
-                  aria-label="Effacer la recherche"
+                  aria-label={t.clearSearch}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -155,7 +155,7 @@ export default function HomePage() {
       {/* Error Message */}
       {error && (
         <div className="max-w-2xl mx-auto mb-6">
-          <Alert type="error" title="Erreur de recherche">
+          <Alert type="error" title={t.searchErrorTitle}>
             {error}
           </Alert>
         </div>

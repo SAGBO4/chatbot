@@ -11,6 +11,11 @@ from bot.handlers.user_handlers import (
     handle_resolve_no,
 )
 from bot.handlers.support_handlers import handle_support_agent_reply
+import logging
+from aiogram.types import Voice
+from app.config import settings
+from bot.handlers.user_handlers import handle_help, UserQueryState
+from bot.api_client import BackendClient
 
 
 @pytest.fixture
@@ -83,7 +88,7 @@ async def test_bot_user_query_and_resolution_flow(memory_storage):
 
 @pytest.mark.asyncio
 async def test_bot_resolution_no_escalates_to_group(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     user = MagicMock(spec=User, id=789, username="marc789", first_name="Marc")
     state = make_fsm_context(memory_storage, 789, 789)
@@ -141,7 +146,7 @@ async def test_bot_resolution_no_escalates_to_group(memory_storage, monkeypatch)
 async def test_support_agent_reply_handler_resolves_by_message_id(monkeypatch):
     """Primary path: the reply is resolved via the replied-to message's identity,
     without needing the card's text to match the regex pattern at all."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -203,7 +208,7 @@ async def test_support_agent_reply_handler_resolves_by_message_id(monkeypatch):
 async def test_support_agent_reply_falls_back_to_text_when_id_lookup_misses(monkeypatch):
     """When the id-based lookup finds nothing (e.g. a ticket created before this
     mechanism existed), the previous text-parsing behavior still resolves it."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -258,7 +263,7 @@ async def test_support_agent_reply_text_fallback_ignored_when_replied_message_no
     contain "TICKET #<n> ID: <n>" must never be parsed as a real ticket
     card, even by a genuine group admin replying to it.
     """
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -301,7 +306,7 @@ async def test_support_agent_reply_rejected_for_non_admin_group_member(monkeypat
     ignored, never resolve the ticket or message the user on the team's
     behalf.
     """
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
     monkeypatch.setattr(
         "bot.handlers.support_handlers.is_group_admin",
         AsyncMock(return_value=False),
@@ -339,7 +344,7 @@ async def test_support_agent_reply_rejected_for_non_admin_group_member(monkeypat
 async def test_support_agent_reply_no_match_replies_with_explicit_notice(monkeypatch):
     """When neither the id-based lookup nor the text fallback identify a
     ticket, the bot must not resolve anything and must say so explicitly."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -394,7 +399,7 @@ def _make_support_agent_message(group_chat, agent_user, replied_card):
 async def test_support_agent_reply_media_without_caption_asks_for_text(monkeypatch):
     """A photo/sticker/voice reply with no usable text must not crash
     (message.text is None for media) and must not resolve the ticket."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -419,7 +424,7 @@ async def test_support_agent_reply_media_without_caption_asks_for_text(monkeypat
 async def test_support_agent_reply_photo_with_caption_resolves_ticket(monkeypatch):
     """A photo (e.g. a screenshot) with a caption uses the caption as the
     solution, instead of crashing or being discarded."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -449,9 +454,9 @@ async def test_support_agent_reply_photo_with_caption_resolves_ticket(monkeypatc
 async def test_support_agent_reply_voice_transcribed_via_whisper(monkeypatch):
     """A voice reply is transcribed via OpenAI Whisper when AI_PROVIDER=openai,
     then used as the ticket solution."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
-    monkeypatch.setattr("backend.config.settings.AI_PROVIDER", "openai")
-    monkeypatch.setattr("backend.config.settings.AI_API_KEY", "sk-test-key")
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.AI_PROVIDER", "openai")
+    monkeypatch.setattr("app.config.settings.AI_API_KEY", "sk-test-key")
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -490,9 +495,9 @@ async def test_support_agent_reply_voice_transcribed_via_whisper(monkeypatch):
 async def test_support_agent_reply_voice_without_openai_asks_for_text(monkeypatch):
     """Without AI_PROVIDER=openai, a voice reply cannot be transcribed - the
     handler must ask for text instead of crashing or silently failing."""
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
-    monkeypatch.setattr("backend.config.settings.AI_PROVIDER", "gemini")
-    monkeypatch.setattr("backend.config.settings.AI_API_KEY", None)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.AI_PROVIDER", "gemini")
+    monkeypatch.setattr("app.config.settings.AI_API_KEY", None)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
     group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
@@ -516,7 +521,7 @@ async def test_support_agent_reply_voice_without_openai_asks_for_text(monkeypatc
 
 @pytest.mark.asyncio
 async def test_support_agent_reply_ignored_from_private_chat(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     attacker_user = MagicMock(spec=User, id=789, username="attacker", first_name="Eve", last_name=None)
     # The attacker DMs the bot: private chat id equals their own user id, as Telegram does.
@@ -548,7 +553,7 @@ async def test_support_agent_reply_ignored_from_private_chat(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_support_agent_reply_ignored_from_other_group(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     other_user = MagicMock(spec=User, id=111, username="not_an_agent", first_name="Bob", last_name=None)
     # A different group chat than the configured support group.
@@ -580,7 +585,7 @@ async def test_support_agent_reply_ignored_from_other_group(monkeypatch):
 @pytest.mark.asyncio
 async def test_support_agent_reply_ignored_when_support_group_unconfigured(monkeypatch):
     # Default configuration: TELEGRAM_SUPPORT_GROUP_ID is unset (sentinel "0").
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", 0)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", 0)
 
     user = MagicMock(spec=User, id=0, username="whoever", first_name="Whoever", last_name=None)
     # Chat id happens to be the same falsy sentinel value as the unconfigured setting.
@@ -612,7 +617,7 @@ async def test_support_agent_reply_ignored_when_support_group_unconfigured(monke
 @pytest.mark.asyncio
 async def test_support_agent_reply_escapes_markdown_in_solution_and_agent_name(monkeypatch):
     support_group_id = -100999888777
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=999, username="agent_007", first_name="Agent_007", last_name=None)
     chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -652,7 +657,7 @@ async def test_support_agent_reply_escapes_markdown_in_solution_and_agent_name(m
 @pytest.mark.asyncio
 async def test_support_agent_reply_falls_back_to_plain_text_on_send_error(monkeypatch):
     support_group_id = -100999888777
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=999, username="agent_bob", first_name="Bob", last_name=None)
     chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -714,7 +719,7 @@ async def test_handle_resolve_no_double_click_prevention(memory_storage):
 @pytest.mark.asyncio
 async def test_support_agent_reply_already_resolved_collision(monkeypatch):
     support_group_id = -100999888777
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=999, username="agent_late", first_name="Agent Late")
     chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -754,7 +759,7 @@ async def test_support_agent_reply_already_resolved_collision(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_handle_resolve_no_with_excessively_long_text_does_not_overflow_telegram_limit(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     user = MagicMock(spec=User, id=888, username="long_user", first_name="Long")
     state = make_fsm_context(memory_storage, 888, 888)
@@ -796,7 +801,7 @@ async def test_handle_resolve_no_with_excessively_long_text_does_not_overflow_te
 
 @pytest.mark.asyncio
 async def test_handle_resolve_no_proceeds_to_escalate_when_user_edit_text_fails(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
 
     user = MagicMock(spec=User, id=777, username="edit_fail_user", first_name="User")
     state = make_fsm_context(memory_storage, 777, 777)
@@ -836,7 +841,7 @@ async def test_handle_resolve_no_proceeds_to_escalate_when_user_edit_text_fails(
 @pytest.mark.asyncio
 async def test_support_agent_reply_with_excessively_long_solution_caps_user_notification(monkeypatch):
     support_group_id = -100999888
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_long", first_name="Agent")
     group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -875,7 +880,7 @@ async def test_support_agent_reply_with_excessively_long_solution_caps_user_noti
 async def test_support_agent_reply_truncates_solution_exceeding_backend_limit(monkeypatch):
     """When an agent sends a solution > 5000 chars, it is truncated before calling backend resolve_ticket."""
     support_group_id = -100999888
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     agent_user = MagicMock(spec=User, id=99, username="agent_verbose", first_name="Agent")
     group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
@@ -930,3 +935,453 @@ async def test_handle_user_query_rejects_questions_exceeding_telegram_limit():
 
 
 
+
+
+@pytest.mark.parametrize("provider", ["openai", "OpenAI", " OPENAI "])
+@pytest.mark.asyncio
+async def test_voice_transcription_accepts_any_casing_of_the_openai_provider(monkeypatch, provider):
+    """AIAssistantService lower-cases AI_PROVIDER, so AI_PROVIDER=OpenAI enables AI answers; speech-to-text must too."""
+    from bot.handlers.support_handlers import _transcribe_voice_message
+
+    monkeypatch.setattr("app.config.settings.AI_PROVIDER", provider)
+    monkeypatch.setattr("app.config.settings.AI_API_KEY", "sk-test-key")
+    message = MagicMock(spec=Message)
+    message.voice = MagicMock(file_id="voice123", file_size=1000)
+    message.audio = None
+    mock_bot = AsyncMock()
+    mock_bot.get_file.return_value = MagicMock(file_path="voice/file_123.oga")
+    mock_bot.download_file.return_value = MagicMock(read=MagicMock(return_value=b"ogg"))
+    response = MagicMock(status_code=200)
+    response.json.return_value = {"text": "Redemarrez le service."}
+
+    with patch("httpx.AsyncClient.post", new=AsyncMock(return_value=response)):
+        assert await _transcribe_voice_message(message, mock_bot) == "Redemarrez le service."
+
+
+@pytest.mark.asyncio
+async def test_already_resolved_notice_names_another_agent_in_english_when_the_name_is_missing(monkeypatch):
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    agent_user = MagicMock(spec=User, id=99, username="agent_late", first_name="Late", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+    card = MagicMock(spec=Message)
+    card.message_id = 555
+    message = _make_support_agent_message(group_chat, agent_user, card)
+    message.text = "A late solution."
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "en"
+    mock_client.get_ticket_by_support_message.return_value = {"id": 33, "user_id": 1234}
+    mock_client.resolve_ticket.return_value = {"id": 33, "user_id": 1234, "resolved_by": None, "is_newly_resolved": False}
+
+    await handle_support_agent_reply(message, bot=AsyncMock(), backend_client=mock_client)
+
+    assert "another agent" in message.reply.call_args[0][0]
+
+
+# ---------------------------------------------------------------------------
+# Cases numbered 1 (functional), 2 (security) and 3 (robustness) in their docstrings
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def bot_test_env():
+    storage = MemoryStorage()
+    user = MagicMock(spec=User, id=1001, username="test_user", first_name="Test")
+    user_chat = MagicMock(spec=Chat, id=1001, type="private")
+    state = FSMContext(storage=storage, key=StorageKey(bot_id=1, chat_id=1001, user_id=1001))
+    mock_bot = AsyncMock()
+    mock_backend_client = AsyncMock(spec=BackendClient)
+    return {
+        "user": user,
+        "chat": user_chat,
+        "state": state,
+        "bot": mock_bot,
+        "client": mock_backend_client,
+    }
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_start_command_clears_state_and_sends_welcome(bot_test_env):
+    """
+    1. FUNCTIONAL:
+    /start resets the FSM state and sends the welcome message.
+    """
+    state = bot_test_env["state"]
+    await state.set_state(UserQueryState.waiting_for_resolution)
+
+    message = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"])
+    message.answer = AsyncMock()
+
+    await handle_start(message, state)
+
+    assert await state.get_state() is None
+    message.answer.assert_called_once()
+    assert "Bonjour et bienvenue" in message.answer.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_help_command_sends_help_text(bot_test_env):
+    """
+    1. FONCTIONNEL:
+    /help affiche l'aide utilisateur.
+    """
+    message = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"])
+    message.answer = AsyncMock()
+
+    await handle_help(message)
+    message.answer.assert_called_once()
+    assert "Aide" in message.answer.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_user_query_happy_path_answers_and_sets_waiting_state(bot_test_env):
+    """
+    1. FUNCTIONAL - Happy Path:
+    The user asks a question, the bot queries the backend, shows the answer
+    with the YES/NO keyboard and moves to the waiting_for_resolution state.
+    """
+    client = bot_test_env["client"]
+    state = bot_test_env["state"]
+
+    client.query.return_value = {
+        "found": True,
+        "confidence": 0.85,
+        "answer": "Solution KB automatique.",
+        "requires_resolution_confirmation": True,
+    }
+
+    msg = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"], text="Comment payer ?")
+    msg.answer = AsyncMock()
+
+    await handle_user_query(msg, state, backend_client=client)
+
+    msg.answer.assert_called_once()
+    sent_text = msg.answer.call_args[0][0]
+    assert "Solution KB automatique" in sent_text
+    assert "Votre problème est-il résolu ?" in sent_text
+
+    # Check the FSM state and the saved context
+    current_state = await state.get_state()
+    assert current_state == UserQueryState.waiting_for_resolution.state
+    data = await state.get_data()
+    assert data["last_question"] == "Comment payer ?"
+    assert data["last_answer"] == "Solution KB automatique."
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_user_query_exceeds_4000_chars_rejected(bot_test_env):
+    """
+    1. FUNCTIONAL - Max edge case:
+    A user message over 4000 characters is rejected without calling the backend.
+    """
+    client = bot_test_env["client"]
+    state = bot_test_env["state"]
+
+    long_text = "Q" * 4001
+    msg = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"], text=long_text)
+    msg.answer = AsyncMock()
+
+    await handle_user_query(msg, state, backend_client=client)
+
+    msg.answer.assert_called_once()
+    assert "trop longue" in msg.answer.call_args[0][0]
+    client.query.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_resolve_yes_clears_state_and_marks_resolved(bot_test_env):
+    """
+    1. FUNCTIONAL:
+    The user clicks YES: the message is updated and the FSM state is cleared.
+    """
+    state = bot_test_env["state"]
+    await state.set_state(UserQueryState.waiting_for_resolution)
+
+    cb_message = MagicMock(spec=Message, text="Message précédent")
+    cb_message.edit_text = AsyncMock()
+
+    cb = MagicMock(spec=CallbackQuery, data="resolve:yes:0", message=cb_message, from_user=bot_test_env["user"])
+    cb.answer = AsyncMock()
+
+    await handle_resolve_yes(cb, state)
+
+    cb.answer.assert_called_once_with("Merci pour votre retour !")
+    cb_message.edit_text.assert_called_once()
+    assert "Statut : Problème résolu" in cb_message.edit_text.call_args[0][0]
+    assert await state.get_state() is None
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_resolve_no_creates_ticket_and_notifies_support_group(bot_test_env, monkeypatch):
+    """
+    1. FUNCTIONAL:
+    The user clicks NO: a backend ticket is created, the Telegram support group
+    is notified and the card is attached.
+    """
+    monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", -100555666)
+
+    state = bot_test_env["state"]
+    await state.update_data(last_question="Panne fibre", last_answer="Redémarrez box")
+
+    client = bot_test_env["client"]
+    client.create_ticket.return_value = {"id": 77, "user_id": 1001, "status": "OPEN"}
+    client.attach_support_card = AsyncMock()
+
+    bot = bot_test_env["bot"]
+    posted_card = MagicMock(message_id=9900)
+    bot.send_message.return_value = posted_card
+
+    cb_message = MagicMock(spec=Message, text="Question initiale")
+    cb_message.edit_text = AsyncMock()
+    cb = MagicMock(spec=CallbackQuery, data="resolve:no:0", message=cb_message, from_user=bot_test_env["user"])
+    cb.answer = AsyncMock()
+
+    await handle_resolve_no(cb, state, bot=bot, backend_client=client)
+
+    # 1. Ticket created
+    client.create_ticket.assert_called_once()
+    assert client.create_ticket.call_args[1]["question"] == "Panne fibre"
+
+    # 2. User message edited
+    cb_message.edit_text.assert_called_once()
+    assert "Ticket #77 créé et escaladé" in cb_message.edit_text.call_args[0][0]
+
+    # 3. Message sent to the support group
+    bot.send_message.assert_called_once()
+    assert bot.send_message.call_args[1]["chat_id"] == -100555666
+    assert "NOUVEAU TICKET SUPPORT #77" in bot.send_message.call_args[1]["text"]
+
+    # 4. Attachement message_id
+    client.attach_support_card.assert_called_once_with(ticket_id=77, message_id=9900)
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_resolve_no_missing_state_aborts_quietly(bot_test_env):
+    """
+    1. FUNCTIONAL & IDEMPOTENCE:
+    If the user double-clicks NO or the state is empty, the bot simply answers
+    'already taken into account' without creating a second ticket.
+    """
+    state = bot_test_env["state"]
+    client = bot_test_env["client"]
+
+    cb = MagicMock(spec=CallbackQuery, data="resolve:no:0", message=MagicMock(), from_user=bot_test_env["user"])
+    cb.answer = AsyncMock()
+
+    await handle_resolve_no(cb, state, bot=bot_test_env["bot"], backend_client=client)
+
+    cb.answer.assert_called_once()
+    assert "déjà été prise en compte" in cb.answer.call_args[0][0]
+    client.create_ticket.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_support_agent_reply_matched_by_message_id_resolves_ticket(monkeypatch):
+    """
+    1. FUNCTIONAL:
+    The agent replies to the support group card; the ticket is found by message_id
+    and the solution is forwarded to the user.
+    """
+    support_group_id = -100555666
+    monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+
+    client = AsyncMock(spec=BackendClient)
+    client.get_ticket_by_support_message.return_value = {"id": 15, "user_id": 2002, "status": "OPEN"}
+    client.resolve_ticket.return_value = {"id": 15, "is_newly_resolved": True, "status": "RESOLVED"}
+
+    bot = AsyncMock()
+
+    group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+    agent_user = MagicMock(spec=User, id=999, username="agent_tom", first_name="Tom")
+    card_msg = MagicMock(spec=Message, message_id=5544)
+
+    reply_msg = MagicMock(
+        spec=Message,
+        chat=group_chat,
+        from_user=agent_user,
+        reply_to_message=card_msg,
+        text="Voici la solution technique apportée.",
+    )
+    reply_msg.reply = AsyncMock()
+
+    await handle_support_agent_reply(reply_msg, bot=bot, backend_client=client)
+
+    # 1. Lookup par message id
+    client.get_ticket_by_support_message.assert_called_once_with(5544)
+
+    # 2. Backend ticket resolution
+    client.resolve_ticket.assert_called_once()
+
+    # 3. Notification forwarded to the user
+    bot.send_message.assert_called_once()
+    assert bot.send_message.call_args[1]["chat_id"] == 2002
+    assert "Voici la solution technique" in bot.send_message.call_args[1]["text"]
+
+    # 4. Confirmation in the support group
+    reply_msg.reply.assert_called_once()
+    assert "Ticket #15 résolu" in reply_msg.reply.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_support_agent_reply_matched_by_card_text_fallback_resolves(monkeypatch):
+    """
+    1. FUNCTIONAL - Text fallback:
+    If the ticket is not found by message_id, it is extracted from the card text:
+    'NOUVEAU TICKET SUPPORT #25' and 'ID: 3003'.
+    """
+    support_group_id = -100555666
+    monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+
+    client = AsyncMock(spec=BackendClient)
+    client.get_ticket_by_support_message.return_value = None  # Lookup by id fails
+    client.resolve_ticket.return_value = {"id": 25, "is_newly_resolved": True}
+
+    bot = AsyncMock()
+    bot.id = 42
+
+    group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+    agent_user = MagicMock(spec=User, id=999, username="agent_tom")
+    card_text = "🚨 NOUVEAU TICKET SUPPORT #25\nUtilisateur : @toto (ID: 3003)\nQuestion..."
+    card_msg = MagicMock(spec=Message, message_id=123, text=card_text, from_user=MagicMock(spec=User, id=bot.id))
+
+    reply_msg = MagicMock(
+        spec=Message,
+        chat=group_chat,
+        from_user=agent_user,
+        reply_to_message=card_msg,
+        text="Solution fallback.",
+    )
+    reply_msg.reply = AsyncMock()
+
+    await handle_support_agent_reply(reply_msg, bot=bot, backend_client=client)
+
+    client.resolve_ticket.assert_called_once()
+    assert client.resolve_ticket.call_args[1]["ticket_id"] == 25
+    bot.send_message.assert_called_once()
+    assert bot.send_message.call_args[1]["chat_id"] == 3003
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_support_agent_reply_already_resolved_notifies_agent(monkeypatch):
+    """
+    1. FUNCTIONAL:
+    If an agent replies to an already resolved ticket, an informational message is shown
+    to them and the user is not spammed a second time.
+    """
+    support_group_id = -100555666
+    monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+
+    client = AsyncMock(spec=BackendClient)
+    client.get_ticket_by_support_message.return_value = {"id": 10, "user_id": 100, "status": "RESOLVED"}
+    client.resolve_ticket.return_value = {
+        "id": 10,
+        "is_newly_resolved": False,
+        "resolved_by": "autre_agent",
+    }
+
+    bot = AsyncMock()
+    reply_msg = MagicMock(
+        spec=Message,
+        chat=MagicMock(spec=Chat, id=support_group_id),
+        from_user=MagicMock(spec=User, id=1, username="agent1", first_name="Agent", last_name=None),
+        reply_to_message=MagicMock(message_id=10),
+        text="Solution tardive",
+    )
+    reply_msg.reply = AsyncMock()
+
+    await handle_support_agent_reply(reply_msg, bot=bot, backend_client=client)
+
+    reply_msg.reply.assert_called_once()
+    assert "déjà résolu" in reply_msg.reply.call_args[0][0]
+    bot.send_message.assert_not_called()
+
+
+# ==============================================================================
+# 2. SECURITY
+# ==============================================================================
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_agent_reply_from_unauthorized_chat_ignored(monkeypatch):
+    """
+    2. SECURITY - Chat ID access control:
+    A reply written from a private chat or an unconfigured group
+    is simply ignored, so nobody can resolve a ticket fraudulently.
+    """
+    monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", -100555666)
+
+    client = AsyncMock(spec=BackendClient)
+    unauthorized_chat = MagicMock(spec=Chat, id=-999999999)  # Mauvais ID de chat
+
+    reply_msg = MagicMock(
+        spec=Message,
+        chat=unauthorized_chat,
+        reply_to_message=MagicMock(message_id=1),
+        text="Tentative de résolution pirate",
+    )
+
+    await handle_support_agent_reply(reply_msg, bot=AsyncMock(), backend_client=client)
+    client.resolve_ticket.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_agent_reply_from_non_admin_group_member_ignored(monkeypatch):
+    """
+    2. SECURITY - Admin role access control:
+    Being in the right support group is not enough: a plain member
+    (non-admin) must never be able to resolve a ticket or speak for
+    the support team.
+    """
+    support_group_id = -100555666
+    monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr(
+        "bot.handlers.support_handlers.is_group_admin",
+        AsyncMock(return_value=False),
+    )
+
+    client = AsyncMock(spec=BackendClient)
+    client.get_ticket_by_support_message.return_value = {"id": 15, "user_id": 2002}
+
+    bot = AsyncMock()
+    group_chat = MagicMock(spec=Chat, id=support_group_id, type="supergroup")
+    non_admin_user = MagicMock(spec=User, id=321, username="not_an_agent")
+    card_msg = MagicMock(spec=Message, message_id=5544)
+
+    reply_msg = MagicMock(
+        spec=Message,
+        chat=group_chat,
+        from_user=non_admin_user,
+        reply_to_message=card_msg,
+        text="Envoyez vos clés privées à ce lien",
+    )
+    reply_msg.reply = AsyncMock()
+
+    await handle_support_agent_reply(reply_msg, bot=bot, backend_client=client)
+
+    client.resolve_ticket.assert_not_called()
+    bot.send_message.assert_not_called()
+    reply_msg.reply.assert_not_called()
+
+
+# ==============================================================================
+# 3. ROBUSTESSE
+# ==============================================================================
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_backend_error_on_query_answers_user_friendly_error(bot_test_env):
+    """
+    3. ROBUSTNESS - Backend API outage:
+    If the backend API is unavailable during the user's query,
+    a polite error message is shown without crashing the bot.
+    """
+    client = bot_test_env["client"]
+    client.query.side_effect = ConnectionError("Backend down")
+
+    msg = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"], text="Ma question")
+    msg.answer = AsyncMock()
+
+    await handle_user_query(msg, bot_test_env["state"], backend_client=client)
+
+    msg.answer.assert_called_once()
+    assert "Une erreur est survenue" in msg.answer.call_args[0][0]

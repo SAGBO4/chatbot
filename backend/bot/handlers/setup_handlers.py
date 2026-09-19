@@ -8,7 +8,7 @@ from bot.access_control import is_authorized, is_owner, invalidate_whitelist_cac
 from bot.api_client import BackendClient
 from bot.group_scope import invalidate_community_group_cache, get_community_group_id
 from bot.language import get_active_language, invalidate_language_cache
-from bot.i18n import t, SUPPORTED_LANGUAGES
+from app.i18n import t, SUPPORTED_LANGUAGES
 
 logger = logging.getLogger(__name__)
 setup_router = Router()
@@ -16,11 +16,10 @@ setup_router = Router()
 
 async def _should_show_setup_tutorial(message: Message) -> bool:
     """
-    True only for a private /start from an authorized user (owner or
-    whitelisted admin) while no community group is configured yet - the
-    filter, not the handler body, decides this, so an unmatched case falls
-    through to user_handlers.handle_start's normal welcome message instead
-    of this router silently doing nothing.
+    Filter: a private /start from the owner or a whitelisted admin while no community group is set.
+
+    Being a filter (not a check in the handler) lets every other /start fall through to the normal
+    welcome in user_handlers.handle_start.
     """
     if message.chat.type != "private":
         return False
@@ -35,12 +34,14 @@ async def handle_start_setup_tutorial(
     state: FSMContext,
     backend_client: Optional[BackendClient] = None,
 ):
+    """Show the community group setup tutorial."""
     await state.clear()
     lang = await get_active_language(backend_client=backend_client)
     await message.answer(t("setup_tutorial", lang), parse_mode="Markdown")
 
 
 def _parse_whitelist_args(args: Optional[str]):
+    """Parse `add|remove <user_id>` into `(action, user_id)`, or `(None, None)` if it is malformed."""
     parts = (args or "").split()
     if len(parts) != 2:
         return None, None
@@ -57,13 +58,12 @@ async def handle_whitelist(
     backend_client: Optional[BackendClient] = None,
 ):
     """
-    /whitelist add|remove <user_id>: owner-only management of the admins
-    authorized to configure the community group and bot language. A
-    whitelisted (non-owner) admin cannot manage the whitelist themselves.
+    `/whitelist add|remove <user_id>`, owner only: manage who may configure the community group and
+    the language. A whitelisted admin cannot manage the whitelist themselves.
     """
     requester_id = message.from_user.id
     lang = await get_active_language(backend_client=backend_client)
-    if not await is_owner(requester_id):
+    if not is_owner(requester_id):
         await message.reply(t("setup_not_owner", lang))
         return
 
@@ -104,10 +104,10 @@ async def handle_setup_community(
     backend_client: Optional[BackendClient] = None,
 ):
     """
-    Sets or replaces the active community group with the group this command
-    is run in. Usable only by the bot owner or a whitelisted admin
-    (bot-access-control); the target group is always the chat the command
-    was sent in, so there is no separate group id to trust or mistype.
+    `/setup_community`: make the group it is sent in the active community group (owner or
+    whitelisted admin only).
+
+    The target is always the current chat, so there is no group id to mistype or forge.
     """
     requester_id = message.from_user.id
     client = backend_client or BackendClient()
@@ -138,10 +138,7 @@ async def handle_language(
     command: CommandObject,
     backend_client: Optional[BackendClient] = None,
 ):
-    """
-    /language fr|en: sets the bot-wide message language. Usable only by the
-    bot owner or a whitelisted admin.
-    """
+    """`/language fr|en`: set the language of every bot message (owner or whitelisted admin only)."""
     requester_id = message.from_user.id
     client = backend_client or BackendClient()
     current_lang = await get_active_language(backend_client=client)

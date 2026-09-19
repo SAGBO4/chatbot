@@ -17,7 +17,7 @@ def make_message(user_id, username="admin_x"):
 
 @pytest.fixture(autouse=True)
 def reset_caches(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
     access_control.invalidate_whitelist_cache()
     language.invalidate_language_cache()
     yield

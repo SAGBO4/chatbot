@@ -1,4 +1,6 @@
 import time
+import asyncio
+
 import pytest
 from unittest.mock import AsyncMock, MagicMock
 from aiogram.types import User, Chat, Message, CallbackQuery
@@ -33,11 +35,13 @@ async def _fake_get_community_group_id(backend_client=None):
 
 @pytest.fixture(autouse=True)
 def configure_community_group(monkeypatch):
-    monkeypatch.setattr("backend.config.settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS", 600)
+    monkeypatch.setattr("app.config.settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS", 600)
     monkeypatch.setattr("bot.group_scope.get_community_group_id", _fake_get_community_group_id)
     community_handlers._recent_bot_messages.clear()
     yield
     community_handlers._recent_bot_messages.clear()
+    for task in list(getattr(community_handlers, "_background_tasks", ())):
+        task.cancel()
 
 
 def make_group_message(chat_id, user_id, text, username="alice"):
@@ -100,6 +104,27 @@ async def test_ask_triggers_query_and_tags_asker(memory_storage):
     assert 777 in community_handlers._recent_bot_messages[COMMUNITY_GROUP_ID]
 
 
+@pytest.mark.asyncio
+async def test_ask_keeps_a_reference_to_the_button_expiry_task(memory_storage):
+    """asyncio only keeps weak references to tasks: an unreferenced expiry task can be garbage-collected mid-sleep."""
+    message = make_group_message(chat_id=COMMUNITY_GROUP_ID, user_id=42, text="/ask question")
+    state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
+    mock_client = AsyncMock()
+    mock_client.query.return_value = {"found": True, "answer": "Reponse."}
+    message.answer.return_value = MagicMock(message_id=778)
+    command = CommandObject(prefix="/", command="ask", args="question")
+
+    await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=mock_client)
+
+    tasks = list(community_handlers._background_tasks)
+    assert len(tasks) == 1 and not tasks[0].done()
+
+    tasks[0].cancel()
+    await asyncio.gather(*tasks, return_exceptions=True)
+    await asyncio.sleep(0)
+    assert not community_handlers._background_tasks, "finished tasks must be dropped from the set"
+
+
 def make_callback(storage, chat_id, user_id, data, text="Réponse précédente"):
     cb_message = MagicMock(spec=Message)
     cb_message.chat = MagicMock(spec=Chat, id=chat_id, type="supergroup")
@@ -134,7 +159,7 @@ async def test_resolve_yes_confirms_and_clears_state(memory_storage):
 
 @pytest.mark.asyncio
 async def test_resolve_yes_rejects_expired_answer(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS", 1)
+    monkeypatch.setattr("app.config.settings.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS", 1)
     state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
     await state.update_data(
         last_question="q", last_answer="a", last_answer_timestamp=time.time() - 100,
@@ -152,7 +177,7 @@ async def test_resolve_yes_rejects_expired_answer(memory_storage, monkeypatch):
 
 @pytest.mark.asyncio
 async def test_resolve_no_creates_ticket_and_only_posts_neutral_ack_in_community(memory_storage, monkeypatch):
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100777)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100777)
     state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
     await state.update_data(
         last_question="Erreur de sync", last_answer="Solution auto",
@@ -239,3 +264,53 @@ async def test_purge_deletes_recent_bot_messages_for_admin(memory_storage, monke
     assert mock_bot.delete_message.call_count == 2
     message.reply.assert_called_once()
     assert "2 message" in message.reply.call_args[0][0]
+
+
+def _is_markdown(call):
+    return call.kwargs.get("parse_mode") == "Markdown"
+
+
+@pytest.mark.asyncio
+async def test_ask_answer_is_resent_as_plain_text_when_telegram_rejects_the_markdown(memory_storage):
+    message = make_group_message(chat_id=COMMUNITY_GROUP_ID, user_id=42, text="/ask q")
+    message.answer = AsyncMock(side_effect=[Exception("can't parse entities"), MagicMock(message_id=901)])
+    mock_client = AsyncMock()
+    mock_client.query.return_value = {"found": True, "answer": "reponse avec _underscore"}
+    command = CommandObject(prefix="/", command="ask", args="q")
+
+    await handle_community_ask(message, command, make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID), bot=AsyncMock(), backend_client=mock_client)
+
+    first, second = message.answer.await_args_list
+    assert _is_markdown(first) and not _is_markdown(second)
+    assert second.args == first.args and "reply_markup" in second.kwargs
+    assert 901 in community_handlers._recent_bot_messages[COMMUNITY_GROUP_ID]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("handler,data", [(handle_community_resolve_yes, "cresolve:yes")])
+async def test_resolve_yes_edit_falls_back_to_plain_text_and_survives_a_second_failure(memory_storage, handler, data):
+    state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
+    await state.update_data(last_question="q", last_answer="a", last_answer_timestamp=time.time(), last_answer_message_id=1)
+    callback = make_callback(memory_storage, COMMUNITY_GROUP_ID, 42, data)
+    callback.message.edit_text = AsyncMock(side_effect=[Exception("markdown"), Exception("message deleted")])
+
+    await handler(callback, state)  # must not raise
+
+    first, second = callback.message.edit_text.await_args_list
+    assert _is_markdown(first) and not _is_markdown(second)
+
+
+@pytest.mark.asyncio
+async def test_resolve_no_edit_falls_back_to_plain_text_after_the_ticket_is_created(memory_storage):
+    state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
+    await state.update_data(last_question="q", last_answer="a", last_answer_timestamp=time.time(), asking_user_handle="alice")
+    callback = make_callback(memory_storage, COMMUNITY_GROUP_ID, 42, "cresolve:no")
+    callback.message.edit_text = AsyncMock(side_effect=[Exception("markdown"), None])
+    mock_client = AsyncMock()
+    mock_client.create_ticket.return_value = {"id": 12}
+
+    await handle_community_resolve_no(callback, state, bot=AsyncMock(), backend_client=mock_client)
+
+    mock_client.create_ticket.assert_called_once()
+    first, second = callback.message.edit_text.await_args_list
+    assert _is_markdown(first) and not _is_markdown(second)

@@ -1,131 +1,78 @@
-# Telegram Support Bot with Knowledge Base & AI Feedback Loop
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="../frontend/public/stack-logo-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="../frontend/public/stack-logo-full.png">
+  <img alt="Stack Wallet" src="../frontend/public/stack-logo-full.png" width="260">
+</picture>
 
-This project implements a complete automated support system on Telegram, connected to a FastAPI Backend API, an evolving knowledge base, and a configurable AI module.
+<h1><img src="../frontend/public/stack-wallet-bot.png" width="54" alt="Stack Wallet Bot" valign="middle"> Backend — API, Telegram Bot & Infrastructure</h1>
 
----
-
-## System Architecture
-
-```
-                    TELEGRAM
-                       │
-                       ▼
-                ┌──────────────┐
-                │ Telegram Bot │
-                └──────┬───────┘
-                       │
-                       ▼
-                ┌──────────────┐
-                │ Backend API  │
-                └──────┬───────┘
-                       │
-             ┌─────────┴─────────┐
-             ▼                   ▼
-      Knowledge Base       AI (Optional)
-             │                   │
-             └─────────┬─────────┘
-                       ▼
-                  User Answer
-                       │
-                Issue resolved?
-                    /       \
-                  YES        NO
-                   │          │
-                   ▼          ▼
-                  END       TICKET
-                              │
-                              ▼
-                         SUPPORT TEAM (Telegram Group)
-                              │
-                              ▼
-                         New Solution
-                              │
-                              ▼
-                        Knowledge Base
-```
-
-### Key Features:
-1. **Automated Telegram Support**: Users ask questions and receive instant answers.
-2. **Two-step Confirmation (YES / NO)**: Interactive buttons under each response to validate resolution.
-3. **Automatic Escalation (NO)**: Immediate ticket creation and notification in a private Telegram support group.
-4. **Resolution via Telegram Reply**: Support agents simply reply to the ticket card message in the group to forward the solution to the user.
-5. **Continuous Learning (Feedback Loop)**: Every solution provided by a support agent is automatically indexed into the knowledge base.
-6. **Pluggable AI / Zero Extra Cost**: Operates 100% autonomously without AI using lexical/semantic similarity search, or with an LLM (OpenAI, Gemini, DeepSeek) if an API key is configured.
-7. **Robust Background Isolation**: Asynchronous email dispatches and Telegram notifications run inside fault-isolated task wrappers, ensuring third-party network drops never crash the HTTP response lifecycle.
-8. **IDOR Access Control**: User-scoped ticket retrieval (`?user_id=`) prevents unauthorized cross-user inspection while preserving administrative master access.
-9. **Dual-Mode Webhook Security**: Brevo inbound emails authenticate via `X-Webhook-Token` / `X-Brevo-Token` headers or query parameters with automated access log token redaction.
-10. **Community Group Q&A**: Members ask questions directly in a public community group via `/ask <question>`; the bot answers publicly, tagging the asker, with YES/NO resolution buttons that auto-expire after inactivity. Escalated tickets and all resolution/agent traffic stay confined to the private admin/support group or email — never posted to the community group.
-11. **Crypto Market Data**: `/btc`, `/eth`, `/firo`, and other mapped asset commands return live price, 24h change, market cap, and 24h volume from CoinGecko, usable in DM or the community group.
-12. **Community Moderation**: Admin-only `/mute`, `/unmute`, `/ban`, `/kick`, and `/warn` commands scoped to the community group, with admin status verified live against the Telegram Bot API. `/purge` lets a community-group admin delete recent bot messages without needing admin-group access.
-13. **Dynamic Community Group Setup**: No redeploy needed to point the bot at a community — an env-defined owner (`BOT_OWNER_TELEGRAM_ID`) or an admin they whitelist runs `/setup_community` directly in the target group at any time. The admin/support group stays fixed via `.env` so ticket/moderation traffic can never be redirected by a chat command.
-14. **Bilingual Bot (FR/EN)**: All bot-authored messages are available in French (default) and English; the owner or a whitelisted admin switches with `/language fr` or `/language en`.
-15. **Telegram WebApp & Web Portal (Mobile-First)**: Dedicated Next.js web application styled with the official **Stack Wallet** monochrome branding and frosted glassmorphism. Designed mobile-first for seamless integration as a Telegram Mini App (Web App) with haptic feedback, safe area insets, compact header with drawer, and bottom navigation bar.
+FastAPI backend, Telegram bot (aiogram 3), and supporting infrastructure for the [Telegram Support Bot](../README.md) project. See the [root README](../README.md) for the product overview, architecture diagram, and feature list.
 
 ---
 
-## Project Structure
+## Structure
 
 ```
-├── backend/                      # Complete Python Backend Services
-│   ├── backend/                  # FastAPI Application & Services
-│   │   ├── config.py             # Pydantic settings & env resolution
-│   │   ├── database.py           # Async SQLAlchemy engine (SQLite / PostgreSQL)
-│   │   ├── models.py             # ORM models (Tickets, Knowledge Base, Moderation)
-│   │   ├── schemas.py            # Pydantic request/response schemas
-│   │   ├── main.py               # FastAPI application & REST endpoints
-│   │   └── services/             # Core business logic services
-│   ├── bot/                      # Telegram Bot (aiogram 3)
-│   │   ├── api_client.py         # Async HTTP client targeting FastAPI
-│   │   ├── keyboards.py          # Interactive inline keyboards (YES / NO)
-│   │   ├── main.py               # Telegram bot entrypoint
-│   │   └── handlers/             # Bot handlers (user, support, community, crypto)
-│   ├── alembic/                  # Database schema migration revisions
-│   ├── alembic.ini               # Alembic configuration
-│   ├── tests/                    # 414 test cases (unit, integration, resilience, E2E)
-│   ├── scripts/                  # Management scripts (e.g. seed_knowledge_base.py)
-│   ├── data/                     # Persistent storage directory
-│   ├── deploy/                   # Reverse proxy configurations (Caddy / Nginx)
-│   ├── Dockerfile                # Production multi-stage Docker image
-│   ├── docker-compose.yml        # Multi-service local orchestrator
-│   ├── docker-compose.prod.yml   # Production stack with PostgreSQL 16
-│   ├── requirements.txt          # Python dependencies
-│   └── pytest.ini                # Pytest configuration
-├── frontend/                     # Modern Next.js Mobile-First WebApp (B&W Glassmorphism)
-│   ├── src/
-│   │   ├── app/                  # App Router routes (/, /tickets, /knowledge, /crypto, /settings)
-│   │   ├── components/           # UI primitives, layout (Header, BottomNav, Drawer), cards
-│   │   ├── lib/                  # Backend API client, i18n dictionaries, Telegram WebApp SDK
-│   │   └── types/                # TypeScript shared models
-│   ├── public/                   # Static assets & Stack Wallet icons
-│   └── package.json              # Next.js 16, React 19, Tailwind CSS v4
-└── .env.example                  # Environment variables template
+backend/
+├── app/                  # FastAPI Application & Services
+│   ├── main.py           # App wiring only: lifespan, middleware, includes the routers
+│   ├── routers/          # REST endpoints, one module per area (tickets, query, webhooks, ...)
+│   ├── services/         # Core business logic services
+│   ├── config.py         # Pydantic settings & env resolution
+│   ├── database.py       # Async SQLAlchemy engine (SQLite / PostgreSQL), Alembic at startup
+│   ├── models.py         # ORM models (Tickets, Knowledge Base, Moderation)
+│   ├── schemas.py        # Pydantic request/response schemas
+│   ├── security.py       # API key and webhook authentication
+│   ├── inbound_email.py  # Turns an inbound email into a ticket resolution
+│   ├── email_parsing.py  # Ticket id in subjects, quoted-reply stripping
+│   ├── background.py     # Fire-and-forget tasks whose failures are logged
+│   ├── observability.py  # Sentry setup, secret redaction in logs and events
+│   ├── i18n.py           # fr / en message table, shared by the API and the bot
+│   ├── telegram_text.py  # Markdown escaping and truncation for Telegram
+│   └── limiter.py        # Rate limiting (slowapi)
+├── bot/                   # Telegram Bot (aiogram 3); never imported by app/
+│   ├── main.py           # Telegram bot entrypoint
+│   ├── api_client.py     # Async HTTP client targeting FastAPI
+│   ├── keyboards.py      # Interactive inline keyboards (YES / NO)
+│   ├── messaging.py      # Send with a plain-text fallback when Markdown is rejected
+│   ├── ttl_cache.py      # Small expiring cache used by the bot
+│   ├── access_control.py, admin_check.py, group_scope.py, language.py, ticket_escalation.py
+│   ├── middlewares/      # Throttling
+│   └── handlers/         # Bot handlers (user, support, community, moderation, crypto)
+├── alembic/               # Database schema migration revisions
+├── alembic.ini            # Alembic configuration
+├── tests/                 # 500+ test cases (unit, integration, resilience, E2E)
+├── scripts/               # Management scripts (e.g. seed_knowledge_base.py)
+├── data/                  # Persistent storage directory
+├── deploy/                # Reverse proxy configurations (Caddy / Nginx)
+├── Dockerfile             # Docker image for the API and the bot (non-root user)
+├── Procfile, CHECKS       # Process types and health check for Dokku / Heroku-style platforms
+├── docker-compose.yml     # Multi-service local orchestrator
+├── docker-compose.prod.yml # Production stack with PostgreSQL 16
+├── requirements.txt       # Runtime dependencies
+├── requirements-dev.txt   # Test and QA tools (pytest, ruff, bandit, semgrep, ...)
+├── requirements.lock      # Pinned runtime set installed by the Docker image
+└── pytest.ini             # Pytest configuration
 ```
 
 ---
 
-## Installation & Quick Start
-
-### 1. Clone and Set Up Environment
+## 1. Environment Setup
 
 ```bash
-# Clone the repository
-git clone <repo_url>
-cd chatbot
-
 # Create a virtual environment
 virtualenv .venv
 source .venv/bin/activate
 
 # Install backend dependencies
 cd backend
-pip install -r requirements.txt
-cd ..
+pip install -r requirements-dev.txt   # runtime dependencies + the test and QA tools
 
-# Copy configuration template
-cp .env.example backend/.env
+# Copy configuration template (defined once at the repo root)
+cp ../.env.example .env
 ```
 
-### 2. Configure the `.env` File
+## 2. Configure the `.env` File
 
 Edit `backend/.env` with your Telegram bot credentials:
 ```ini
@@ -134,6 +81,9 @@ TELEGRAM_SUPPORT_GROUP_ID=
 
 # Your own Telegram user id - message @userinfobot to find it
 BOT_OWNER_TELEGRAM_ID=
+
+# Shared secret between the backend and the bot (see the note below)
+API_KEY=
 
 # Optional: Enable AI Module
 AI_ENABLED=false
@@ -144,6 +94,8 @@ AI_PROVIDER=gemini
 > **Tip to find `TELEGRAM_SUPPORT_GROUP_ID`:**
 > 1. Create the admin/support Telegram group and add your bot as a member.
 > 2. Send any message in the group, then call `https://api.telegram.org/bot<TOKEN>/getUpdates` to inspect `chat.id` (a negative integer starting with `-100`).
+
+> **`API_KEY` is required.** The backend refuses every `/api/*` request with `503 Backend API is not configured (API_KEY missing)` until it is set — this is deliberate (fail-closed), not a bug. Generate a long random value with `openssl rand -hex 32`, use a different one per environment, and set the same value wherever the bot runs: it sends it as the `X-API-Key` header.
 
 **The community group is not set in `.env`.** Instead, configure it from inside Telegram, at any time, without a redeploy:
 
@@ -157,7 +109,7 @@ Run `/setup_community` again at any time to point the bot at a different group �
 
 > **Upgrading an existing deployment:** if you already had `TELEGRAM_COMMUNITY_GROUP_ID` set in `.env` before this feature existed, its value is copied into the new persisted setting automatically on first startup after upgrading (and only if no community group has been configured yet). After that one-time copy, the env var is never read again — use `/setup_community` for any further change.
 
-### 3. Database Migrations & Initial Data Seeding
+## 3. Database Migrations & Initial Data Seeding
 
 From the `backend/` directory:
 
@@ -171,7 +123,7 @@ alembic upgrade head
 python -m scripts.seed_knowledge_base
 ```
 
-### 4. Optional: Inbound Email Webhooks (Brevo & HMAC Relay)
+## 4. Optional: Inbound Email Webhooks (Brevo & HMAC Relay)
 
 To resolve tickets via email replies:
 - **Brevo Inbound Parsing**: Point your Brevo inbound webhook to `https://your-domain.com/api/webhooks/email-inbound/brevo`.
@@ -180,23 +132,20 @@ To resolve tickets via email replies:
 - **HMAC Email Relay**: Send signed payloads to `/api/webhooks/email-inbound` with `EMAIL_WEBHOOK_SECRET` and header `X-Webhook-Signature: <sha256_hex>`.
 - Restrict authorized responder addresses via `ALLOWED_SUPPORT_EMAIL_SENDERS`.
 
-### 5. Launch Services
+## 5. Launch Services
 
 #### Local Development Mode:
 ```bash
 # Terminal 1: Start the backend API
 cd backend
-uvicorn backend.main:app --reload --port 8000
+uvicorn app.main:app --reload --port 8000
 
 # Terminal 2: Start the Telegram Bot
 cd backend
 python -m bot.main
-
-# Terminal 3: Start the Next.js Frontend (Mobile-First Telegram WebApp)
-cd frontend
-npm install
-npm run dev
 ```
+
+For the Next.js frontend, see [frontend/README.md](../frontend/README.md).
 
 #### Docker Compose Mode (Default SQLite WAL):
 ```bash
@@ -205,20 +154,24 @@ docker compose up --build -d
 ```
 
 #### Docker Compose Mode (Production PostgreSQL 16):
-For high-volume production deployments with multiple concurrent support agents, use the dedicated PostgreSQL stack:
+For high-volume production deployments with multiple concurrent support agents, use the dedicated PostgreSQL stack. Set `POSTGRES_PASSWORD` in `backend/.env` first (URL-safe characters only, e.g. `openssl rand -hex 24`): there is no default, and the stack refuses to start without it.
 ```bash
 cd backend
 docker compose -f docker-compose.prod.yml up --build -d
 ```
+The API is published on `127.0.0.1:8000` only, so put the reverse proxy described in the next section in front of it; that is also what keeps secrets out of the access logs.
 
-### 6. Production Reverse Proxy & Webhook Hardening
+#### Dokku and other Heroku-style platforms:
+`Procfile` declares two processes, `web` (the API, on `$PORT`) and `bot` (the Telegram bot), and `CHECKS` points the platform's health check at `/health`. A `DATABASE_URL` written as `postgres://` or `postgresql://` is accepted and rewritten to the `postgresql+asyncpg://` form the async driver needs.
+
+## 6. Production Reverse Proxy & Webhook Hardening
 
 To safeguard credentials passed via webhooks:
 - **Application Level**: The backend includes `SensitiveDataFilter` and `sanitize_access_logging_middleware` which automatically redact sensitive parameters (`?token=[REDACTED]`, `?api_key=[REDACTED]`) from server traces and access logs.
-- **Nginx**: Use the template provided in [backend/deploy/nginx.conf](backend/deploy/nginx.conf) with custom log format `redacted_combined` logging `$uri` without query strings.
-- **Caddy**: Use the template provided in [backend/deploy/Caddyfile](backend/deploy/Caddyfile) with the `format filter` log directive.
+- **Nginx**: Use the template provided in [backend/deploy/nginx.conf](deploy/nginx.conf) with custom log format `redacted_combined` logging `$uri` without query strings.
+- **Caddy**: Use the template provided in [backend/deploy/Caddyfile](deploy/Caddyfile): its `format filter` log directive redacts the `token`, `secret`, `api_key` and `password` query parameters and the `X-Webhook-Token`, `X-Brevo-Token` and `X-Api-Key` headers (Caddy only masks `Authorization` and `Cookie` by default).
 
-### 7. Production Monitoring & Anti-Spam Rate Limiting
+## 7. Production Monitoring & Anti-Spam Rate Limiting
 
 - **Rate Limiting**:
   - Telegram Bot messages are throttled via an in-memory sliding window (5 messages / 10s per `user_id`).
@@ -226,9 +179,10 @@ To safeguard credentials passed via webhooks:
 - **Diagnostics & Health**:
   - Endpoint `GET /health` runs an active `SELECT 1` ping against the database and returns HTTP 503 if unreachable.
 - **Sentry Integration**:
-  - Set `SENTRY_DSN=https://...` in `.env` to automatically capture unhandled exceptions with full tracebacks.
+  - Set `SENTRY_DSN=https://...` in `.env` to automatically capture unhandled exceptions with full tracebacks. `SENTRY_TRACES_SAMPLE_RATE` (0 to 1, default 1.0) sets the share of requests traced; lower it on a busy deployment.
+  - Bot tokens and secret query parameters are redacted from logs and from what is sent to Sentry.
 
-### 8. User Ownership & IDOR Protection
+## 8. User Ownership & IDOR Protection
 
 - `GET /api/tickets` accepts an optional `user_id` query parameter to scope listings strictly to that user's tickets.
 - `GET /api/tickets/{ticket_id}` accepts an optional `user_id` query parameter; querying a ticket belonging to another user returns `404 Not Found`.
@@ -238,39 +192,26 @@ To safeguard credentials passed via webhooks:
 
 ## Testing & Verification
 
-The automated test suite contains **414 tests** across modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
+The automated test suite contains **500+ tests** across modular test files covering Functional paths, Security (SQLi, XSS, IDOR, auth, log leakage), Robustness (concurrency, external network failures, timeouts, idempotence), community/moderation/crypto command routing, dynamic community-group setup and owner/whitelist access control, FR/EN localization, and multi-layer assertions (HTTP + Database + Logs).
 
-All tests run hermetically using isolated SQLite databases and mock external boundaries (Brevo SMTP and Telegram Bot API) to guarantee safety, zero external network leaks, and rapid execution (~16s):
+All tests run hermetically using isolated SQLite databases and mock external boundaries (Brevo SMTP and Telegram Bot API) to guarantee safety, zero external network leaks, and rapid execution (about 10 seconds):
 
 ```bash
 cd backend
 
-# Run all 414 tests
+# Run all tests
 pytest -v
 
 # Run with module coverage report (HTML report + >=85% threshold check)
-pytest --cov=backend --cov=bot --cov-report=html --cov-fail-under=85
+pytest --cov=app --cov=bot --cov-report=html --cov-fail-under=85   # about 93% today
 
 # Mutation testing (verifies that tests actively catch seeded bugs)
 mutmut run
 
 # Static security analysis & linting
 ruff check .
-bandit -r backend/ bot/                 # Python AST security linter (0 issues)
-semgrep scan --config=auto backend/ bot/ # Semantic AST multi-rule security analysis (0 issues)
-trivy fs --file-patterns "pip:requirements.lock" requirements.lock # Dependency vulnerabilities & secret scanning (0 issues)
+bandit -r app/ bot/                     # Python AST security linter (0 issues)
+semgrep scan --config=auto app/ bot/     # Semantic AST multi-rule security analysis
+trivy fs --file-patterns "pip:requirements.lock" requirements.lock # Dependency vulnerabilities & secret scanning
 pip-audit                               # PyPA advisory vulnerability scanner (0 issues)
 ```
-
-For the frontend:
-```bash
-cd frontend
-
-# Linting
-npm run lint
-
-# Production build
-npm run build
-```
-
-

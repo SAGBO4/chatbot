@@ -1,16 +1,21 @@
 .venv/
+venv/
 __pycache__/
 *.pyc
 *.pyo
 *.pyd
 .pytest_cache/
 .coverage
+coverage.xml
 htmlcov/
+mutants/
+.mutmut-cache
 *.db
 *.db-shm
 *.db-wal
 *.sqlite3
-.env
+.env*
+!.env.example
 .chroma/
 frontend/node_modules/
 frontend/.next/
@@ -19,3 +24,7 @@ backend/data/*.db*
 !backend/data/.gitkeep
 tutorial_vps.html
 *.pdf
+
+# OS cruft
+.DS_Store
+Thumbs.db

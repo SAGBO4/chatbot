@@ -1,6 +1,12 @@
-# Stack Wallet Support Portal (Telegram WebApp & Web Portal)
+<picture>
+  <source media="(prefers-color-scheme: dark)" srcset="public/stack-logo-white.png">
+  <source media="(prefers-color-scheme: light)" srcset="public/stack-logo-full.png">
+  <img alt="Stack Wallet" src="public/stack-logo-full.png" width="260">
+</picture>
 
-Mobile-first web frontend for the Telegram Support Bot and Knowledge Base, styled with the official **Stack Wallet** monochrome design system and frosted glassmorphism.
+<h1><img src="public/stack-wallet-bot.png" width="54" alt="Stack Wallet Bot" valign="middle"> Stack Wallet Support Portal (Telegram WebApp & Web Portal)</h1>
+
+Mobile-first web frontend for the [Telegram Support Bot](../README.md) and Knowledge Base, styled with the official **Stack Wallet** monochrome design system and frosted glassmorphism. See the [root README](../README.md) for the product overview and [backend/README.md](../backend/README.md) for the API this frontend talks to.
 
 ---
 
@@ -40,16 +46,27 @@ Mobile-first web frontend for the Telegram Support Bot and Knowledge Base, style
    - Ticket list with user filter (`?user_id=`)
    - Direct agent ticket resolution modal (`POST /api/tickets/{id}/resolve`) with automatic knowledge base re-indexing
 3. **Knowledge Base Explorer & Ingestion (`/knowledge`)**:
-   - Database metrics dashboard (`/api/knowledge/stats`)
-   - Article directory search and pagination (`/api/knowledge/articles`)
-   - Manual knowledge ingestion modal (`POST /api/knowledge/ingest`)
+   - Article list with client-side search (`GET /api/knowledge`; admins see up to 100 articles, other users 10)
+   - Manual knowledge ingestion modal (`POST /api/knowledge/ingest`), admin only
 4. **Live Crypto Market Data (`/crypto`)**:
-   - Real-time prices, 24h change percentage, market cap, and volume (`/api/crypto/prices`)
-   - Real-time search filter across tracked cryptocurrencies (BTC, ETH, FIRO, etc.)
-5. **Bot Settings & Moderation (`/settings`)**:
-   - Dynamic community group setup inspection (`/api/settings`)
-   - Live admin whitelist verification (`/api/settings/whitelist/check/{user_id}`)
-   - User moderation warnings history lookup (`/api/moderation/warnings/{user_id}`)
+   - Price, 24h change, market cap, and volume per asset (`GET /api/crypto/{symbol}`, one call per tracked symbol: BTC, ETH, FIRO, SOL, LTC, DOGE, XRP)
+   - Client-side search filter across the tracked cryptocurrencies
+5. **Bot Settings & Moderation (`/settings`)** (admin):
+   - Current community group (`GET /api/admin/settings/community_group_id`)
+   - Admin whitelist: list, add, remove and check a user (`/api/admin/whitelist`)
+   - Moderation warnings lookup for a user in a group (`GET /api/moderation/warnings?user_id=&group_id=`)
+
+---
+
+## How the frontend talks to the backend
+
+The browser never calls the backend directly. Every request goes through a same-origin proxy (`src/app/api/backend/[...path]/route.ts`), so the backend `API_KEY` only ever exists in the Next.js server process and is never shipped to visitors' browsers.
+
+The proxy also enforces who can do what, using the signed `initData` string Telegram gives a Mini App (verified server-side with the bot token, and rejected after 24 hours):
+
+- **Admin-only** (must be a whitelisted admin): the `admin` endpoints, knowledge ingestion, moderation warnings, and resolving tickets.
+- **Everyone else** only sees and creates their own tickets: the verified Telegram user id always overrides any id sent by the client.
+- **Local development:** under `npm run dev`, requests without a Telegram session are let through so the app can be tried outside Telegram. A production build (`npm run build` + `npm start`) always enforces the verification, with no bypass.
 
 ---
 
@@ -58,19 +75,33 @@ Mobile-first web frontend for the Telegram Support Bot and Knowledge Base, style
 ### 1. Prerequisites
 
 - Node.js >= 18.18.0
-- Backend FastAPI running on `http://localhost:8000`
+- Backend FastAPI running on `http://localhost:8000`, with `API_KEY` set (see [backend/README.md](../backend/README.md))
 
-### 2. Install & Run
+### 2. Configure the environment
 
 ```bash
 cd frontend
+cp .env.example .env.local
+```
+
+These variables are read by the Next.js **server** only, never by the browser:
+
+| Variable | Purpose |
+|---|---|
+| `BACKEND_API_URL` | Where the FastAPI backend is reachable from the Next.js server (defaults to `http://127.0.0.1:8000`). |
+| `BACKEND_API_KEY` | Must equal the backend's `API_KEY`; the proxy sends it as the `X-API-Key` header. |
+| `TELEGRAM_BOT_TOKEN` | Must be the same bot token as the backend's; used to verify that Telegram really signed the Mini App session. |
+
+### 3. Install & Run
+
+```bash
 npm install
 npm run dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-### 3. Port Management
+### 4. Port Management
 
 ```bash
 # Free port 3000 if occupied

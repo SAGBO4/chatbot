@@ -3,6 +3,8 @@ import logging
 from typing import Any, Awaitable, Callable, Dict, List
 from aiogram import BaseMiddleware
 from aiogram.types import CallbackQuery, Message, TelegramObject
+from app.i18n import DEFAULT_LANGUAGE, t
+from bot.language import get_active_language
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,23 @@ class ThrottlingMiddleware(BaseMiddleware):
         self.warning_cooldown = warning_cooldown
         self.user_timestamps: Dict[int, List[float]] = {}
         self.last_warning_time: Dict[int, float] = {}
+        self._next_prune = 0.0
+
+    def _prune(self, now: float) -> None:
+        """
+        Forget users idle for longer than the window, at most once per window.
+
+        Without this both dicts grow with every user the bot has ever seen. Dropping an idle entry
+        changes nothing for that user: their next message would start from an empty window anyway.
+        """
+        if now < self._next_prune:
+            return
+        self._next_prune = now + self.window_seconds
+        window_start = now - self.window_seconds
+        for user_id in [uid for uid, stamps in self.user_timestamps.items() if not stamps or stamps[-1] <= window_start]:
+            del self.user_timestamps[user_id]
+        for user_id in [uid for uid, warned in self.last_warning_time.items() if now - warned >= self.warning_cooldown]:
+            del self.last_warning_time[user_id]
 
     async def __call__(
         self,
@@ -44,30 +63,26 @@ class ThrottlingMiddleware(BaseMiddleware):
 
         user_id = user.id
         now = time.time()
+        self._prune(now)
         window_start = now - self.window_seconds
 
-        # Clean timestamps older than sliding window
-        current_timestamps = [t for t in self.user_timestamps.get(user_id, []) if t > window_start]
+        current_timestamps = [stamp for stamp in self.user_timestamps.get(user_id, []) if stamp > window_start]
 
         if len(current_timestamps) >= self.rate_limit:
-            # User exceeded rate limit
             logger.warning("Throttling rate limit reached for user %s (%s messages in %ss)", user_id, len(current_timestamps), self.window_seconds)
 
-            # Send warning message if cooldown has elapsed
             last_warn = self.last_warning_time.get(user_id, 0.0)
             if now - last_warn >= self.warning_cooldown:
                 self.last_warning_time[user_id] = now
                 try:
+                    # Only with the dispatcher's backend client can the bot language be read; otherwise French
+                    backend_client = data.get("backend_client")
+                    lang = await get_active_language(backend_client=backend_client) if backend_client else DEFAULT_LANGUAGE
                     if isinstance(event, CallbackQuery):
-                        # A toast, not a new message - callback queries are
-                        # answered once via .answer(text=..., show_alert=...),
-                        # never via the Message-style positional text arg.
-                        await event.answer(
-                            "⚠️ Veuillez patienter quelques secondes avant de réessayer.",
-                            show_alert=False,
-                        )
+                        # A toast, not a new message: callback queries are answered with .answer(text=...)
+                        await event.answer(t("throttle_wait_callback", lang), show_alert=False)
                     else:
-                        await event.answer("⚠️ Veuillez patienter quelques secondes avant d'envoyer un nouveau message.")
+                        await event.answer(t("throttle_wait_message", lang))
                 except Exception as exc:
                     logger.warning("Failed to send throttling notice to user %s: %s", user_id, exc)
             return None

@@ -118,7 +118,7 @@ export default function SettingsPage() {
       setSettingsSuccess(true);
       setTimeout(() => setSettingsSuccess(false), 3000);
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de l’enregistrement des paramètres.';
+      const msg = (err as { message?: string })?.message || t.errSettingsSave;
       setSettingsError(msg);
     } finally {
       setIsSavingSettings(false);
@@ -137,7 +137,7 @@ export default function SettingsPage() {
       setNewWhitelistId('');
       refreshData();
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de l’ajout dans la whitelist.';
+      const msg = (err as { message?: string })?.message || t.errWhitelistAdd;
       setWhitelistError(msg);
     } finally {
       setIsAddingWhitelist(false);
@@ -149,7 +149,7 @@ export default function SettingsPage() {
       await api.removeWhitelist(userId);
       setWhitelist((prev) => prev.filter((item) => item.user_id !== userId));
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de la suppression.';
+      const msg = (err as { message?: string })?.message || t.errWhitelistRemove;
       setWhitelistError(msg);
     }
   };
@@ -164,7 +164,7 @@ export default function SettingsPage() {
       const res = await api.checkWhitelist(parsedId);
       setCheckResult(res);
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de la vérification.';
+      const msg = (err as { message?: string })?.message || t.errWhitelistCheck;
       setWhitelistError(msg);
     }
   };
@@ -182,7 +182,7 @@ export default function SettingsPage() {
       const res = await api.getWarnings(parsedUserId, isNaN(parsedGroupId) ? -1001234567890 : parsedGroupId);
       setWarningData(res);
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de la recherche des avertissements.';
+      const msg = (err as { message?: string })?.message || t.errWarningsLookup;
       setWarnError(msg);
     } finally {
       setIsQueryingWarns(false);
@@ -264,23 +264,23 @@ export default function SettingsPage() {
             </div>
 
             {settingsError && <Alert type="error" className="mb-4">{settingsError}</Alert>}
-            {settingsSuccess && <Alert type="success" className="mb-4">Paramètres enregistrés avec succès.</Alert>}
+            {settingsSuccess && <Alert type="success" className="mb-4">{t.settingsSaved}</Alert>}
 
             <form onSubmit={handleSaveSettings} className="space-y-3.5">
               <Input
                 label={t.currentGroupId}
                 value={communityGroupId}
                 onChange={(e) => setCommunityGroupId(e.target.value)}
-                placeholder="ex: -1001234567890"
-                helperText="ID Telegram du groupe communautaire surveillé"
+                placeholder={t.placeholderGroupId}
+                helperText={t.helperCommunityGroup}
               />
 
               <Input
                 label={t.activeLang}
                 value={botLanguage}
                 onChange={(e) => setBotLanguage(e.target.value)}
-                placeholder="fr ou en"
-                helperText="Code de langue par défaut du bot (fr / en)"
+                placeholder={t.placeholderBotLang}
+                helperText={t.helperBotLanguage}
               />
 
               <div className="flex justify-end pt-1">
@@ -299,8 +299,8 @@ export default function SettingsPage() {
                 <ShieldCheck className="h-4 w-4" />
               </div>
               <div>
-                <h3 className="text-sm font-semibold text-white">Whitelist Administrateurs</h3>
-                <p className="text-[11px] text-neutral-400">Gestion des privilèges de configuration du bot</p>
+                <h3 className="text-sm font-semibold text-white">{t.adminWhitelistTitle}</h3>
+                <p className="text-[11px] text-neutral-400">{t.adminWhitelistSub}</p>
               </div>
             </div>
 
@@ -313,7 +313,7 @@ export default function SettingsPage() {
                   type="number"
                   value={checkUserId}
                   onChange={(e) => setCheckUserId(e.target.value)}
-                  placeholder="Vérifier un ID Telegram..."
+                  placeholder={t.placeholderCheckId}
                   required
                 />
               </div>
@@ -345,7 +345,7 @@ export default function SettingsPage() {
                   type="number"
                   value={newWhitelistId}
                   onChange={(e) => setNewWhitelistId(e.target.value)}
-                  placeholder="Nouvel ID Telegram..."
+                  placeholder={t.placeholderNewId}
                   required
                 />
               </div>
@@ -358,7 +358,7 @@ export default function SettingsPage() {
             {/* Whitelist table */}
             <div className="space-y-1.5 mt-3 max-h-48 overflow-y-auto">
               {whitelist.length === 0 ? (
-                <p className="text-xs text-neutral-500 italic text-center py-2">Aucun admin dans la whitelist.</p>
+                <p className="text-xs text-neutral-500 italic text-center py-2">{t.whitelistEmpty}</p>
               ) : (
                 whitelist.map((item) => (
                   <div
@@ -367,7 +367,7 @@ export default function SettingsPage() {
                   >
                     <div>
                       <span className="font-mono font-semibold text-white">ID: {item.user_id}</span>
-                      <span className="text-[10px] text-neutral-400 ml-2">ajouté par {item.added_by}</span>
+                      <span className="text-[10px] text-neutral-400 ml-2">{t.addedBy} {item.added_by}</span>
                     </div>
                     <button
                       onClick={() => handleRemoveWhitelist(item.user_id)}
@@ -401,15 +401,15 @@ export default function SettingsPage() {
                 type="number"
                 value={warnUserId}
                 onChange={(e) => setWarnUserId(e.target.value)}
-                label="User ID Telegram *"
-                placeholder="ex: 10001"
+                label={t.labelUserIdTelegram}
+                placeholder={t.placeholderUserExample}
                 required
               />
               <Input
                 value={warnGroupId}
                 onChange={(e) => setWarnGroupId(e.target.value)}
                 label="Group ID *"
-                placeholder="ex: -1001234567890"
+                placeholder={t.placeholderGroupId}
                 required
               />
               <div className="flex justify-end">
@@ -433,7 +433,7 @@ export default function SettingsPage() {
 
                 {warningData.warnings.length === 0 ? (
                   <p className="text-xs text-neutral-500 italic text-center py-3">
-                    Aucun avertissement enregistré pour cet utilisateur dans ce groupe.
+                    {t.noWarnings}
                   </p>
                 ) : (
                   <div className="space-y-2">
@@ -448,7 +448,7 @@ export default function SettingsPage() {
                             {new Date(w.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className="text-neutral-200">{w.reason || 'Aucune raison spécifiée'}</p>
+                        <p className="text-neutral-200">{w.reason || t.noReason}</p>
                         <div className="text-[10px] text-neutral-400">Émis par : {w.warned_by}</div>
                       </div>
                     ))}

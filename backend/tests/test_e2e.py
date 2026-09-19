@@ -7,10 +7,10 @@ from aiogram.types import User, Chat, Message, CallbackQuery
 from aiogram.fsm.storage.memory import MemoryStorage, StorageKey
 from aiogram.fsm.context import FSMContext
 
-from backend.main import app
-from backend.database import get_db, init_db
-from backend.config import settings
-from backend.models import Ticket, TicketStatus
+from app.main import app
+from app.database import get_db, init_db
+from app.config import settings
+from app.models import Ticket, TicketStatus
 from sqlalchemy import select
 from bot.api_client import BackendClient
 from bot.handlers.user_handlers import (
@@ -114,7 +114,7 @@ async def test_full_support_lifecycle_loop(e2e_environment, monkeypatch):
     backend_client, session_maker = e2e_environment
     storage = MemoryStorage()
     support_group_id = -100555666777
-    monkeypatch.setattr("backend.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     user = MagicMock(spec=User, id=1001, username="david_user", first_name="David")
     user_chat = MagicMock(spec=Chat, id=1001, type="private")
@@ -138,7 +138,7 @@ async def test_full_support_lifecycle_loop(e2e_environment, monkeypatch):
     assert "Je n'ai pas trouvé de réponse directe" in initial_answer
     assert "Votre problème est-il résolu ?" in initial_answer
 
-    # Step 2: User clicks "NON" (problème non résolu -> TICKET)
+    # Step 2: User clicks "NON" (problem not solved -> TICKET)
     cb_msg_1 = MagicMock(spec=Message, text=initial_answer)
     cb_msg_1.edit_text = AsyncMock()
     callback_no = MagicMock(
@@ -219,7 +219,7 @@ async def test_full_support_lifecycle_loop(e2e_environment, monkeypatch):
     assert agent_solution in auto_answer_2
     assert "Votre problème est-il résolu ?" in auto_answer_2
 
-    # Step 5: User 2 clicks "OUI" (Problème résolu -> FIN)
+    # Step 5: User 2 clicks "OUI" (problem solved -> END)
     cb_msg_2 = MagicMock(spec=Message, text=auto_answer_2)
     cb_msg_2.edit_text = AsyncMock()
     callback_yes = MagicMock(
