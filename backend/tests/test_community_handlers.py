@@ -264,3 +264,53 @@ async def test_purge_deletes_recent_bot_messages_for_admin(memory_storage, monke
     assert mock_bot.delete_message.call_count == 2
     message.reply.assert_called_once()
     assert "2 message" in message.reply.call_args[0][0]
+
+
+def _is_markdown(call):
+    return call.kwargs.get("parse_mode") == "Markdown"
+
+
+@pytest.mark.asyncio
+async def test_ask_answer_is_resent_as_plain_text_when_telegram_rejects_the_markdown(memory_storage):
+    message = make_group_message(chat_id=COMMUNITY_GROUP_ID, user_id=42, text="/ask q")
+    message.answer = AsyncMock(side_effect=[Exception("can't parse entities"), MagicMock(message_id=901)])
+    mock_client = AsyncMock()
+    mock_client.query.return_value = {"found": True, "answer": "reponse avec _underscore"}
+    command = CommandObject(prefix="/", command="ask", args="q")
+
+    await handle_community_ask(message, command, make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID), bot=AsyncMock(), backend_client=mock_client)
+
+    first, second = message.answer.await_args_list
+    assert _is_markdown(first) and not _is_markdown(second)
+    assert second.args == first.args and "reply_markup" in second.kwargs
+    assert 901 in community_handlers._recent_bot_messages[COMMUNITY_GROUP_ID]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("handler,data", [(handle_community_resolve_yes, "cresolve:yes")])
+async def test_resolve_yes_edit_falls_back_to_plain_text_and_survives_a_second_failure(memory_storage, handler, data):
+    state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
+    await state.update_data(last_question="q", last_answer="a", last_answer_timestamp=time.time(), last_answer_message_id=1)
+    callback = make_callback(memory_storage, COMMUNITY_GROUP_ID, 42, data)
+    callback.message.edit_text = AsyncMock(side_effect=[Exception("markdown"), Exception("message deleted")])
+
+    await handler(callback, state)  # must not raise
+
+    first, second = callback.message.edit_text.await_args_list
+    assert _is_markdown(first) and not _is_markdown(second)
+
+
+@pytest.mark.asyncio
+async def test_resolve_no_edit_falls_back_to_plain_text_after_the_ticket_is_created(memory_storage):
+    state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
+    await state.update_data(last_question="q", last_answer="a", last_answer_timestamp=time.time(), asking_user_handle="alice")
+    callback = make_callback(memory_storage, COMMUNITY_GROUP_ID, 42, "cresolve:no")
+    callback.message.edit_text = AsyncMock(side_effect=[Exception("markdown"), None])
+    mock_client = AsyncMock()
+    mock_client.create_ticket.return_value = {"id": 12}
+
+    await handle_community_resolve_no(callback, state, bot=AsyncMock(), backend_client=mock_client)
+
+    mock_client.create_ticket.assert_called_once()
+    first, second = callback.message.edit_text.await_args_list
+    assert _is_markdown(first) and not _is_markdown(second)

@@ -3,6 +3,7 @@ from aiogram import Bot
 from app.config import settings
 from app.i18n import DEFAULT_LANGUAGE, t
 from bot.api_client import BackendClient
+from bot.messaging import call_with_markdown_fallback
 from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
 
 logger = logging.getLogger(__name__)
@@ -47,26 +48,15 @@ async def create_ticket_and_notify_admin_group(
         "admin_ticket_card", lang,
         ticket_id=ticket_id, handle=safe_handle, user_id=user_id, question=safe_question, answer=safe_answer,
     )
-    sent_card = None
-    try:
-        sent_card = await bot.send_message(
-            chat_id=support_group_id,
-            text=group_card,
-            parse_mode="Markdown",
-        )
-    except Exception as send_err:
-        logger.warning("Failed to send markdown group card, falling back to plain text: %s", send_err)
-        plain_card = t(
-            "admin_ticket_card_plain", lang,
-            ticket_id=ticket_id, handle=user_handle, user_id=user_id, question=card_question, answer=card_answer,
-        )
-        try:
-            sent_card = await bot.send_message(
-                chat_id=support_group_id,
-                text=plain_card,
-            )
-        except Exception as plain_err:
-            logger.error("Failed to send plain text group card: %s", plain_err)
+    plain_card = t(
+        "admin_ticket_card_plain", lang,
+        ticket_id=ticket_id, handle=user_handle, user_id=user_id, question=card_question, answer=card_answer,
+    )
+    sent_card = await call_with_markdown_fallback(
+        bot.send_message, chat_id=support_group_id, text=group_card,
+        plain_overrides={"text": plain_card},
+        what="Support group card", swallow_failure=True, failure_level=logging.ERROR,
+    )
 
     # Best effort: store the card's message id so a reply can be matched to the ticket by identity
     if sent_card and hasattr(sent_card, "message_id"):

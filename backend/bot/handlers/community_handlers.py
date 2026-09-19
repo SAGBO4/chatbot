@@ -14,6 +14,7 @@ from bot.admin_check import is_group_admin
 from bot.group_scope import is_community_group_chat as _is_community_group_chat
 from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
+from bot.messaging import call_with_markdown_fallback
 from app.i18n import t
 from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
 
@@ -112,11 +113,9 @@ async def handle_community_ask(
 
     reply_text = t("community_answer_prompt", lang, mention=mention, answer=answer)
     reply_text = truncate_telegram_text(reply_text, max_length=4000, suffix=t("truncated_suffix", lang))
-    try:
-        sent = await message.answer(reply_text, reply_markup=get_community_resolution_keyboard(lang), parse_mode="Markdown")
-    except Exception as send_err:
-        logger.warning("Failed to send community answer in markdown, falling back to plain text: %s", send_err)
-        sent = await message.answer(reply_text, reply_markup=get_community_resolution_keyboard(lang))
+    sent = await call_with_markdown_fallback(
+        message.answer, reply_text, reply_markup=get_community_resolution_keyboard(lang), what="Community answer"
+    )
 
     _track_bot_message(message.chat.id, sent.message_id)
 
@@ -158,14 +157,10 @@ async def handle_community_resolve_yes(
     await callback.answer(t("resolve_yes_ack", lang))
     base_text = truncate_telegram_text(callback.message.text or "", max_length=3700, suffix=t("truncated_suffix", lang))
     resolved_notice = t("community_resolved_notice", lang, base_text=base_text)
-    try:
-        await callback.message.edit_text(resolved_notice, reply_markup=None, parse_mode="Markdown")
-    except Exception as edit_err:
-        logger.warning("Markdown edit_text failed in community resolve_yes, falling back to plain text: %s", edit_err)
-        try:
-            await callback.message.edit_text(resolved_notice, reply_markup=None)
-        except Exception as e:
-            logger.warning("Failed to edit community message in resolve_yes: %s", e)
+    await call_with_markdown_fallback(
+        callback.message.edit_text, resolved_notice, reply_markup=None,
+        what="Edit of the community resolved notice", swallow_failure=True,
+    )
 
 
 @community_router.callback_query(F.data == "cresolve:no")
@@ -220,14 +215,10 @@ async def handle_community_resolve_no(
         if len(base_text) > 3700:
             base_text = base_text[:3700] + t("truncated_suffix", lang)
         ack_text = t("community_ticket_ack", lang, base_text=base_text)
-        try:
-            await callback.message.edit_text(ack_text, reply_markup=None, parse_mode="Markdown")
-        except Exception as edit_err:
-            logger.warning("Markdown edit_text failed in community resolve_no, retrying in plain text: %s", edit_err)
-            try:
-                await callback.message.edit_text(ack_text, reply_markup=None)
-            except Exception as e:
-                logger.warning("Failed to edit community message in resolve_no: %s", e)
+        await call_with_markdown_fallback(
+            callback.message.edit_text, ack_text, reply_markup=None,
+            what="Edit of the community ticket notice", swallow_failure=True,
+        )
         logger.info("Community ticket #%s created for user %s", ticket_id, user_id)
     except Exception as exc:
         logger.error("Error creating or escalating community ticket: %s", exc)

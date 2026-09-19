@@ -8,6 +8,7 @@ from app.config import settings
 from bot.admin_check import is_group_admin
 from bot.api_client import BackendClient
 from bot.language import get_active_language
+from bot.messaging import call_with_markdown_fallback
 from app.i18n import t
 from app.schemas import MAX_SOLUTION_LENGTH
 from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
@@ -192,21 +193,10 @@ async def handle_support_agent_reply(
             user_notification = t(
                 "support_user_notification", lang, ticket_id=ticket_id, solution=safe_solution, agent=safe_agent
             )
-            try:
-                await bot.send_message(
-                    chat_id=user_id,
-                    text=user_notification,
-                    parse_mode="Markdown",
-                )
-            except Exception as send_err:
-                logger.warning("Markdown send failed for user %s, retrying in plain text: %s", user_id, send_err)
-                try:
-                    await bot.send_message(
-                        chat_id=user_id,
-                        text=user_notification,
-                    )
-                except Exception as plain_err:
-                    logger.error("Failed to send plain text user notification: %s", plain_err)
+            await call_with_markdown_fallback(
+                bot.send_message, chat_id=user_id, text=user_notification,
+                what=f"Notification to user {user_id}", swallow_failure=True, failure_level=logging.ERROR,
+            )
 
         # Confirm in the support group
         await message.reply(
