@@ -366,7 +366,7 @@ async def test_webhooks_brevo_token_query_parameter_not_leaked_in_application_lo
 
 
 @pytest.mark.asyncio
-async def test_webhooks_brevo_header_auth_x_webhook_token_succes(app_test_env):
+async def test_webhooks_brevo_header_auth_x_webhook_token_succeeds(app_test_env):
     """
     2. SECURITY - Header auth:
     A Brevo webhook authenticated with the X-Webhook-Token header
@@ -395,7 +395,7 @@ async def test_webhooks_brevo_header_auth_x_webhook_token_succes(app_test_env):
 
 
 @pytest.mark.asyncio
-async def test_webhooks_brevo_header_auth_x_brevo_token_succes(app_test_env):
+async def test_webhooks_brevo_header_auth_x_brevo_token_succeeds(app_test_env):
     """
     2. SECURITY - Header auth:
     A Brevo webhook authenticated with the alternative X-Brevo-Token header
@@ -424,7 +424,7 @@ async def test_webhooks_brevo_header_auth_x_brevo_token_succes(app_test_env):
 
 
 @pytest.mark.asyncio
-async def test_webhooks_brevo_access_log_middleware_redacts_query_token_succes(app_test_env, caplog):
+async def test_webhooks_brevo_access_log_middleware_redacts_query_token_succeeds(app_test_env, caplog):
     """
     2. SECURITY - HTTP access log redaction:
     The access middleware and the SensitiveDataFilter filter
