@@ -1,14 +1,11 @@
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
+from app.i18n import t
 from app.schemas import QueryResponse
-from app.services.knowledge_base import KnowledgeBaseService
 from app.services.ai_assistant import AIAssistantService
-
-FALLBACK_NO_MATCH = (
-    "Je n'ai pas trouvé de réponse directe à votre question dans notre base de connaissances. "
-    "Souhaitez-vous que je transmette votre demande à notre équipe support ?"
-)
+from app.services.bot_settings_service import BotSettingsService
+from app.services.knowledge_base import KnowledgeBaseService
 
 
 class QueryOrchestrator:
@@ -26,7 +23,7 @@ class QueryOrchestrator:
         rephrases that article using the top matches; if it fails, the article text is used as is.
 
         Nothing above the confidence threshold gives `found=False` and a fallback message offering
-        to escalate. `user_id` and `user_handle` are accepted but not used.
+        to escalate; both fallback messages are in the bot language (the persisted `language` setting). `user_id` and `user_handle` are accepted but not used.
         """
         clean_query = query.strip()
         if not clean_query:
@@ -34,7 +31,7 @@ class QueryOrchestrator:
                 query=query,
                 found=False,
                 confidence=0.0,
-                answer="Veuillez poser une question pour que je puisse vous aider.",
+                answer=t("query_empty", await BotSettingsService.get_language(session)),
                 article_id=None,
                 requires_resolution_confirmation=False,
             )
@@ -52,7 +49,7 @@ class QueryOrchestrator:
                 query=clean_query,
                 found=False,
                 confidence=0.0,
-                answer=FALLBACK_NO_MATCH,
+                answer=t("query_no_match", await BotSettingsService.get_language(session)),
                 article_id=None,
                 requires_resolution_confirmation=True,
             )

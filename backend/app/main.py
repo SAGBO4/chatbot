@@ -32,6 +32,7 @@ async def _safe_background_task(coro_fn, *args, **kwargs):
         )
 
 from app.config import settings
+from app.i18n import t
 from app.observability import SensitiveDataFilter, sanitize_url_query, setup_observability
 from app.database import get_db, init_db, async_session_maker
 from app.models import Ticket, TicketStatus
@@ -335,6 +336,7 @@ async def create_ticket(
             user_id=ticket.user_id,
             question=ticket.question,
             automated_answer=ticket.automated_answer,
+            lang=await BotSettingsService.get_language(session),
         )
 
     return ticket
@@ -459,6 +461,7 @@ async def resolve_ticket(
             resolved_by=ticket.resolved_by,
             resolution_channel="TELEGRAM",
             solution=ticket.solution,
+            lang=await BotSettingsService.get_language(session),
         )
 
     res = TicketResponse.model_validate(ticket)
@@ -549,14 +552,9 @@ async def _resolve_inbound_email(
     safe_solution = escape_telegram_markdown(clean_solution)
     safe_sender = escape_telegram_markdown(sender)
 
-    user_text = (
-        f"📬 **Réponse de l'équipe support par Email (Ticket #{ticket_id})**\n\n"
-        f"{safe_solution}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"Traité par : *{safe_sender}*\n"
-        f"Merci de votre confiance ! 👋"
-    )
-    user_text = truncate_telegram_text(user_text, max_length=4000)
+    lang = await BotSettingsService.get_language(session)
+    user_text = t("email_reply_to_user", lang, ticket_id=ticket_id, solution=safe_solution, sender=safe_sender)
+    user_text = truncate_telegram_text(user_text, max_length=4000, lang=lang)
     background_tasks.add_task(
         _safe_background_task,
         TelegramRelay.send_message_to_user,
@@ -565,12 +563,7 @@ async def _resolve_inbound_email(
     )
 
     # 2. Inform the Telegram Support Group that the ticket was resolved via email
-    group_notification = (
-        f"✅ **Ticket #{ticket_id} résolu par Email !**\n"
-        f"• Par : `{safe_sender}`\n"
-        f"• La solution a été transmise à l'utilisateur (`ID: {ticket.user_id}`).\n"
-        f"• La base de connaissances a été mise à jour automatiquement."
-    )
+    group_notification = t("email_resolved_group_notice", lang, ticket_id=ticket_id, sender=safe_sender, user_id=ticket.user_id)
     background_tasks.add_task(
         _safe_background_task,
         TelegramRelay.notify_support_group,

@@ -40,6 +40,102 @@ TRANSLATIONS = {
             "or **NO** to automatically create a ticket with our support team."
         ),
     },
+    # --- messages written by the API rather than the bot (query fallbacks, email resolution, emails) ---
+    "query_empty": {
+        "fr": "Veuillez poser une question pour que je puisse vous aider.",
+        "en": "Please ask a question so that I can help you.",
+    },
+    "query_no_match": {
+        "fr": (
+            "Je n'ai pas trouvé de réponse directe à votre question dans notre base de connaissances. "
+            "Souhaitez-vous que je transmette votre demande à notre équipe support ?"
+        ),
+        "en": (
+            "I couldn't find a direct answer to your question in our knowledge base. "
+            "Would you like me to forward your request to our support team?"
+        ),
+    },
+    "email_reply_to_user": {
+        "fr": (
+            "📬 **Réponse de l'équipe support par Email (Ticket #{ticket_id})**\n\n"
+            "{solution}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "Traité par : *{sender}*\n"
+            "Merci de votre confiance ! 👋"
+        ),
+        "en": (
+            "📬 **Support team reply by email (Ticket #{ticket_id})**\n\n"
+            "{solution}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "Handled by: *{sender}*\n"
+            "Thank you for your trust! 👋"
+        ),
+    },
+    "email_resolved_group_notice": {
+        "fr": (
+            "✅ **Ticket #{ticket_id} résolu par Email !**\n"
+            "• Par : `{sender}`\n"
+            "• La solution a été transmise à l'utilisateur (`ID: {user_id}`).\n"
+            "• La base de connaissances a été mise à jour automatiquement."
+        ),
+        "en": (
+            "✅ **Ticket #{ticket_id} resolved by email!**\n"
+            "• By: `{sender}`\n"
+            "• The solution was forwarded to the user (`ID: {user_id}`).\n"
+            "• The knowledge base was updated automatically."
+        ),
+    },
+    # Email subjects keep "[Ticket #<id>]": inbound replies are matched to their ticket with it.
+    "email_ticket_created_subject": {
+        "fr": "[Ticket #{ticket_id}] Nouvelle demande de support de @{handle}",
+        "en": "[Ticket #{ticket_id}] New support request from @{handle}",
+    },
+    "email_ticket_created_body": {
+        "fr": (
+            "Bonjour Équipe Support,\n\n"
+            "Un nouveau ticket d'assistance a été ouvert sur Telegram :\n\n"
+            "• Numéro de Ticket : #{ticket_id}\n"
+            "• Utilisateur : @{handle} (ID: {user_id})\n\n"
+            "❓ Question posée :\n{question}\n\n"
+            "🤖 Réponse automatique du bot :\n{answer}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "👉 Pour résoudre ce ticket, répondez directement à cet email avec votre solution.\n"
+        ),
+        "en": (
+            "Hello Support Team,\n\n"
+            "A new support ticket was opened on Telegram:\n\n"
+            "• Ticket number: #{ticket_id}\n"
+            "• User: @{handle} (ID: {user_id})\n\n"
+            "❓ Question asked:\n{question}\n\n"
+            "🤖 Automatic answer from the bot:\n{answer}\n\n"
+            "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
+            "👉 To resolve this ticket, reply to this email directly with your solution.\n"
+        ),
+    },
+    "email_ticket_resolved_subject": {
+        "fr": "[Ticket #{ticket_id}] Résolu via {channel}",
+        "en": "[Ticket #{ticket_id}] Resolved via {channel}",
+    },
+    "email_ticket_resolved_body": {
+        "fr": (
+            "Bonjour Équipe Support,\n\n"
+            "Le Ticket #{ticket_id} vient d'être résolu sur le canal {channel}.\n\n"
+            "• Résolu par : {resolved_by}\n"
+            "• Canal : {channel}\n\n"
+            "📝 Solution apportée :\n{solution}\n\n"
+            "La solution a été automatiquement intégrée dans la base de connaissances.\n"
+        ),
+        "en": (
+            "Hello Support Team,\n\n"
+            "Ticket #{ticket_id} was just resolved on the {channel} channel.\n\n"
+            "• Resolved by: {resolved_by}\n"
+            "• Channel: {channel}\n\n"
+            "📝 Solution provided:\n{solution}\n\n"
+            "The solution was automatically added to the knowledge base.\n"
+        ),
+    },
+    "email_none": {"fr": "Aucune", "en": "None"},
+    "email_unspecified": {"fr": "Non spécifié", "en": "Not specified"},
     "truncated_suffix": {"fr": "...(tronqué)", "en": "...(truncated)"},
     "no_answer": {"fr": "Aucune réponse", "en": "No answer"},
     "another_agent": {"fr": "un autre agent", "en": "another agent"},

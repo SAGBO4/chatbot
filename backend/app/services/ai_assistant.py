@@ -38,12 +38,12 @@ class AIAssistantService:
         context_str = "\n\n".join(context_snippets)
 
         return (
-            "Tu es un assistant support technique bienveillant et concis. "
-            "Réponds à la question de l'utilisateur en te basant UNIQUEMENT sur les solutions fournies ci-dessous. "
-            "Réponds toujours dans la même langue que la question de l'utilisateur (français ou anglais).\n\n"
-            f"--- CONTEXTE FOURNI ---\n{context_str}\n\n"
-            f"--- QUESTION UTILISATEUR ---\n{query}\n\n"
-            "--- RÉPONSE ---"
+            "You are a helpful, concise technical support assistant. "
+            "Answer the user's question using ONLY the solutions provided below. "
+            "Always answer in the same language as the user's question (French or English).\n\n"
+            f"--- PROVIDED CONTEXT ---\n{context_str}\n\n"
+            f"--- USER QUESTION ---\n{query}\n\n"
+            "--- ANSWER ---"
         )
 
     @classmethod
@@ -112,8 +112,8 @@ class AIAssistantService:
                         {
                             "role": "system",
                             "content": (
-                                "Tu es un assistant support utile et concis. Réponds toujours dans la "
-                                "même langue que la question de l'utilisateur (français ou anglais)."
+                                "You are a helpful, concise support assistant. Always answer in the same "
+                                "language as the user's question (French or English)."
                             ),
                         },
                         {"role": "user", "content": prompt},

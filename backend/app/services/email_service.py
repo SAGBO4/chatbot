@@ -4,6 +4,7 @@ import asyncio
 from email.message import EmailMessage
 from typing import Optional, Callable
 from app.config import settings
+from app.i18n import DEFAULT_LANGUAGE, t
 
 logger = logging.getLogger(__name__)
 
@@ -70,19 +71,15 @@ class EmailService:
         question: str,
         automated_answer: Optional[str] = None,
         custom_sender: Optional[Callable[[EmailMessage], bool]] = None,
+        lang: str = DEFAULT_LANGUAGE,
     ) -> bool:
-        """Tell the support team a ticket was opened; replying to that email resolves it."""
+        """Tell the support team a ticket was opened, in `lang`; replying to that email resolves it."""
         handle = user_handle or f"User_{user_id}"
-        subject = f"[Ticket #{ticket_id}] Nouvelle demande de support de @{handle}"
-        body = (
-            f"Bonjour Équipe Support,\n\n"
-            f"Un nouveau ticket d'assistance a été ouvert sur Telegram :\n\n"
-            f"• Numéro de Ticket : #{ticket_id}\n"
-            f"• Utilisateur : @{handle} (ID: {user_id})\n\n"
-            f"❓ Question posée :\n{question}\n\n"
-            f"🤖 Réponse automatique du bot :\n{automated_answer or 'Aucune'}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
-            f"👉 Pour résoudre ce ticket, répondez directement à cet email avec votre solution.\n"
+        subject = t("email_ticket_created_subject", lang, ticket_id=ticket_id, handle=handle)
+        body = t(
+            "email_ticket_created_body", lang,
+            ticket_id=ticket_id, handle=handle, user_id=user_id, question=question,
+            answer=automated_answer or t("email_none", lang),
         )
         return await cls.send_email_async(
             subject=subject,
@@ -98,16 +95,14 @@ class EmailService:
         resolution_channel: str,
         solution: str,
         custom_sender: Optional[Callable[[EmailMessage], bool]] = None,
+        lang: str = DEFAULT_LANGUAGE,
     ) -> bool:
-        """Tell the support team a ticket was resolved, and on which channel."""
-        subject = f"[Ticket #{ticket_id}] Résolu via {resolution_channel}"
-        body = (
-            f"Bonjour Équipe Support,\n\n"
-            f"Le Ticket #{ticket_id} vient d'être résolu sur le canal {resolution_channel}.\n\n"
-            f"• Résolu par : {resolved_by or 'Non spécifié'}\n"
-            f"• Canal : {resolution_channel}\n\n"
-            f"📝 Solution apportée :\n{solution}\n\n"
-            f"La solution a été automatiquement intégrée dans la base de connaissances.\n"
+        """Tell the support team a ticket was resolved, and on which channel, in `lang`."""
+        subject = t("email_ticket_resolved_subject", lang, ticket_id=ticket_id, channel=resolution_channel)
+        body = t(
+            "email_ticket_resolved_body", lang,
+            ticket_id=ticket_id, channel=resolution_channel,
+            resolved_by=resolved_by or t("email_unspecified", lang), solution=solution,
         )
         return await cls.send_email_async(
             subject=subject,
