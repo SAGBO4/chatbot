@@ -15,9 +15,9 @@ from tests.conftest import TEST_API_KEY
 @pytest.mark.asyncio
 async def test_tickets_create_happy_path_creates_open_ticket(app_test_env, caplog):
     """
-    1. FONCTIONNEL - Happy Path:
-    Vérifie la création d'un ticket avec code HTTP 201.
-    Vérifie l'état DB (status=OPEN, timestamps, question, automated_answer) et les logs.
+    1. FUNCTIONAL - Happy Path:
+    Creating a ticket returns HTTP 201.
+    Checks the DB state (status=OPEN, timestamps, question, automated_answer) and the logs.
     """
     client, session_maker, _ = app_test_env
 
@@ -44,7 +44,7 @@ async def test_tickets_create_happy_path_creates_open_ticket(app_test_env, caplo
 
     ticket_id = data["id"]
 
-    # Vérification état DB réel
+    # Check the real DB state
     async with session_maker() as session:
         ticket = (await session.execute(select(Ticket).where(Ticket.id == ticket_id))).scalar_one()
         assert ticket.status == "OPEN"
@@ -55,8 +55,8 @@ async def test_tickets_create_happy_path_creates_open_ticket(app_test_env, caplo
 @pytest.mark.asyncio
 async def test_tickets_create_min_length_question_succeeds(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite Min:
-    Une question de longueur 1 caractère est acceptée.
+    1. FUNCTIONAL - Min edge case:
+    A 1-character question is accepted.
     """
     client, _, _ = app_test_env
     response = await client.post(
@@ -70,8 +70,8 @@ async def test_tickets_create_min_length_question_succeeds(app_test_env):
 @pytest.mark.asyncio
 async def test_tickets_create_empty_question_returns_422_validation_error(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite Vide:
-    Une question vide est rejetée par Pydantic (422).
+    1. FUNCTIONAL - Empty edge case:
+    An empty question is rejected by Pydantic (422).
     """
     client, _, _ = app_test_env
     response = await client.post(
@@ -84,8 +84,8 @@ async def test_tickets_create_empty_question_returns_422_validation_error(app_te
 @pytest.mark.asyncio
 async def test_tickets_create_max_length_question_succeeds(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite Max:
-    Une question de 4096 caractères est acceptée.
+    1. FUNCTIONAL - Max edge case:
+    A 4096-character question is accepted.
     """
     client, _, _ = app_test_env
     long_q = "X" * 4096
@@ -100,8 +100,8 @@ async def test_tickets_create_max_length_question_succeeds(app_test_env):
 @pytest.mark.asyncio
 async def test_tickets_create_exceeds_max_length_returns_422_validation_error(app_test_env):
     """
-    1. FONCTIONNEL - Validation des entrées:
-    Une question dépassant 4096 caractères renvoie 422.
+    1. FUNCTIONAL - Input validation:
+    A question longer than 4096 characters returns 422.
     """
     client, _, _ = app_test_env
     too_long = "X" * 4097
@@ -115,9 +115,9 @@ async def test_tickets_create_exceeds_max_length_returns_422_validation_error(ap
 @pytest.mark.asyncio
 async def test_tickets_create_unicode_and_emojis_stored_accurately(app_test_env):
     """
-    1. FONCTIONNEL - Unicode / Emojis:
-    Question et réponses contenant des caractères internationaux et emojis
-    doivent être enregistrés et restitués fidèlement.
+    1. FUNCTIONAL - Unicode / Emojis:
+    A question and answers containing international characters and emojis
+    must be stored and returned faithfully.
     """
     client, session_maker, _ = app_test_env
     q = "Erreur de paiement sur la facture #4521 💳 ! Déblocage urgent requis 🙏"
@@ -139,31 +139,31 @@ async def test_tickets_create_unicode_and_emojis_stored_accurately(app_test_env)
 @pytest.mark.asyncio
 async def test_tickets_list_pagination_limit_and_offset_works(app_test_env):
     """
-    1. FONCTIONNEL - Pagination:
-    Vérifie le fonctionnement précis des paramètres limit et offset sur /api/tickets.
+    1. FUNCTIONAL - Pagination:
+    The limit and offset parameters on /api/tickets work exactly as expected.
     """
     client, session_maker, _ = app_test_env
 
-    # Création de 5 tickets
+    # Create 5 tickets
     async with session_maker() as session:
         for i in range(1, 6):
             await TicketService.create_ticket(
                 session=session, user_id=100 + i, user_handle=f"user_{i}", question=f"Question {i}"
             )
 
-    # Récupérer limit=2, offset=0
+    # Fetch limit=2, offset=0
     resp1 = await client.get("/api/tickets?limit=2&offset=0")
     assert resp1.status_code == 200
     tickets_page1 = resp1.json()
     assert len(tickets_page1) == 2
 
-    # Récupérer limit=2, offset=2
+    # Fetch limit=2, offset=2
     resp2 = await client.get("/api/tickets?limit=2&offset=2")
     assert resp2.status_code == 200
     tickets_page2 = resp2.json()
     assert len(tickets_page2) == 2
 
-    # Vérification que les pages ne se chevauchent pas
+    # Check that the pages do not overlap
     ids1 = {t["id"] for t in tickets_page1}
     ids2 = {t["id"] for t in tickets_page2}
     assert ids1.isdisjoint(ids2)
@@ -172,8 +172,8 @@ async def test_tickets_list_pagination_limit_and_offset_works(app_test_env):
 @pytest.mark.asyncio
 async def test_tickets_list_filter_by_status_returns_matching_only(app_test_env):
     """
-    1. FONCTIONNEL - Filtrage:
-    Vérifie le filtrage par statut (OPEN vs RESOLVED).
+    1. FUNCTIONAL - Filtering:
+    Filtering by status (OPEN vs RESOLVED).
     """
     client, session_maker, _ = app_test_env
 
@@ -200,8 +200,8 @@ async def test_tickets_list_filter_by_status_returns_matching_only(app_test_env)
 @pytest.mark.asyncio
 async def test_tickets_list_invalid_status_filter_returns_422_validation_error(app_test_env):
     """
-    1. FONCTIONNEL - Erreurs attendues:
-    Un statut inconnu dans status_filter renvoie 422.
+    1. FUNCTIONAL - Expected errors:
+    An unknown status in status_filter returns 422.
     """
     client, _, _ = app_test_env
     resp = await client.get("/api/tickets?status_filter=NON_EXISTENT")
@@ -211,8 +211,8 @@ async def test_tickets_list_invalid_status_filter_returns_422_validation_error(a
 @pytest.mark.asyncio
 async def test_tickets_get_by_id_found_returns_200_and_ticket_details(app_test_env):
     """
-    1. FONCTIONNEL:
-    GET /api/tickets/{id} retourne 200 et les informations complètes du ticket.
+    1. FUNCTIONAL:
+    GET /api/tickets/{id} returns 200 and the ticket's full details.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -239,8 +239,8 @@ async def test_tickets_get_by_id_not_found_returns_404_not_found(app_test_env):
 @pytest.mark.asyncio
 async def test_tickets_attach_support_card_updates_message_id_in_db(app_test_env):
     """
-    1. FONCTIONNEL:
-    POST /api/tickets/{id}/support-card associe l'ID du message Telegram du groupe support.
+    1. FUNCTIONAL:
+    POST /api/tickets/{id}/support-card links the support group's Telegram message ID.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -253,7 +253,7 @@ async def test_tickets_attach_support_card_updates_message_id_in_db(app_test_env
     assert response.status_code == 200
     assert response.json()["support_group_message_id"] == 884422
 
-    # Vérification DB
+    # DB check
     async with session_maker() as session:
         refreshed = (await session.execute(select(Ticket).where(Ticket.id == ticket.id))).scalar_one()
         assert refreshed.support_group_message_id == 884422
@@ -262,8 +262,8 @@ async def test_tickets_attach_support_card_updates_message_id_in_db(app_test_env
 @pytest.mark.asyncio
 async def test_tickets_get_by_support_message_id_returns_ticket(app_test_env):
     """
-    1. FONCTIONNEL:
-    GET /api/tickets/by-support-message/{message_id} retrouve le ticket associé.
+    1. FUNCTIONAL:
+    GET /api/tickets/by-support-message/{message_id} finds the linked ticket.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -278,8 +278,8 @@ async def test_tickets_get_by_support_message_id_returns_ticket(app_test_env):
 @pytest.mark.asyncio
 async def test_tickets_get_by_support_message_id_not_found_returns_404(app_test_env):
     """
-    1. FONCTIONNEL:
-    GET /api/tickets/by-support-message/123456789 non associé renvoie 404.
+    1. FUNCTIONAL:
+    GET /api/tickets/by-support-message/123456789 with no linked ticket returns 404.
     """
     client, _, _ = app_test_env
     response = await client.get("/api/tickets/by-support-message/123456789")
@@ -289,9 +289,9 @@ async def test_tickets_get_by_support_message_id_not_found_returns_404(app_test_
 @pytest.mark.asyncio
 async def test_tickets_resolve_happy_path_resolves_and_ingests_kb(app_test_env):
     """
-    1. FONCTIONNEL & EFFETS DE BORD:
-    Résolution d'un ticket: passe le statut à RESOLVED, stocke la solution et le résolveur,
-    et déclenche automatiquement l'ingestion dans la Knowledge Base (source_ticket_id).
+    1. FUNCTIONAL & SIDE EFFECTS:
+    Resolving a ticket sets the status to RESOLVED, stores the solution and the resolver,
+    and automatically ingests it into the Knowledge Base (source_ticket_id).
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -311,13 +311,13 @@ async def test_tickets_resolve_happy_path_resolves_and_ingests_kb(app_test_env):
     assert data["solution"] == resolve_payload["solution"]
     assert data["resolved_by"] == "agent_claire"
 
-    # Vérification état DB Ticket + KB
+    # Check the Ticket + KB DB state
     async with session_maker() as session:
         db_ticket = (await session.execute(select(Ticket).where(Ticket.id == ticket.id))).scalar_one()
         assert db_ticket.status == "RESOLVED"
         assert db_ticket.resolved_at is not None
 
-        # Vérification effet de bord: article KB créé
+        # Check the side effect: KB article created
         kb_stmt = select(KnowledgeArticle).where(KnowledgeArticle.source_ticket_id == ticket.id)
         kb_art = (await session.execute(kb_stmt)).scalar_one()
         assert kb_art.question == "Comment activer la 2FA ?"
@@ -327,9 +327,9 @@ async def test_tickets_resolve_happy_path_resolves_and_ingests_kb(app_test_env):
 @pytest.mark.asyncio
 async def test_tickets_resolve_idempotence_second_call_returns_not_newly_resolved(app_test_env):
     """
-    1. FONCTIONNEL - Idempotence:
-    Résoudre un ticket déjà résolu ne doit pas créer de second article dans la KB
-    ni réémettre de notification Telegram. is_newly_resolved doit être False.
+    1. FUNCTIONAL - Idempotence:
+    Resolving an already resolved ticket must not create a second KB article
+    nor send another Telegram notification. is_newly_resolved must be False.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -340,13 +340,13 @@ async def test_tickets_resolve_idempotence_second_call_returns_not_newly_resolve
     assert resp1.status_code == 200
     assert resp1.json()["is_newly_resolved"] is True
 
-    # Deuxième appel de résolution
+    # Second resolution call
     payload2 = {"solution": "Deuxième tentative", "resolved_by": "agent2"}
     resp2 = await client.post(f"/api/tickets/{ticket.id}/resolve", json=payload2)
     assert resp2.status_code == 200
     assert resp2.json()["is_newly_resolved"] is False
 
-    # Vérification: pas de doublon dans la base de connaissances
+    # Check: no duplicate in the knowledge base
     async with session_maker() as session:
         kb_articles = (
             await session.execute(
@@ -357,15 +357,15 @@ async def test_tickets_resolve_idempotence_second_call_returns_not_newly_resolve
 
 
 # ==============================================================================
-# 2. SÉCURITÉ
+# 2. SECURITY
 # ==============================================================================
 
 
 @pytest.mark.asyncio
 async def test_tickets_unauthorized_endpoints_return_401(unauth_client):
     """
-    2. SÉCURITÉ - Authz / Headers:
-    Tous les endpoints de tickets doivent refuser les accès sans clé d'API valide.
+    2. SECURITY - Authz / Headers:
+    All ticket endpoints must refuse access without a valid API key.
     """
     endpoints = [
         ("POST", "/api/tickets", {"user_id": 1, "question": "Q"}),
@@ -387,8 +387,8 @@ async def test_tickets_unauthorized_endpoints_return_401(unauth_client):
 @pytest.mark.asyncio
 async def test_tickets_sql_injection_in_question_and_solution_handled_safely(app_test_env):
     """
-    2. SÉCURITÉ - Injection SQL:
-    Test d'injection SQL dans les champs question et solution des tickets.
+    2. SECURITY - SQL injection:
+    SQL injection test in the ticket question and solution fields.
     """
     client, session_maker, _ = app_test_env
 
@@ -400,7 +400,7 @@ async def test_tickets_sql_injection_in_question_and_solution_handled_safely(app
     assert response.status_code == 201
     ticket_id = response.json()["id"]
 
-    # Résolution avec payload SQL
+    # Resolution with an SQL payload
     resolve_sql = "'); DELETE FROM tickets WHERE '1'='1"
     res_resp = await client.post(
         f"/api/tickets/{ticket_id}/resolve",
@@ -408,7 +408,7 @@ async def test_tickets_sql_injection_in_question_and_solution_handled_safely(app
     )
     assert res_resp.status_code == 200
 
-    # Vérification intégrité de la table tickets
+    # Check the integrity of the tickets table
     async with session_maker() as session:
         t = (await session.execute(select(Ticket).where(Ticket.id == ticket_id))).scalar_one()
         assert t.solution == resolve_sql
@@ -419,8 +419,8 @@ async def test_tickets_sql_injection_in_question_and_solution_handled_safely(app
 @pytest.mark.asyncio
 async def test_tickets_xss_payload_in_solution_stored_safely(app_test_env):
     """
-    2. SÉCURITÉ - XSS:
-    Test de payload XSS dans la solution d'un ticket.
+    2. SECURITY - XSS:
+    XSS payload test in a ticket's solution.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -438,11 +438,11 @@ async def test_tickets_xss_payload_in_solution_stored_safely(app_test_env):
 @pytest.mark.asyncio
 async def test_tickets_idor_access_control_verification(app_test_env):
     """
-    2. SÉCURITÉ - IDOR / Contrôle d'accès:
-    Vérifie le comportement du système lors de la consultation de tickets appartenant
-    à différents utilisateurs.
-    Note d'audit: Le backend actuel repose sur un modèle d'API Key partagée de confiance
-    entre le Bot Telegram et le Backend FastAPI (pas de token JWT utilisateur individuel).
+    2. SECURITY - IDOR / Access control:
+    Checks the system's behaviour when reading tickets that belong
+    to different users.
+    Audit note: the current backend relies on a trusted API key shared
+    between the Telegram bot and the FastAPI backend (no per-user JWT token).
     """
     client, session_maker, _ = app_test_env
 
@@ -450,7 +450,7 @@ async def test_tickets_idor_access_control_verification(app_test_env):
         ticket_user_a = await TicketService.create_ticket(session, user_id=1001, user_handle="user_a", question="A")
         ticket_user_b = await TicketService.create_ticket(session, user_id=2002, user_handle="user_b", question="B")
 
-    # Avec l'API Key partagée du Bot, l'accès aux deux tickets est autorisé pour le bot
+    # With the bot's shared API Key, access to both tickets is allowed for the bot
     resp_a = await client.get(f"/api/tickets/{ticket_user_a.id}")
     resp_b = await client.get(f"/api/tickets/{ticket_user_b.id}")
     assert resp_a.status_code == 200
@@ -460,26 +460,26 @@ async def test_tickets_idor_access_control_verification(app_test_env):
 @pytest.mark.asyncio
 async def test_tickets_user_id_scoping_prevents_cross_user_idor_access(app_test_env):
     """
-    2. SÉCURITÉ - IDOR / Contrôle d'accès par user_id:
-    Vérifie que spécifier ?user_id= restreint la consultation aux tickets appartenant à cet utilisateur.
-    Accéder au ticket d'un autre utilisateur avec un scope utilisateur renvoie 404 (non trouvé).
+    2. SECURITY - IDOR / Access control by user_id:
+    Specifying ?user_id= restricts reads to the tickets belonging to that user.
+    Reading another user's ticket with a user scope returns 404 (not found).
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
         t_alice = await TicketService.create_ticket(session, user_id=1001, user_handle="alice", question="Alice Q")
         t_bob = await TicketService.create_ticket(session, user_id=2002, user_handle="bob", question="Bob Q")
 
-    # 1. Alice accède à son propre ticket avec user_id=1001 -> 200 OK
+    # 1. Alice reads her own ticket with user_id=1001 -> 200 OK
     resp_alice_own = await client.get(f"/api/tickets/{t_alice.id}?user_id=1001")
     assert resp_alice_own.status_code == 200
     assert resp_alice_own.json()["id"] == t_alice.id
 
-    # 2. Alice tente d'accéder au ticket de Bob avec son user_id=1001 -> 404 IDOR protection
+    # 2. Alice tries to read Bob's ticket with her user_id=1001 -> 404 IDOR protection
     resp_alice_on_bob = await client.get(f"/api/tickets/{t_bob.id}?user_id=1001")
     assert resp_alice_on_bob.status_code == 404
     assert "Ticket not found" in resp_alice_on_bob.json()["detail"]
 
-    # 3. Listing des tickets avec user_id=1001 ne renvoie que les tickets d'Alice
+    # 3. Listing tickets with user_id=1001 returns only Alice's tickets
     resp_list = await client.get("/api/tickets?user_id=1001")
     assert resp_list.status_code == 200
     listed_ids = [t["id"] for t in resp_list.json()]
@@ -490,8 +490,8 @@ async def test_tickets_user_id_scoping_prevents_cross_user_idor_access(app_test_
 @pytest.mark.asyncio
 async def test_tickets_secrets_not_logged_during_creation_and_resolution(app_test_env, caplog):
     """
-    2. SÉCURITÉ - Secrets dans les logs:
-    S'assure que la clé secrète API_KEY ne fuite pas dans les logs du serveur.
+    2. SECURITY - Secrets in logs:
+    Makes sure the secret API_KEY does not leak into the server logs.
     """
     client, _, _ = app_test_env
     with caplog.at_level(logging.DEBUG):
@@ -511,10 +511,10 @@ async def test_tickets_secrets_not_logged_during_creation_and_resolution(app_tes
 @pytest.mark.asyncio
 async def test_tickets_concurrent_resolutions_race_condition_protection(app_test_env):
     """
-    3. ROBUSTESSE - Concurrence:
-    Résolutions concurrentes simultanées d'un même ticket.
-    Vérifie qu'exactement une requête est marquée `is_newly_resolved=True`
-    et que la base de données ne contient aucun état corrompu ou doublon d'article.
+    3. ROBUSTNESS - Concurrency:
+    Simultaneous concurrent resolutions of the same ticket.
+    Exactly one request is marked `is_newly_resolved=True`
+    and the database holds no corrupted state or duplicate article.
     """
     client, session_maker, _ = app_test_env
 
@@ -532,10 +532,10 @@ async def test_tickets_concurrent_resolutions_race_condition_protection(app_test
     assert all(r.status_code == 200 for r in responses)
 
     newly_resolved_flags = [r.json().get("is_newly_resolved") for r in responses]
-    # Au moins une (idéalement exactement une) requête effectue la première transition
+    # At least one (ideally exactly one) request performs the first transition
     assert True in newly_resolved_flags
 
-    # Vérification DB finale
+    # Final DB check
     async with session_maker() as session:
         t = (await session.execute(select(Ticket).where(Ticket.id == t_id))).scalar_one()
         assert t.status == "RESOLVED"
@@ -543,20 +543,20 @@ async def test_tickets_concurrent_resolutions_race_condition_protection(app_test
         kb_articles = (
             await session.execute(select(KnowledgeArticle).where(KnowledgeArticle.source_ticket_id == t_id))
         ).scalars().all()
-        # Grâce à l'upsert par source_ticket_id, un seul article existe
+        # Thanks to the upsert by source_ticket_id, only one article exists
         assert len(kb_articles) == 1
 
 
 @pytest.mark.asyncio
 async def test_tickets_background_email_dispatch_failure_does_not_fail_ticket_creation(app_test_env, monkeypatch):
     """
-    3. ROBUSTESSE - Tolérance aux pannes dépendance externe:
-    Si l'envoi SMTP échoue (ex: serveur SMTP inaccessible retournant False),
-    la création du ticket doit tout de même réussir (HTTP 201) et le ticket doit être persisté en DB.
+    3. ROBUSTNESS - External dependency fault tolerance:
+    If sending the SMTP email fails (e.g. unreachable SMTP server returning False),
+    ticket creation must still succeed (HTTP 201) and the ticket must be persisted in the DB.
     """
     client, session_maker, _ = app_test_env
 
-    # Simuler un échec SMTP capturé par le service (retourne False)
+    # Simulate an SMTP failure caught by the service (returns False)
     monkeypatch.setattr(EmailService, "_send_smtp_sync", lambda msg: False)
 
     response = await client.post(
@@ -566,7 +566,7 @@ async def test_tickets_background_email_dispatch_failure_does_not_fail_ticket_cr
     assert response.status_code == 201
     ticket_id = response.json()["id"]
 
-    # Le ticket existe bien en base
+    # The ticket does exist in the database
     async with session_maker() as session:
         ticket = (await session.execute(select(Ticket).where(Ticket.id == ticket_id))).scalar_one()
         assert ticket.question == "Ticket malgré panne SMTP"
@@ -575,14 +575,14 @@ async def test_tickets_background_email_dispatch_failure_does_not_fail_ticket_cr
 @pytest.mark.asyncio
 async def test_tickets_background_tasks_uncaught_exception_isolated_and_logged(app_test_env, caplog):
     """
-    3. ROBUSTESSE - Isolation des pannes non gérées en BackgroundTasks:
-    Vérifie qu'une exception brutale (ex: socket dropout, bug inattendu) dans la tâche
-    de fond EmailService ne se propage pas à l'Event Loop ASGI / Starlette et ne
-    déclenche pas une erreur HTTP 500 pour le client après commit DB.
+    3. ROBUSTNESS - Isolating unhandled failures in BackgroundTasks:
+    A sudden exception (e.g. socket dropout, unexpected bug) in the EmailService
+    background task must not propagate to the ASGI / Starlette event loop and must not
+    trigger an HTTP 500 for the client after the DB commit.
     """
     client, session_maker, _ = app_test_env
 
-    # 1. Création avec crash direct de la coroutine
+    # 1. Creation with a direct coroutine crash
     with patch(
         "app.services.email_service.EmailService.send_ticket_created_notification",
         side_effect=ConnectionResetError("Fatal SMTP drop"),
@@ -596,7 +596,7 @@ async def test_tickets_background_tasks_uncaught_exception_isolated_and_logged(a
     assert resp_create.status_code == 201
     created_id = resp_create.json()["id"]
 
-    # 2. Résolution avec crash direct de la coroutine
+    # 2. Resolution with a direct coroutine crash
     with patch(
         "app.services.email_service.EmailService.send_ticket_resolved_notification",
         side_effect=TimeoutError("Fatal SMTP timeout"),
@@ -610,7 +610,7 @@ async def test_tickets_background_tasks_uncaught_exception_isolated_and_logged(a
     assert resp_resolve.status_code == 200
     assert resp_resolve.json()["status"] == "RESOLVED"
 
-    # Vérification que les exceptions ont été interceptées et loggées
+    # Check that the exceptions were caught and logged
     error_logs = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
     assert any("failed with exception: Fatal SMTP drop" in msg for msg in error_logs)
     assert any("failed with exception: Fatal SMTP timeout" in msg for msg in error_logs)
@@ -621,8 +621,8 @@ async def test_ticket_creation_and_resolution_bypasses_email_tasks_when_disabled
     app_test_env, monkeypatch
 ):
     """
-    Vérifie que lorsque EMAIL_ENABLED est False, aucun tâche d'envoi d'email
-    n'est planifiée lors de la création ou de la résolution d'un ticket.
+    When EMAIL_ENABLED is False, no email sending task
+    is scheduled when a ticket is created or resolved.
     """
     client, session_maker, _ = app_test_env
     monkeypatch.setattr(settings, "EMAIL_ENABLED", False)
@@ -632,7 +632,7 @@ async def test_ticket_creation_and_resolution_bypasses_email_tasks_when_disabled
     ) as mock_send_created, patch(
         "app.services.email_service.EmailService.send_ticket_resolved_notification"
     ) as mock_send_resolved:
-        # 1. Création du ticket
+        # 1. Ticket creation
         resp_create = await client.post(
             "/api/tickets",
             json={"user_id": 777, "question": "Pure Telegram query"},
@@ -640,14 +640,14 @@ async def test_ticket_creation_and_resolution_bypasses_email_tasks_when_disabled
         assert resp_create.status_code == 201
         ticket_id = resp_create.json()["id"]
 
-        # 2. Résolution sur Telegram
+        # 2. Resolution on Telegram
         resp_resolve = await client.post(
             f"/api/tickets/{ticket_id}/resolve",
             json={"solution": "Pure Telegram resolution", "resolution_channel": "TELEGRAM"},
         )
         assert resp_resolve.status_code == 200
 
-        # Vérifier qu'aucun envoi d'email n'a été appelé
+        # Check that no email sending was called
         mock_send_created.assert_not_called()
         mock_send_resolved.assert_not_called()
 

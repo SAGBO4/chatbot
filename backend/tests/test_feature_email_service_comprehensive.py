@@ -18,8 +18,8 @@ def _mock_smtp_context_manager():
 @pytest.mark.asyncio
 async def test_email_service_send_ticket_created_notification_formats_subject_and_body_correctly(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Vérifie le formatage du sujet et du corps lors de la création d'un ticket.
+    1. FUNCTIONAL:
+    Subject and body formatting when a ticket is created.
     """
     monkeypatch.setattr(settings, "EMAIL_ENABLED", True)
     monkeypatch.setattr(settings, "SUPPORT_EMAIL_RECIPIENT", "support@target.org")
@@ -51,8 +51,8 @@ async def test_email_service_send_ticket_created_notification_formats_subject_an
 @pytest.mark.asyncio
 async def test_email_service_send_ticket_resolved_notification_formats_subject_and_body_correctly(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Vérifie le formatage lors de la résolution d'un ticket.
+    1. FUNCTIONAL:
+    Formatting when a ticket is resolved.
     """
     monkeypatch.setattr(settings, "EMAIL_ENABLED", True)
     captured = []
@@ -80,8 +80,8 @@ async def test_email_service_send_ticket_resolved_notification_formats_subject_a
 @pytest.mark.asyncio
 async def test_email_service_disabled_returns_true_without_network_dispatch(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Quand EMAIL_ENABLED est False, l'appel retourne immédiatement True sans tenter d'envoi.
+    1. FUNCTIONAL:
+    When EMAIL_ENABLED is False, the call returns True immediately without trying to send.
     """
     monkeypatch.setattr(settings, "EMAIL_ENABLED", False)
     called = []
@@ -99,8 +99,8 @@ async def test_email_service_disabled_returns_true_without_network_dispatch(monk
 
 def test_email_service_port_465_uses_smtp_ssl_context(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Le port 465 nécessite smtplib.SMTP_SSL au lieu de STARTTLS.
+    1. FUNCTIONAL:
+    Port 465 requires smtplib.SMTP_SSL instead of STARTTLS.
     """
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.custom-ssl.com")
     monkeypatch.setattr(settings, "SMTP_PORT", 465)
@@ -126,8 +126,8 @@ def test_email_service_port_465_uses_smtp_ssl_context(monkeypatch):
 
 def test_email_service_port_587_uses_smtp_with_starttls(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Le port 587 utilise smtplib.SMTP standard puis appelle server.starttls().
+    1. FUNCTIONAL:
+    Port 587 uses the standard smtplib.SMTP and then calls server.starttls().
     """
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.relay.com")
     monkeypatch.setattr(settings, "SMTP_PORT", 587)
@@ -150,8 +150,8 @@ def test_email_service_port_587_uses_smtp_with_starttls(monkeypatch):
 
 def test_email_service_unconfigured_host_simulates_success(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Quand l'hôte est 'smtp.example.com', l'envoi est simulé sans erreur.
+    1. FUNCTIONAL:
+    When the host is 'smtp.example.com', sending is simulated without error.
     """
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.example.com")
     msg = EmailMessage()
@@ -160,14 +160,14 @@ def test_email_service_unconfigured_host_simulates_success(monkeypatch):
 
 
 # ==============================================================================
-# 2. SÉCURITÉ
+# 2. SECURITY
 # ==============================================================================
 
 
 def test_email_service_smtp_credentials_never_logged_on_failure(monkeypatch, caplog):
     """
-    2. SÉCURITÉ - Secrets dans les logs:
-    En cas d'échec d'authentification SMTP, le mot de passe ne doit jamais figurer dans les logs.
+    2. SECURITY - Secrets in logs:
+    When SMTP authentication fails, the password must never appear in the logs.
     """
     SECRET_PASS = "ultra_secret_smtp_password_xyz123"
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.auth-fail.com")
@@ -192,8 +192,8 @@ def test_email_service_smtp_credentials_never_logged_on_failure(monkeypatch, cap
 
 def test_email_service_header_injection_prevented_by_email_message():
     """
-    2. SÉCURITÉ - Injection d'en-tête (CRLF Injection):
-    EmailMessage lève une exception s'il y a tentative d'injection CRLF dans le sujet.
+    2. SECURITY - Header injection (CRLF injection):
+    EmailMessage raises an exception on a CRLF injection attempt in the subject.
     """
     msg = EmailMessage()
     with pytest.raises(ValueError):
@@ -207,8 +207,8 @@ def test_email_service_header_injection_prevented_by_email_message():
 
 def test_email_service_smtp_timeout_returns_false_and_logs_error(monkeypatch, caplog):
     """
-    3. ROBUSTESSE - Timeout réseau:
-    Un timeout SMTP doit retourner False sans planter le serveur.
+    3. ROBUSTNESS - Network timeout:
+    An SMTP timeout must return False without crashing the server.
     """
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.timeout.com")
     monkeypatch.setattr(settings, "SMTP_PORT", 587)
@@ -229,8 +229,8 @@ def test_email_service_smtp_timeout_returns_false_and_logs_error(monkeypatch, ca
 
 def test_email_service_smtp_connection_refused_returns_false_and_logs_error(monkeypatch):
     """
-    3. ROBUSTESSE - Panne serveur SMTP:
-    Une connexion refusée (ConnectionRefusedError) retourne False gracieusement.
+    3. ROBUSTNESS - SMTP server outage:
+    A refused connection (ConnectionRefusedError) gracefully returns False.
     """
     monkeypatch.setattr(settings, "SMTP_HOST", "smtp.down.com")
     monkeypatch.setattr(settings, "SMTP_PORT", 587)

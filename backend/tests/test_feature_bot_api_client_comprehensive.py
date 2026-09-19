@@ -9,8 +9,8 @@ from bot.api_client import BackendClient
 @pytest.mark.asyncio
 async def test_api_client_headers_includes_api_key_when_configured(monkeypatch):
     """
-    1. FONCTIONNEL & SÉCURITÉ:
-    Vérifie que BackendClient inclut l'en-tête X-API-Key quand API_KEY est configurée.
+    1. FUNCTIONAL & SECURITY:
+    BackendClient includes the X-API-Key header when API_KEY is configured.
     """
     monkeypatch.setattr(settings, "API_KEY", "secret-test-key")
     client = BackendClient(base_url="http://localhost:8000")
@@ -21,8 +21,8 @@ async def test_api_client_headers_includes_api_key_when_configured(monkeypatch):
 @pytest.mark.asyncio
 async def test_api_client_headers_empty_when_api_key_unset(monkeypatch):
     """
-    1. FONCTIONNEL & SÉCURITÉ:
-    Vérifie que BackendClient renvoie des en-têtes vides quand API_KEY est None.
+    1. FUNCTIONAL & SECURITY:
+    BackendClient returns empty headers when API_KEY is None.
     """
     monkeypatch.setattr(settings, "API_KEY", None)
     client = BackendClient(base_url="http://localhost:8000")
@@ -33,8 +33,8 @@ async def test_api_client_headers_empty_when_api_key_unset(monkeypatch):
 @pytest.mark.asyncio
 async def test_api_client_lifecycle_close_closes_owned_session():
     """
-    1. FONCTIONNEL:
-    Vérifie la fermeture de la session httpx si elle appartient au client.
+    1. FUNCTIONAL:
+    The httpx session is closed when the client owns it.
     """
     client = BackendClient(base_url="http://localhost:8000")
     internal_client = await client._get_client()
@@ -46,8 +46,8 @@ async def test_api_client_lifecycle_close_closes_owned_session():
 @pytest.mark.asyncio
 async def test_api_client_query_calls_correct_endpoint():
     """
-    1. FONCTIONNEL:
-    BackendClient.query appelle POST /api/query avec le payload adéquat.
+    1. FUNCTIONAL:
+    BackendClient.query calls POST /api/query with the right payload.
     """
     req = httpx.Request("POST", "http://test/api/query")
     mock_resp = httpx.Response(status_code=200, json={"found": True, "answer": "OK"}, request=req)
@@ -128,8 +128,8 @@ async def test_api_client_attach_support_card_calls_correct_endpoint():
 @pytest.mark.asyncio
 async def test_api_client_get_ticket_by_support_message_returns_none_on_404():
     """
-    1. FONCTIONNEL:
-    get_ticket_by_support_message retourne None en cas de code HTTP 404 (pas d'exception levée).
+    1. FUNCTIONAL:
+    get_ticket_by_support_message returns None on an HTTP 404 (no exception raised).
     """
     req = httpx.Request("GET", "http://test/api/tickets/by-support-message/999")
     mock_resp = httpx.Response(status_code=404, json={"detail": "Not found"}, request=req)
@@ -145,8 +145,8 @@ async def test_api_client_get_ticket_by_support_message_returns_none_on_404():
 @pytest.mark.asyncio
 async def test_api_client_get_ticket_by_support_message_returns_ticket_on_200():
     """
-    1. FONCTIONNEL:
-    get_ticket_by_support_message retourne le dictionnaire du ticket si trouvé (HTTP 200).
+    1. FUNCTIONAL:
+    get_ticket_by_support_message returns the ticket dictionary when found (HTTP 200).
     """
     req = httpx.Request("GET", "http://test/api/tickets/by-support-message/888")
     mock_resp = httpx.Response(status_code=200, json={"id": 77, "status": "OPEN"}, request=req)

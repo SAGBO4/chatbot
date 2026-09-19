@@ -13,9 +13,9 @@ from tests.conftest import TEST_BREVO_INBOUND_SECRET
 @pytest.mark.asyncio
 async def test_webhooks_brevo_happy_path_single_item_resolves_ticket(app_test_env, caplog):
     """
-    1. FONCTIONNEL - Happy Path:
-    Vérifie qu'un webhook Brevo avec token valide et un élément dans items[]
-    résout le ticket associé et retourne status="resolved".
+    1. FUNCTIONAL - Happy Path:
+    A Brevo webhook with a valid token and one element in items[]
+    resolves the associated ticket and returns status="resolved".
     """
     client, session_maker, _ = app_test_env
 
@@ -50,7 +50,7 @@ async def test_webhooks_brevo_happy_path_single_item_resolves_ticket(app_test_en
     assert item_res["ticket_id"] == t_id
     assert item_res["channel"] == "EMAIL"
 
-    # Vérification DB
+    # DB check
     async with session_maker() as session:
         t = (await session.execute(select(Ticket).where(Ticket.id == t_id))).scalar_one()
         assert t.status == "RESOLVED"
@@ -61,8 +61,8 @@ async def test_webhooks_brevo_happy_path_single_item_resolves_ticket(app_test_en
 @pytest.mark.asyncio
 async def test_webhooks_brevo_happy_path_batch_multiple_items_resolves_all(app_test_env):
     """
-    1. FONCTIONNEL - Batching:
-    Vérifie la résolution de plusieurs tickets différents dans un même lot Brevo.
+    1. FUNCTIONAL - Batching:
+    Several different tickets are resolved in a single Brevo batch.
     """
     client, session_maker, _ = app_test_env
 
@@ -100,7 +100,7 @@ async def test_webhooks_brevo_happy_path_batch_multiple_items_resolves_all(app_t
     assert len(results) == 3
     assert all(r["status"] == "resolved" for r in results)
 
-    # Vérification DB
+    # DB check
     async with session_maker() as session:
         tickets = (await session.execute(select(Ticket).where(Ticket.id.in_([t1.id, t2.id, t3.id])))).scalars().all()
         assert all(t.status == "RESOLVED" for t in tickets)
@@ -109,9 +109,9 @@ async def test_webhooks_brevo_happy_path_batch_multiple_items_resolves_all(app_t
 @pytest.mark.asyncio
 async def test_webhooks_brevo_prefers_extracted_markdown_over_raw_text(app_test_env):
     """
-    1. FONCTIONNEL - Sélection du meilleur corps:
-    Brevo fournit à la fois ExtractedMarkdownMessage et RawTextBody;
-    l'orchestrateur doit privilégier ExtractedMarkdownMessage.
+    1. FUNCTIONAL - Best body selection:
+    Brevo provides both ExtractedMarkdownMessage and RawTextBody;
+    the orchestrator must prefer ExtractedMarkdownMessage.
     """
     client, session_maker, _ = app_test_env
 
@@ -144,8 +144,8 @@ async def test_webhooks_brevo_prefers_extracted_markdown_over_raw_text(app_test_
 @pytest.mark.asyncio
 async def test_webhooks_brevo_falls_back_to_raw_text_when_markdown_absent(app_test_env):
     """
-    1. FONCTIONNEL - Fallback corps brut:
-    Si ExtractedMarkdownMessage est None ou vide, utilise RawTextBody.
+    1. FUNCTIONAL - Raw body fallback:
+    If ExtractedMarkdownMessage is None or empty, RawTextBody is used.
     """
     client, session_maker, _ = app_test_env
 
@@ -178,10 +178,10 @@ async def test_webhooks_brevo_falls_back_to_raw_text_when_markdown_absent(app_te
 @pytest.mark.asyncio
 async def test_webhooks_brevo_partial_batch_failures_returns_200_with_individual_statuses(app_test_env, monkeypatch):
     """
-    1. FONCTIONNEL & ROBUSTESSE - Dégradation gracieuse:
-    Dans un lot hétérogène (un item valide, un item inconnu, un item sans ID, un item émetteur non autorisé),
-    l'échec d'un item ne doit PAS faire échouer l'ensemble du lot HTTP.
-    Le code HTTP doit être 200 et chaque item doit reporter son statut précis.
+    1. FUNCTIONAL & ROBUSTNESS - Graceful degradation:
+    In a mixed batch (one valid item, one unknown item, one item without an ID, one item from an unauthorized sender),
+    one item failing must NOT make the whole HTTP batch fail.
+    The HTTP status must be 200 and each item must report its precise status.
     """
     client, session_maker, _ = app_test_env
     monkeypatch.setattr(settings, "ALLOWED_SUPPORT_EMAIL_SENDERS", "authorized@example.com")
@@ -204,13 +204,13 @@ async def test_webhooks_brevo_partial_batch_failures_returns_200_with_individual
                 "Subject": "[Ticket #9999999] Sol",
                 "ExtractedMarkdownMessage": "Solution introuvable",
             },
-            # Item 3: Pas d'ID de ticket
+            # Item 3: no ticket ID
             {
                 "From": {"Address": "authorized@example.com"},
                 "Subject": "Email sans numéro de ticket",
                 "ExtractedMarkdownMessage": "Solution sans id",
             },
-            # Item 4: Expéditeur non autorisé
+            # Item 4: unauthorized sender
             {
                 "From": {"Address": "hacker@evil.com"},
                 "Subject": f"[Ticket #{valid_id}] Sol",
@@ -236,8 +236,8 @@ async def test_webhooks_brevo_partial_batch_failures_returns_200_with_individual
 @pytest.mark.asyncio
 async def test_webhooks_brevo_empty_items_batch_returns_empty_results(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite vide:
-    Un payload avec une liste items vide renvoie 200 avec results: [].
+    1. FUNCTIONAL - Empty edge case:
+    A payload with an empty items list returns 200 with results: [].
     """
     client, _, _ = app_test_env
     resp = await client.post(
@@ -251,9 +251,9 @@ async def test_webhooks_brevo_empty_items_batch_returns_empty_results(app_test_e
 @pytest.mark.asyncio
 async def test_webhooks_brevo_idempotence_duplicate_items_in_same_batch(app_test_env):
     """
-    1. FONCTIONNEL - Idempotence:
-    Si le même ticket apparaît deux fois dans le même lot,
-    le premier est 'resolved' et le second est 'already_resolved'.
+    1. FUNCTIONAL - Idempotence:
+    If the same ticket appears twice in the same batch,
+    the first is 'resolved' and the second is 'already_resolved'.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -278,15 +278,15 @@ async def test_webhooks_brevo_idempotence_duplicate_items_in_same_batch(app_test
 
 
 # ==============================================================================
-# 2. SÉCURITÉ
+# 2. SECURITY
 # ==============================================================================
 
 
 @pytest.mark.asyncio
 async def test_webhooks_brevo_missing_token_returns_401_unauthorized(app_test_env):
     """
-    2. SÉCURITÉ - Auth:
-    Requête sans paramètre `?token=` renvoie 401.
+    2. SECURITY - Auth:
+    A request without the `?token=` parameter returns 401.
     """
     client, _, _ = app_test_env
     resp = await client.post(
@@ -300,8 +300,8 @@ async def test_webhooks_brevo_missing_token_returns_401_unauthorized(app_test_en
 @pytest.mark.asyncio
 async def test_webhooks_brevo_invalid_token_returns_401_unauthorized(app_test_env):
     """
-    2. SÉCURITÉ - Auth:
-    Token invalide renvoie 401.
+    2. SECURITY - Auth:
+    An invalid token returns 401.
     """
     client, _, _ = app_test_env
     resp = await client.post(
@@ -314,8 +314,8 @@ async def test_webhooks_brevo_invalid_token_returns_401_unauthorized(app_test_en
 @pytest.mark.asyncio
 async def test_webhooks_brevo_secret_not_configured_returns_503_service_unavailable(app_test_env, monkeypatch):
     """
-    2. SÉCURITÉ - Fail-closed:
-    Si BREVO_INBOUND_SECRET n'est pas configuré, rejet immédiat avec 503.
+    2. SECURITY - Fail-closed:
+    If BREVO_INBOUND_SECRET is not configured, immediate rejection with 503.
     """
     client, _, _ = app_test_env
     monkeypatch.setattr(settings, "BREVO_INBOUND_SECRET", None)
@@ -331,9 +331,9 @@ async def test_webhooks_brevo_secret_not_configured_returns_503_service_unavaila
 @pytest.mark.asyncio
 async def test_webhooks_brevo_unauthenticated_request_rejected_before_json_parsing(app_test_env):
     """
-    2. SÉCURITÉ - Masquage du schéma JSON:
-    Un appel sans token valide et avec un corps malformé doit être rejeté avec 401,
-    sans révéler le schéma d'erreurs 422.
+    2. SECURITY - Hiding the JSON schema:
+    A call without a valid token and with a malformed body must be rejected with 401,
+    without revealing the 422 error schema.
     """
     client, _, _ = app_test_env
     resp = await client.post(
@@ -347,10 +347,10 @@ async def test_webhooks_brevo_unauthenticated_request_rejected_before_json_parsi
 @pytest.mark.asyncio
 async def test_webhooks_brevo_token_query_parameter_not_leaked_in_application_logs(app_test_env, caplog):
     """
-    2. SÉCURITÉ - Secrets dans les logs applicatifs:
-    Vérifie que les logs internes de l'application (logger backend) ne loggent pas le token secret.
-    Note d'audit: Le passage de secret en query parameter (?token=...) expose néanmoins
-    le secret dans les logs d'accès HTTP (ex: uvicorn/httpx/reverse proxies).
+    2. SECURITY - Secrets in application logs:
+    The application's internal logs (backend logger) do not log the secret token.
+    Audit note: passing a secret as a query parameter (?token=...) still exposes
+    the secret in HTTP access logs (e.g. uvicorn/httpx/reverse proxies).
     """
     client, _, _ = app_test_env
     with caplog.at_level(logging.DEBUG):
@@ -368,9 +368,9 @@ async def test_webhooks_brevo_token_query_parameter_not_leaked_in_application_lo
 @pytest.mark.asyncio
 async def test_webhooks_brevo_header_auth_x_webhook_token_succes(app_test_env):
     """
-    2. SÉCURITÉ - Auth par Header:
-    Vérifie qu'un webhook Brevo authentifié par l'en-tête X-Webhook-Token
-    est accepté avec succès sans nécessiter de token dans la query string.
+    2. SECURITY - Header auth:
+    A Brevo webhook authenticated with the X-Webhook-Token header
+    is accepted without needing a token in the query string.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -397,9 +397,9 @@ async def test_webhooks_brevo_header_auth_x_webhook_token_succes(app_test_env):
 @pytest.mark.asyncio
 async def test_webhooks_brevo_header_auth_x_brevo_token_succes(app_test_env):
     """
-    2. SÉCURITÉ - Auth par Header:
-    Vérifie qu'un webhook Brevo authentifié par l'en-tête alternatif X-Brevo-Token
-    est accepté avec succès sans nécessiter de token dans la query string.
+    2. SECURITY - Header auth:
+    A Brevo webhook authenticated with the alternative X-Brevo-Token header
+    is accepted without needing a token in the query string.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -426,9 +426,9 @@ async def test_webhooks_brevo_header_auth_x_brevo_token_succes(app_test_env):
 @pytest.mark.asyncio
 async def test_webhooks_brevo_access_log_middleware_redacts_query_token_succes(app_test_env, caplog):
     """
-    2. SÉCURITÉ - Redaction des logs d'accès HTTP:
-    Vérifie que le middleware d'accès et le filtre SensitiveDataFilter
-    masquent systématiquement le token query parameter (?token=[REDACTED]).
+    2. SECURITY - HTTP access log redaction:
+    The access middleware and the SensitiveDataFilter filter
+    always mask the token query parameter (?token=[REDACTED]).
     """
     client, _, _ = app_test_env
     with caplog.at_level(logging.INFO):
@@ -438,9 +438,9 @@ async def test_webhooks_brevo_access_log_middleware_redacts_query_token_succes(a
         )
 
     backend_records = [r for r in caplog.records if r.name.split(".")[0] == "app"]
-    # Le secret en clair ne doit jamais apparaître dans les logs du backend
+    # The clear-text secret must never appear in the backend logs
     assert not any(TEST_BREVO_INBOUND_SECRET in r.getMessage() for r in backend_records)
-    # Le message du middleware de log d'accès doit contenir [REDACTED]
+    # The access log middleware message must contain [REDACTED]
     redacted_logs = [r.getMessage() for r in backend_records if "[REDACTED]" in r.getMessage()]
     assert len(redacted_logs) >= 1
 
@@ -453,9 +453,9 @@ async def test_webhooks_brevo_access_log_middleware_redacts_query_token_succes(a
 @pytest.mark.asyncio
 async def test_webhooks_brevo_exception_in_single_item_handled_as_internal_error(app_test_env):
     """
-    3. ROBUSTESSE - Isolation des erreurs de traitement:
-    Si une exception imprévue survient lors du traitement d'un élément,
-    l'élément est marqué 'internal_error' et les autres éléments du lot sont préservés.
+    3. ROBUSTNESS - Isolating processing errors:
+    If an unexpected exception occurs while processing one element,
+    that element is marked 'internal_error' and the other elements of the batch are preserved.
     """
     client, session_maker, _ = app_test_env
 
@@ -463,7 +463,7 @@ async def test_webhooks_brevo_exception_in_single_item_handled_as_internal_error
         t1 = await TicketService.create_ticket(session, 1, "u1", "Q1")
         t2 = await TicketService.create_ticket(session, 2, "u2", "Q2")
 
-    # Patch resolve_inbound_email pour crasher uniquement sur le ticket 1
+    # Patch resolve_inbound_email to crash only on ticket 1
     from app.inbound_email import resolve_inbound_email
     orig_fn = resolve_inbound_email
 
@@ -495,8 +495,8 @@ async def test_webhooks_brevo_exception_in_single_item_handled_as_internal_error
 @pytest.mark.asyncio
 async def test_webhooks_brevo_large_batch_preloading_performance(app_test_env):
     """
-    3. ROBUSTESSE - Performance et batch pre-fetch:
-    Vérifie qu'un lot de 15 tickets est pré-chargé et résolu efficacement.
+    3. ROBUSTNESS - Performance and batch pre-fetch:
+    A batch of 15 tickets is preloaded and resolved efficiently.
     """
     client, session_maker, _ = app_test_env
 

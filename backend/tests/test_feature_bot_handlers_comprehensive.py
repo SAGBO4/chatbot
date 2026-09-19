@@ -38,8 +38,8 @@ def bot_test_env():
 @pytest.mark.asyncio
 async def test_bot_handlers_start_command_clears_state_and_sends_welcome(bot_test_env):
     """
-    1. FONCTIONNEL:
-    /start réinitialise l'état FSM et envoie le message d'accueil.
+    1. FUNCTIONAL:
+    /start resets the FSM state and sends the welcome message.
     """
     state = bot_test_env["state"]
     await state.set_state(UserQueryState.waiting_for_resolution)
@@ -71,9 +71,9 @@ async def test_bot_handlers_help_command_sends_help_text(bot_test_env):
 @pytest.mark.asyncio
 async def test_bot_handlers_user_query_happy_path_answers_and_sets_waiting_state(bot_test_env):
     """
-    1. FONCTIONNEL - Happy Path:
-    L'utilisateur pose une question, le bot consulte le backend,
-    affiche la réponse avec le clavier OUI/NON et passe à l'état waiting_for_resolution.
+    1. FUNCTIONAL - Happy Path:
+    The user asks a question, the bot queries the backend, shows the answer
+    with the YES/NO keyboard and moves to the waiting_for_resolution state.
     """
     client = bot_test_env["client"]
     state = bot_test_env["state"]
@@ -95,7 +95,7 @@ async def test_bot_handlers_user_query_happy_path_answers_and_sets_waiting_state
     assert "Solution KB automatique" in sent_text
     assert "Votre problème est-il résolu ?" in sent_text
 
-    # Vérification état FSM et contexte sauvegardé
+    # Check the FSM state and the saved context
     current_state = await state.get_state()
     assert current_state == UserQueryState.waiting_for_resolution.state
     data = await state.get_data()
@@ -106,8 +106,8 @@ async def test_bot_handlers_user_query_happy_path_answers_and_sets_waiting_state
 @pytest.mark.asyncio
 async def test_bot_handlers_user_query_exceeds_4000_chars_rejected(bot_test_env):
     """
-    1. FONCTIONNEL - Cas limite Max:
-    Message utilisateur > 4000 caractères rejeté sans appeler le backend.
+    1. FUNCTIONAL - Max edge case:
+    A user message over 4000 characters is rejected without calling the backend.
     """
     client = bot_test_env["client"]
     state = bot_test_env["state"]
@@ -126,8 +126,8 @@ async def test_bot_handlers_user_query_exceeds_4000_chars_rejected(bot_test_env)
 @pytest.mark.asyncio
 async def test_bot_handlers_resolve_yes_clears_state_and_marks_resolved(bot_test_env):
     """
-    1. FONCTIONNEL:
-    L'utilisateur clique sur OUI: le message est mis à jour et l'état FSM est nettoyé.
+    1. FUNCTIONAL:
+    The user clicks YES: the message is updated and the FSM state is cleared.
     """
     state = bot_test_env["state"]
     await state.set_state(UserQueryState.waiting_for_resolution)
@@ -149,9 +149,9 @@ async def test_bot_handlers_resolve_yes_clears_state_and_marks_resolved(bot_test
 @pytest.mark.asyncio
 async def test_bot_handlers_resolve_no_creates_ticket_and_notifies_support_group(bot_test_env, monkeypatch):
     """
-    1. FONCTIONNEL:
-    L'utilisateur clique sur NON: création d'un ticket backend,
-    notification au groupe support Telegram et attachement de la carte.
+    1. FUNCTIONAL:
+    The user clicks NO: a backend ticket is created, the Telegram support group
+    is notified and the card is attached.
     """
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", -100555666)
 
@@ -173,15 +173,15 @@ async def test_bot_handlers_resolve_no_creates_ticket_and_notifies_support_group
 
     await handle_resolve_no(cb, state, bot=bot, backend_client=client)
 
-    # 1. Ticket créé
+    # 1. Ticket created
     client.create_ticket.assert_called_once()
     assert client.create_ticket.call_args[1]["question"] == "Panne fibre"
 
-    # 2. Message utilisateur édité
+    # 2. User message edited
     cb_message.edit_text.assert_called_once()
     assert "Ticket #77 créé et escaladé" in cb_message.edit_text.call_args[0][0]
 
-    # 3. Message envoyé au groupe support
+    # 3. Message sent to the support group
     bot.send_message.assert_called_once()
     assert bot.send_message.call_args[1]["chat_id"] == -100555666
     assert "NOUVEAU TICKET SUPPORT #77" in bot.send_message.call_args[1]["text"]
@@ -193,9 +193,9 @@ async def test_bot_handlers_resolve_no_creates_ticket_and_notifies_support_group
 @pytest.mark.asyncio
 async def test_bot_handlers_resolve_no_missing_state_aborts_quietly(bot_test_env):
     """
-    1. FONCTIONNEL & IDEMPOTENCE:
-    Si l'utilisateur double-clique sur NON ou que l'état est vide,
-    le bot répond simplement 'déjà prise en compte' sans créer de 2e ticket.
+    1. FUNCTIONAL & IDEMPOTENCE:
+    If the user double-clicks NO or the state is empty, the bot simply answers
+    'already taken into account' without creating a second ticket.
     """
     state = bot_test_env["state"]
     client = bot_test_env["client"]
@@ -213,9 +213,9 @@ async def test_bot_handlers_resolve_no_missing_state_aborts_quietly(bot_test_env
 @pytest.mark.asyncio
 async def test_bot_handlers_support_agent_reply_matched_by_message_id_resolves_ticket(monkeypatch):
     """
-    1. FONCTIONNEL:
-    L'agent répond à la carte du groupe support; le ticket est retrouvé par message_id
-    et la solution est transmise à l'utilisateur.
+    1. FUNCTIONAL:
+    The agent replies to the support group card; the ticket is found by message_id
+    and the solution is forwarded to the user.
     """
     support_group_id = -100555666
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
@@ -244,15 +244,15 @@ async def test_bot_handlers_support_agent_reply_matched_by_message_id_resolves_t
     # 1. Lookup par message id
     client.get_ticket_by_support_message.assert_called_once_with(5544)
 
-    # 2. Résolution ticket backend
+    # 2. Backend ticket resolution
     client.resolve_ticket.assert_called_once()
 
-    # 3. Notification transmise à l'utilisateur
+    # 3. Notification forwarded to the user
     bot.send_message.assert_called_once()
     assert bot.send_message.call_args[1]["chat_id"] == 2002
     assert "Voici la solution technique" in bot.send_message.call_args[1]["text"]
 
-    # 4. Confirmation dans le groupe support
+    # 4. Confirmation in the support group
     reply_msg.reply.assert_called_once()
     assert "Ticket #15 résolu" in reply_msg.reply.call_args[0][0]
 
@@ -260,15 +260,15 @@ async def test_bot_handlers_support_agent_reply_matched_by_message_id_resolves_t
 @pytest.mark.asyncio
 async def test_bot_handlers_support_agent_reply_matched_by_card_text_fallback_resolves(monkeypatch):
     """
-    1. FONCTIONNEL - Fallback texte:
-    Si le ticket n'est pas trouvé par message_id, il est extrait du texte de la carte:
-    'NOUVEAU TICKET SUPPORT #25' et 'ID: 3003'.
+    1. FUNCTIONAL - Text fallback:
+    If the ticket is not found by message_id, it is extracted from the card text:
+    'NOUVEAU TICKET SUPPORT #25' and 'ID: 3003'.
     """
     support_group_id = -100555666
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
 
     client = AsyncMock(spec=BackendClient)
-    client.get_ticket_by_support_message.return_value = None  # Lookup par id échoue
+    client.get_ticket_by_support_message.return_value = None  # Lookup by id fails
     client.resolve_ticket.return_value = {"id": 25, "is_newly_resolved": True}
 
     bot = AsyncMock()
@@ -299,9 +299,9 @@ async def test_bot_handlers_support_agent_reply_matched_by_card_text_fallback_re
 @pytest.mark.asyncio
 async def test_bot_handlers_support_agent_reply_already_resolved_notifies_agent(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Si un agent répond à un ticket déjà résolu, un message d'information lui est affiché
-    et l'utilisateur n'est pas spammé une seconde fois.
+    1. FUNCTIONAL:
+    If an agent replies to an already resolved ticket, an informational message is shown
+    to them and the user is not spammed a second time.
     """
     support_group_id = -100555666
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
@@ -332,16 +332,16 @@ async def test_bot_handlers_support_agent_reply_already_resolved_notifies_agent(
 
 
 # ==============================================================================
-# 2. SÉCURITÉ
+# 2. SECURITY
 # ==============================================================================
 
 
 @pytest.mark.asyncio
 async def test_bot_handlers_agent_reply_from_unauthorized_chat_ignored(monkeypatch):
     """
-    2. SÉCURITÉ - Contrôle d'accès Chat ID:
-    Une réponse formulée depuis un chat privé ou un groupe non configuré
-    est purement ignorée pour empêcher toute résolution frauduleuse.
+    2. SECURITY - Chat ID access control:
+    A reply written from a private chat or an unconfigured group
+    is simply ignored, so nobody can resolve a ticket fraudulently.
     """
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", -100555666)
 
@@ -362,10 +362,10 @@ async def test_bot_handlers_agent_reply_from_unauthorized_chat_ignored(monkeypat
 @pytest.mark.asyncio
 async def test_bot_handlers_agent_reply_from_non_admin_group_member_ignored(monkeypatch):
     """
-    2. SÉCURITÉ - Contrôle d'accès rôle admin:
-    Être présent dans le bon groupe support ne suffit pas: un simple membre
-    (non admin) ne doit jamais pouvoir résoudre un ticket ni parler au nom
-    de l'équipe support.
+    2. SECURITY - Admin role access control:
+    Being in the right support group is not enough: a plain member
+    (non-admin) must never be able to resolve a ticket or speak for
+    the support team.
     """
     support_group_id = -100555666
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
@@ -406,9 +406,9 @@ async def test_bot_handlers_agent_reply_from_non_admin_group_member_ignored(monk
 @pytest.mark.asyncio
 async def test_bot_handlers_backend_error_on_query_answers_user_friendly_error(bot_test_env):
     """
-    3. ROBUSTESSE - Panne Backend API:
-    Si le backend API est indisponible pendant la requête utilisateur,
-    un message d'erreur poli est affiché sans crasher le bot.
+    3. ROBUSTNESS - Backend API outage:
+    If the backend API is unavailable during the user's query,
+    a polite error message is shown without crashing the bot.
     """
     client = bot_test_env["client"]
     client.query.side_effect = ConnectionError("Backend down")

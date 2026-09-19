@@ -299,8 +299,8 @@ async def test_brevo_item_with_raw_text_body_only_resolves(brevo_test_client, mo
 @pytest.mark.asyncio
 async def test_brevo_webhook_rejected_when_email_disabled(brevo_test_client, monkeypatch):
     """
-    Vérifie que lorsque EMAIL_ENABLED est False, l'endpoint Brevo retourne
-    immédiatement HTTP 503 Service Unavailable.
+    When EMAIL_ENABLED is False, the Brevo endpoint immediately returns
+    HTTP 503 Service Unavailable.
     """
     monkeypatch.setattr(settings, "EMAIL_ENABLED", False)
     monkeypatch.setattr(settings, "BREVO_INBOUND_SECRET", TEST_BREVO_SECRET)

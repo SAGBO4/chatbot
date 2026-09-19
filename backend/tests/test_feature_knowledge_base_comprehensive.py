@@ -17,9 +17,9 @@ from app.services.knowledge_base import (
 @pytest.mark.asyncio
 async def test_kb_ingest_happy_path_creates_article_and_returns_201(app_test_env, caplog):
     """
-    1. FONCTIONNEL - Happy Path:
-    Création d'un article via POST /api/knowledge/ingest.
-    Vérifie code 201, données retournées et persistance en base de données.
+    1. FUNCTIONAL - Happy Path:
+    Creating an article via POST /api/knowledge/ingest.
+    Checks the 201 status, the returned data and persistence in the database.
     """
     client, session_maker, _ = app_test_env
 
@@ -52,8 +52,8 @@ async def test_kb_ingest_happy_path_creates_article_and_returns_201(app_test_env
 @pytest.mark.asyncio
 async def test_kb_ingest_auto_extracts_keywords_when_none_provided(app_test_env):
     """
-    1. FONCTIONNEL - Extraction automatique de mots-clés:
-    Si keywords est omis (None), les mots-clés sont automatiquement dérivés de la question.
+    1. FUNCTIONAL - Automatic keyword extraction:
+    If keywords is omitted (None), the keywords are derived from the question.
     """
     client, session_maker, _ = app_test_env
 
@@ -72,9 +72,9 @@ async def test_kb_ingest_auto_extracts_keywords_when_none_provided(app_test_env)
 @pytest.mark.asyncio
 async def test_kb_ingest_upsert_existing_source_ticket_id_updates_article(app_test_env):
     """
-    1. FONCTIONNEL & IDEMPOTENCE:
-    Si un article existe déjà pour un source_ticket_id donné,
-    l'ingestion met à jour l'article existant au lieu de créer un doublon.
+    1. FUNCTIONAL & IDEMPOTENCE:
+    If an article already exists for a given source_ticket_id,
+    ingestion updates the existing article instead of creating a duplicate.
     """
     client, session_maker, _ = app_test_env
 
@@ -88,7 +88,7 @@ async def test_kb_ingest_upsert_existing_source_ticket_id_updates_article(app_te
     assert resp1.status_code == 201
     art_id1 = resp1.json()["id"]
 
-    # 2. Deuxième ajout avec le même source_ticket_id
+    # 2. Second insert with the same source_ticket_id
     payload2 = {
         "question": "Question modifiée",
         "solution": "Version révisée de la solution",
@@ -98,7 +98,7 @@ async def test_kb_ingest_upsert_existing_source_ticket_id_updates_article(app_te
     assert resp2.status_code == 201
     art_id2 = resp2.json()["id"]
 
-    # L'ID doit être le même (mise à jour sur place)
+    # The ID must be the same (updated in place)
     assert art_id1 == art_id2
 
     async with session_maker() as session:
@@ -114,8 +114,8 @@ async def test_kb_ingest_upsert_existing_source_ticket_id_updates_article(app_te
 @pytest.mark.asyncio
 async def test_kb_ingest_empty_question_returns_422_validation_error(app_test_env):
     """
-    1. FONCTIONNEL - Validation entrées:
-    Une question vide viole min_length=1 et renvoie 422.
+    1. FUNCTIONAL - Input validation:
+    An empty question violates min_length=1 and returns 422.
     """
     client, _, _ = app_test_env
     resp = await client.post("/api/knowledge/ingest", json={"question": "", "solution": "Valide"})
@@ -125,8 +125,8 @@ async def test_kb_ingest_empty_question_returns_422_validation_error(app_test_en
 @pytest.mark.asyncio
 async def test_kb_ingest_max_length_boundaries_succeeds(app_test_env):
     """
-    1. FONCTIONNEL - Cas limites Max:
-    Question max 4096 caractères, Solution max 5000 caractères.
+    1. FUNCTIONAL - Max edge cases:
+    Question up to 4096 characters, solution up to 5000 characters.
     """
     client, _, _ = app_test_env
     payload = {
@@ -140,8 +140,8 @@ async def test_kb_ingest_max_length_boundaries_succeeds(app_test_env):
 @pytest.mark.asyncio
 async def test_kb_ingest_exceeds_max_length_returns_422(app_test_env):
     """
-    1. FONCTIONNEL - Erreurs attendues:
-    Solution de 5001 caractères renvoie 422.
+    1. FUNCTIONAL - Expected errors:
+    A 5001-character solution returns 422.
     """
     client, _, _ = app_test_env
     resp = await client.post(
@@ -175,9 +175,9 @@ async def test_kb_list_pagination_limit_and_offset_works(app_test_env):
 @pytest.mark.asyncio
 async def test_kb_search_bilingual_stopwords_filtered():
     """
-    1. FONCTIONNEL - Stopwords bilingues:
-    Vérifie que les stopwords français ('le', 'pourquoi', 'comment')
-    et anglais ('the', 'why', 'how') sont correctement filtrés.
+    1. FUNCTIONAL - Bilingual stopwords:
+    French stopwords ('le', 'pourquoi', 'comment') and English ones
+    ('the', 'why', 'how') are filtered out correctly.
     """
     tokens = tokenize("Comment faire pour exporter the file ?")
     assert "comment" not in tokens
@@ -191,8 +191,8 @@ async def test_kb_search_bilingual_stopwords_filtered():
 @pytest.mark.asyncio
 async def test_kb_search_prefix_and_stem_matching_scores_correctly(app_test_env):
     """
-    1. FONCTIONNEL - Recherche lexicale avec stemming/préfixe:
-    'imprimer' doit matcher un article traitant de l''imprimante'.
+    1. FUNCTIONAL - Lexical search with stemming/prefix:
+    'imprimer' must match an article about 'imprimante'.
     """
     client, session_maker, _ = app_test_env
 
@@ -214,8 +214,8 @@ async def test_kb_search_prefix_and_stem_matching_scores_correctly(app_test_env)
 @pytest.mark.asyncio
 async def test_kb_search_trigram_fuzzy_fallback_matches_typos(app_test_env):
     """
-    1. FONCTIONNEL - Fallback n-gram pour tolérance aux fautes de frappe:
-    Recherche avec typo ('imprimantee') retrouve l'article grâce aux trigrammes.
+    1. FUNCTIONAL - N-gram fallback for typo tolerance:
+    A search with a typo ('imprimantee') finds the article thanks to trigrams.
     """
     client, session_maker, _ = app_test_env
 
@@ -233,8 +233,8 @@ async def test_kb_search_trigram_fuzzy_fallback_matches_typos(app_test_env):
 @pytest.mark.asyncio
 async def test_kb_service_crud_update_and_delete_article(app_test_env):
     """
-    1. FONCTIONNEL - Service CRUD:
-    Vérifie les méthodes update_article et delete_article.
+    1. FUNCTIONAL - CRUD service:
+    The update_article and delete_article methods.
     """
     _, session_maker, _ = app_test_env
 
@@ -256,15 +256,15 @@ async def test_kb_service_crud_update_and_delete_article(app_test_env):
 
 
 # ==============================================================================
-# 2. SÉCURITÉ
+# 2. SECURITY
 # ==============================================================================
 
 
 @pytest.mark.asyncio
 async def test_kb_ingest_and_list_unauthorized_returns_401(unauth_client):
     """
-    2. SÉCURITÉ - Authz:
-    POST /api/knowledge/ingest et GET /api/knowledge sans X-API-Key renvoient 401.
+    2. SECURITY - Authz:
+    POST /api/knowledge/ingest and GET /api/knowledge without X-API-Key return 401.
     """
     resp_ingest = await unauth_client.post("/api/knowledge/ingest", json={"question": "Q", "solution": "S"})
     assert resp_ingest.status_code == 401
@@ -276,9 +276,9 @@ async def test_kb_ingest_and_list_unauthorized_returns_401(unauth_client):
 @pytest.mark.asyncio
 async def test_kb_sql_injection_in_search_query_handled_safely(app_test_env):
     """
-    2. SÉCURITÉ - Injection SQL:
-    Recherche KB avec syntaxe SQL (`%' UNION SELECT 1,2,3...`)
-    exécutée de manière sûre via SQLAlchemy ORM sans injection possible.
+    2. SECURITY - SQL injection:
+    KB search with SQL syntax (`%' UNION SELECT 1,2,3...`)
+    is executed safely through the SQLAlchemy ORM, with no possible injection.
     """
     _, session_maker, _ = app_test_env
 
@@ -287,16 +287,16 @@ async def test_kb_sql_injection_in_search_query_handled_safely(app_test_env):
 
         sql_injection = "test%' OR '1'='1' UNION SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL --"
         matches = await KnowledgeBaseService.search(session, query=sql_injection)
-        # Ne doit pas lever d'erreur SQL ni renvoyer de données corrompues
+        # Must not raise an SQL error nor return corrupted data
         assert isinstance(matches, list)
 
 
 @pytest.mark.asyncio
 async def test_kb_excessive_tokens_bounded_to_twelve(app_test_env):
     """
-    2. SÉCURITÉ - Prévention d'explosion de clauses SQL (Déni de service):
-    Une requête contenant 50 mots doit être bornée aux 12 premiers tokens
-    pour éviter la construction d'une requête SQL monstre avec des centaines de conditions.
+    2. SECURITY - Preventing SQL clause explosion (denial of service):
+    A query of 50 words must be bounded to the first 12 tokens
+    so a huge SQL query with hundreds of conditions is never built.
     """
     _, session_maker, _ = app_test_env
 
@@ -314,8 +314,8 @@ async def test_kb_excessive_tokens_bounded_to_twelve(app_test_env):
 @pytest.mark.asyncio
 async def test_kb_concurrent_ingestions_succeed(app_test_env):
     """
-    3. ROBUSTESSE - Concurrence:
-    10 ajouts concurrents d'articles dans la KB.
+    3. ROBUSTNESS - Concurrency:
+    10 concurrent article inserts into the KB.
     """
     client, session_maker, _ = app_test_env
 

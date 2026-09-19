@@ -11,9 +11,9 @@ from app.limiter import limiter
 @pytest.mark.asyncio
 async def test_throttling_messages_under_rate_limit_are_allowed():
     """
-    1. FONCTIONNEL:
-    Les messages inférieurs à la limite (4 messages avec limite=5)
-    doivent tous être transmis au handler.
+    1. FUNCTIONAL:
+    Messages under the limit (4 messages with a limit of 5)
+    must all be passed to the handler.
     """
     middleware = ThrottlingMiddleware(rate_limit=5, window_seconds=10.0)
     handler = AsyncMock(return_value="OK")
@@ -31,10 +31,10 @@ async def test_throttling_messages_under_rate_limit_are_allowed():
 @pytest.mark.asyncio
 async def test_throttling_applies_to_callback_queries_too():
     """
-    2. SÉCURITÉ:
-    Les callback queries (clics sur boutons inline, ex: "resolve:no") sont
-    soumis à la même limite que les messages - sinon un utilisateur peut
-    contourner tout le throttling en spammant un bouton plutôt qu'un texte.
+    2. SECURITY:
+    Callback queries (inline button clicks, e.g. "resolve:no") are
+    subject to the same limit as messages - otherwise a user could
+    bypass all throttling by spamming a button instead of text.
     """
     middleware = ThrottlingMiddleware(rate_limit=3, window_seconds=10.0)
     handler = AsyncMock(return_value="OK")
@@ -57,9 +57,9 @@ async def test_throttling_applies_to_callback_queries_too():
 @pytest.mark.asyncio
 async def test_throttling_excess_messages_dropped_and_warning_sent():
     """
-    1. FONCTIONNEL & SÉCURITÉ:
-    Le 6ème message envoyé dans la fenêtre dépasse la limite (5).
-    Il doit être bloqué (retourne None sans appeler le handler) et un avertissement est envoyé.
+    1. FUNCTIONAL & SECURITY:
+    The 6th message sent within the window exceeds the limit (5).
+    It must be blocked (returns None without calling the handler) and a warning is sent.
     """
     middleware = ThrottlingMiddleware(rate_limit=5, window_seconds=10.0, warning_cooldown=5.0)
     handler = AsyncMock(return_value="OK")
@@ -68,17 +68,17 @@ async def test_throttling_excess_messages_dropped_and_warning_sent():
     message = MagicMock(spec=Message, from_user=user)
     message.answer = AsyncMock()
 
-    # 5 messages autorisés
+    # 5 messages allowed
     for _ in range(5):
         res = await middleware(handler, message, {})
         assert res == "OK"
 
-    # 6ème message bloqué
+    # 6th message blocked
     res_blocked = await middleware(handler, message, {})
     assert res_blocked is None
     assert handler.call_count == 5
 
-    # Avertissement envoyé à l'utilisateur
+    # Warning sent to the user
     message.answer.assert_called_once()
     assert "Veuillez patienter" in message.answer.call_args[0][0]
 
@@ -86,9 +86,9 @@ async def test_throttling_excess_messages_dropped_and_warning_sent():
 @pytest.mark.asyncio
 async def test_throttling_warning_cooldown_prevents_repeated_warning_spam():
     """
-    1. FONCTIONNEL:
-    Pendant la période de cooldown d'avertissement, les messages excédentaires
-    sont silencieusement ignorés sans spammer l'utilisateur de messages d'avertissement.
+    1. FUNCTIONAL:
+    During the warning cooldown period, excess messages
+    are silently ignored without spamming the user with warning messages.
     """
     middleware = ThrottlingMiddleware(rate_limit=2, window_seconds=10.0, warning_cooldown=5.0)
     handler = AsyncMock(return_value="OK")
@@ -97,15 +97,15 @@ async def test_throttling_warning_cooldown_prevents_repeated_warning_spam():
     message = MagicMock(spec=Message, from_user=user)
     message.answer = AsyncMock()
 
-    # 2 autorisés
+    # 2 allowed
     await middleware(handler, message, {})
     await middleware(handler, message, {})
 
-    # 3ème: bloqué + avertissement 1
+    # 3rd: blocked + warning 1
     await middleware(handler, message, {})
     assert message.answer.call_count == 1
 
-    # 4ème: bloqué, mais pas de nouvel avertissement (cooldown actif)
+    # 4th: blocked, but no new warning (cooldown active)
     await middleware(handler, message, {})
     assert message.answer.call_count == 1
 
@@ -113,8 +113,8 @@ async def test_throttling_warning_cooldown_prevents_repeated_warning_spam():
 @pytest.mark.asyncio
 async def test_throttling_per_user_isolation_one_user_limit_does_not_block_another_user():
     """
-    2. SÉCURITÉ - Isolation des utilisateurs:
-    Le dépassement de quota par l'utilisateur A ne doit en aucun cas bloquer l'utilisateur B.
+    2. SECURITY - User isolation:
+    User A exceeding their quota must never block user B.
     """
     middleware = ThrottlingMiddleware(rate_limit=2, window_seconds=10.0)
     handler = AsyncMock(return_value="OK")
@@ -127,13 +127,13 @@ async def test_throttling_per_user_isolation_one_user_limit_does_not_block_anoth
     msg_b = MagicMock(spec=Message, from_user=user_b)
     msg_b.answer = AsyncMock()
 
-    # User A consomme ses 2 requêtes et se fait bloquer à la 3e
+    # User A uses their 2 requests and gets blocked on the 3rd
     await middleware(handler, msg_a, {})
     await middleware(handler, msg_a, {})
     res_a3 = await middleware(handler, msg_a, {})
     assert res_a3 is None
 
-    # User B doit pouvoir envoyer ses messages normalement
+    # User B must be able to send their messages normally
     res_b1 = await middleware(handler, msg_b, {})
     assert res_b1 == "OK"
 
@@ -142,10 +142,10 @@ async def test_throttling_per_user_isolation_one_user_limit_does_not_block_anoth
 @pytest.mark.asyncio
 async def test_throttling_sliding_window_expiration_allows_new_messages():
     """
-    1. FONCTIONNEL & ROBUSTESSE - Expiration fenêtre glissante (marqué @pytest.mark.slow):
-    Après expiration de la fenêtre temporelle, l'utilisateur retrouve son droit de message.
+    1. FUNCTIONAL & ROBUSTNESS - Sliding window expiration (marked @pytest.mark.slow):
+    Once the time window has expired, the user may send messages again.
     """
-    # Fenêtre très courte de 0.2s pour le test
+    # Very short 0.2s window for the test
     middleware = ThrottlingMiddleware(rate_limit=1, window_seconds=0.2)
     handler = AsyncMock(return_value="OK")
 
@@ -157,14 +157,14 @@ async def test_throttling_sliding_window_expiration_allows_new_messages():
     res1 = await middleware(handler, msg, {})
     assert res1 == "OK"
 
-    # Immédiatement après: bloqué
+    # Right after: blocked
     res2 = await middleware(handler, msg, {})
     assert res2 is None
 
-    # Attente expiration fenêtre
+    # Wait for the window to expire
     time.sleep(0.25)
 
-    # Nouveau message autorisé
+    # New message allowed
     res3 = await middleware(handler, msg, {})
     assert res3 == "OK"
 
@@ -172,16 +172,16 @@ async def test_throttling_sliding_window_expiration_allows_new_messages():
 @pytest.mark.asyncio
 async def test_ratelimit_backend_tickets_exceeding_limit_returns_429(app_test_env):
     """
-    1. FONCTIONNEL / 2. SÉCURITÉ - Limiteur backend FastAPI:
-    L'endpoint POST /api/tickets est limité à 10/minute.
-    La 11ème requête doit retourner 429 Too Many Requests.
+    1. FUNCTIONAL / 2. SECURITY - FastAPI backend limiter:
+    The POST /api/tickets endpoint is limited to 10/minute.
+    The 11th request must return 429 Too Many Requests.
     """
     client, _, _ = app_test_env
     limiter.enabled = True
     limiter.reset()
 
     try:
-        # Envoi de 10 requêtes valides
+        # Send 10 valid requests
         for i in range(10):
             resp = await client.post(
                 "/api/tickets",
@@ -189,7 +189,7 @@ async def test_ratelimit_backend_tickets_exceeding_limit_returns_429(app_test_en
             )
             assert resp.status_code == 201
 
-        # 11ème requête -> 429
+        # 11th request -> 429
         resp_blocked = await client.post(
             "/api/tickets",
             json={"user_id": 1, "question": "Question 11 excédentaire"},
@@ -206,9 +206,9 @@ async def test_ratelimit_backend_tickets_exceeding_limit_returns_429(app_test_en
 @pytest.mark.asyncio
 async def test_throttling_forgets_users_who_have_been_idle(monkeypatch):
     """
-    Sans purge, user_timestamps et last_warning_time grandissent avec chaque utilisateur
-    jamais vu (fuite mémoire lente sur un bot public). Un utilisateur inactif au-delà de la
-    fenêtre doit être oublié, sans changer le comportement pour les autres.
+    Without a purge, user_timestamps and last_warning_time grow with every user
+    ever seen (a slow memory leak on a public bot). A user idle beyond the
+    window must be forgotten, without changing the behaviour for the others.
     """
     clock = [1000.0]
     monkeypatch.setattr("bot.middlewares.throttling.time.time", lambda: clock[0])

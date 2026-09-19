@@ -14,8 +14,8 @@ from tests.conftest import TEST_API_KEY
 @pytest.mark.asyncio
 async def test_health_check_database_connected_returns_200_ok(app_test_env):
     """
-    1. FONCTIONNEL - Health Check:
-    GET /health retourne 200 avec status="ok" et database="connected".
+    1. FUNCTIONAL - Health check:
+    GET /health returns 200 with status="ok" and database="connected".
     """
     client, _, _ = app_test_env
     resp = await client.get("/health")
@@ -29,8 +29,8 @@ async def test_health_check_database_connected_returns_200_ok(app_test_env):
 @pytest.mark.asyncio
 async def test_security_api_key_valid_header_authorizes_access(app_test_env):
     """
-    1. FONCTIONNEL / 2. SÉCURITÉ:
-    Une requête avec l'en-tête X-API-Key correcte est acceptée (accès autorisé).
+    1. FUNCTIONAL / 2. SECURITY:
+    A request with the correct X-API-Key header is accepted (access granted).
     """
     client, _, _ = app_test_env
     resp = await client.get("/api/tickets", headers={"X-API-Key": TEST_API_KEY})
@@ -40,8 +40,8 @@ async def test_security_api_key_valid_header_authorizes_access(app_test_env):
 @pytest.mark.asyncio
 async def test_security_api_key_missing_header_returns_401_unauthorized(unauth_client):
     """
-    2. SÉCURITÉ - Auth:
-    Une requête sans l'en-tête X-API-Key retourne 401 Unauthorized.
+    2. SECURITY - Auth:
+    A request without the X-API-Key header returns 401 Unauthorized.
     """
     resp = await unauth_client.get("/api/tickets")
     assert resp.status_code == 401
@@ -51,8 +51,8 @@ async def test_security_api_key_missing_header_returns_401_unauthorized(unauth_c
 @pytest.mark.asyncio
 async def test_security_api_key_invalid_header_returns_401_unauthorized(unauth_client):
     """
-    2. SÉCURITÉ - Auth:
-    Une clé falsifiée retourne 401 Unauthorized.
+    2. SECURITY - Auth:
+    A forged key returns 401 Unauthorized.
     """
     resp = await unauth_client.get("/api/tickets", headers={"X-API-Key": "mauvaise_cle"})
     assert resp.status_code == 401
@@ -61,8 +61,8 @@ async def test_security_api_key_invalid_header_returns_401_unauthorized(unauth_c
 @pytest.mark.asyncio
 async def test_security_api_key_unconfigured_returns_503_fail_closed(app_test_env, monkeypatch):
     """
-    2. SÉCURITÉ - Fail-closed:
-    Si API_KEY n'est pas configuré dans settings, l'accès est bloqué avec 503 (pas d'ouverture par défaut).
+    2. SECURITY - Fail-closed:
+    If API_KEY is not set in settings, access is blocked with 503 (never open by default).
     """
     client, _, _ = app_test_env
     monkeypatch.setattr(settings, "API_KEY", None)
@@ -74,8 +74,8 @@ async def test_security_api_key_unconfigured_returns_503_fail_closed(app_test_en
 
 def test_security_timing_safe_compare_used_for_secrets():
     """
-    2. SÉCURITÉ - Timing Attacks:
-    Vérifie l'utilisation de hmac.compare_digest pour résister aux attaques par analyse temporelle.
+    2. SECURITY - Timing attacks:
+    hmac.compare_digest is used, to resist timing analysis attacks.
     """
     secret = "secret-key-1234567890"
     assert hmac.compare_digest(secret, "secret-key-1234567890") is True
@@ -85,9 +85,9 @@ def test_security_timing_safe_compare_used_for_secrets():
 @pytest.mark.asyncio
 async def test_security_cors_headers_and_credentials_safety(app_test_env):
     """
-    2. SÉCURITÉ - Headers CORS:
-    Vérifie que la configuration CORS refuse les requêtes authentifiées avec credentials
-    lorsque allow_origins=["*"] (pour empêcher le vol de cookies cross-origin).
+    2. SECURITY - CORS headers:
+    The CORS configuration refuses authenticated requests with credentials
+    when allow_origins=["*"] (to prevent cross-origin cookie theft).
     """
     client, _, _ = app_test_env
     resp = await client.options(
@@ -98,15 +98,15 @@ async def test_security_cors_headers_and_credentials_safety(app_test_env):
             "Access-Control-Request-Headers": "X-API-Key",
         },
     )
-    # allow_credentials doit être absent ou à 'false'
+    # allow_credentials must be absent or 'false'
     assert resp.headers.get("access-control-allow-credentials") != "true"
 
 
 @pytest.mark.asyncio
 async def test_security_secrets_never_leaked_in_http_error_responses(app_test_env):
     """
-    2. SÉCURITÉ - Non-divulgation de secrets:
-    Une erreur HTTP ou validation ne doit jamais refléter les clés de configuration.
+    2. SECURITY - Non-disclosure of secrets:
+    An HTTP or validation error must never reflect configuration keys.
     """
     client, _, _ = app_test_env
     resp = await client.post("/api/tickets", json={"invalid_field": True})
@@ -123,13 +123,13 @@ async def test_security_secrets_never_leaked_in_http_error_responses(app_test_en
 @pytest.mark.asyncio
 async def test_health_check_database_outage_returns_503_service_unavailable(app_test_env, caplog):
     """
-    3. ROBUSTESSE - Panne base de données:
-    Si la base de données est déconnectée ou inaccessible,
-    /health renvoie immédiatement 503 Service Unavailable et log l'erreur.
+    3. ROBUSTNESS - Database outage:
+    If the database is disconnected or unreachable,
+    /health immediately returns 503 Service Unavailable and logs the error.
     """
     client, session_maker, _ = app_test_env
 
-    # Simuler une panne de session DB sur text("SELECT 1")
+    # Simulate a DB session failure on text("SELECT 1")
     from app.main import app
     from app.database import get_db
 
@@ -147,7 +147,7 @@ async def test_health_check_database_outage_returns_503_service_unavailable(app_
         assert "Database connectivity error" in resp.json()["detail"]
         assert any("Health check database connectivity failure" in r.getMessage() for r in caplog.records)
     finally:
-        # Rétablir la fixture originale
+        # Restore the original fixture
         async def override_get_db():
             async with session_maker() as session:
                 yield session
@@ -157,8 +157,8 @@ async def test_health_check_database_outage_returns_503_service_unavailable(app_
 @pytest.mark.asyncio
 async def test_health_check_concurrent_requests_all_return_200(app_test_env):
     """
-    3. ROBUSTESSE - Concurrence:
-    20 requêtes simultanées de health check répondent toutes 200 sans blocage.
+    3. ROBUSTNESS - Concurrency:
+    20 simultaneous health check requests all return 200 without blocking.
     """
     client, _, _ = app_test_env
     responses = await asyncio.gather(*(client.get("/health") for _ in range(20)))

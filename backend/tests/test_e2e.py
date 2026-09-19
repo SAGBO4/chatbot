@@ -138,7 +138,7 @@ async def test_full_support_lifecycle_loop(e2e_environment, monkeypatch):
     assert "Je n'ai pas trouvé de réponse directe" in initial_answer
     assert "Votre problème est-il résolu ?" in initial_answer
 
-    # Step 2: User clicks "NON" (problème non résolu -> TICKET)
+    # Step 2: User clicks "NON" (problem not solved -> TICKET)
     cb_msg_1 = MagicMock(spec=Message, text=initial_answer)
     cb_msg_1.edit_text = AsyncMock()
     callback_no = MagicMock(
@@ -219,7 +219,7 @@ async def test_full_support_lifecycle_loop(e2e_environment, monkeypatch):
     assert agent_solution in auto_answer_2
     assert "Votre problème est-il résolu ?" in auto_answer_2
 
-    # Step 5: User 2 clicks "OUI" (Problème résolu -> FIN)
+    # Step 5: User 2 clicks "OUI" (problem solved -> END)
     cb_msg_2 = MagicMock(spec=Message, text=auto_answer_2)
     cb_msg_2.edit_text = AsyncMock()
     callback_yes = MagicMock(

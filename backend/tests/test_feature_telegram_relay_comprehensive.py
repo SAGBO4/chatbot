@@ -10,8 +10,8 @@ from app.services.telegram_relay import TelegramRelay
 @pytest.mark.asyncio
 async def test_telegram_relay_send_message_to_user_happy_path_succeeds(monkeypatch):
     """
-    1. FONCTIONNEL - Happy Path:
-    Vérifie l'envoi d'un message direct à un utilisateur via l'API Telegram sendMessage.
+    1. FUNCTIONAL - Happy Path:
+    A direct message is sent to a user through the Telegram sendMessage API.
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456:ABC-DEF")
     mock_resp = httpx.Response(status_code=200, json={"ok": True})
@@ -35,8 +35,8 @@ async def test_telegram_relay_send_message_to_user_happy_path_succeeds(monkeypat
 @pytest.mark.asyncio
 async def test_telegram_relay_notify_support_group_happy_path_succeeds(monkeypatch):
     """
-    1. FONCTIONNEL - Notification groupe support:
-    Vérifie la transmission d'un message d'alerte au groupe support Telegram configuré.
+    1. FUNCTIONAL - Support group notification:
+    An alert message is forwarded to the configured Telegram support group.
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456:ABC-DEF")
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", -100987654321)
@@ -60,8 +60,8 @@ async def test_telegram_relay_notify_support_group_happy_path_succeeds(monkeypat
 @pytest.mark.asyncio
 async def test_telegram_relay_unconfigured_token_simulates_success(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Quand le token est 'placeholder_token' ou vide, le message est simulé avec succès.
+    1. FUNCTIONAL:
+    When the token is 'placeholder_token' or empty, the message is simulated successfully.
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "placeholder_token")
     success = await TelegramRelay.send_message_to_user(1, "Test")
@@ -71,8 +71,8 @@ async def test_telegram_relay_unconfigured_token_simulates_success(monkeypatch):
 @pytest.mark.asyncio
 async def test_telegram_relay_unconfigured_support_group_simulates_success(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Quand le groupe support est 0 (non configuré), le relay simule sans crash.
+    1. FUNCTIONAL:
+    When the support group is 0 (not configured), the relay simulates without crashing.
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "real_token")
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", 0)
@@ -83,9 +83,9 @@ async def test_telegram_relay_unconfigured_support_group_simulates_success(monke
 @pytest.mark.asyncio
 async def test_telegram_relay_markdown_failure_falls_back_to_plain_text(monkeypatch, caplog):
     """
-    1. FONCTIONNEL & ROBUSTESSE:
-    Si l'envoi en parse_mode Markdown échoue (ex: erreur 400 Bad Request syntaxe markdown),
-    le relais retente immédiatement en texte brut (sans parse_mode).
+    1. FUNCTIONAL & ROBUSTNESS:
+    If sending with parse_mode Markdown fails (e.g. 400 Bad Request, markdown syntax error),
+    the relay immediately retries in plain text (without parse_mode).
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456:ABC-DEF")
 
@@ -104,7 +104,7 @@ async def test_telegram_relay_markdown_failure_falls_back_to_plain_text(monkeypa
 
         assert success is True
         assert mock_client.post.call_count == 2
-        # Le 2e appel ne doit pas avoir parse_mode
+        # The 2nd call must not have parse_mode
         second_call_json = mock_client.post.call_args_list[1][1]["json"]
         assert "parse_mode" not in second_call_json
         assert any("retrying in plain text" in r.getMessage() for r in caplog.records)
@@ -115,8 +115,8 @@ async def test_telegram_relay_markdown_failure_falls_back_to_plain_text(monkeypa
 @pytest.mark.asyncio
 async def test_telegram_relay_message_length_truncated_to_4000_chars(monkeypatch):
     """
-    1. FONCTIONNEL:
-    Un texte de plus de 4000 caractères doit être tronqué pour respecter la limite Telegram.
+    1. FUNCTIONAL:
+    A text longer than 4000 characters must be truncated to respect the Telegram limit.
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456:ABC-DEF")
     mock_client = AsyncMock()
@@ -142,8 +142,8 @@ async def test_telegram_relay_message_length_truncated_to_4000_chars(monkeypatch
 @pytest.mark.asyncio
 async def test_telegram_relay_http_timeout_returns_false(monkeypatch, caplog):
     """
-    3. ROBUSTESSE - Timeout réseau:
-    Un timeout HTTP vers l'API Telegram retourne False sans planter le caller.
+    3. ROBUSTNESS - Network timeout:
+    An HTTP timeout towards the Telegram API returns False without crashing the caller.
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456:ABC-DEF")
 
@@ -164,8 +164,8 @@ async def test_telegram_relay_http_timeout_returns_false(monkeypatch, caplog):
 @pytest.mark.asyncio
 async def test_telegram_relay_network_connection_error_returns_false(monkeypatch, caplog):
     """
-    3. ROBUSTESSE - Erreur de connexion:
-    Une erreur de connexion (ConnectError) retourne False gracieusement.
+    3. ROBUSTNESS - Connection error:
+    A connection error (ConnectError) gracefully returns False.
     """
     monkeypatch.setattr(settings, "TELEGRAM_BOT_TOKEN", "123456:ABC-DEF")
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", -100123456789)
