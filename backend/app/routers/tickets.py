@@ -1,7 +1,7 @@
 """Support tickets: create, read, attach the support-group card, resolve."""
-from typing import List, Optional
+from typing import Annotated, List, Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Query, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.background import safe_background_task
@@ -10,6 +10,7 @@ from app.database import get_db
 from app.limiter import limiter
 from app.models import TicketStatus
 from app.observability import get_logger
+from app.openapi_docs import PROTECTED, RATE_LIMITED, error_responses
 from app.schemas import TicketCreateRequest, TicketResolveRequest, TicketResponse, TicketSupportCardRequest
 from app.security import verify_api_key
 from app.services.bot_settings_service import BotSettingsService
@@ -17,7 +18,9 @@ from app.services.email_service import EmailService
 from app.services.ticket_service import TicketService
 
 logger = get_logger(__name__)
-router = APIRouter(tags=["tickets"])
+router = APIRouter(tags=["tickets"], responses=PROTECTED)
+
+NOT_FOUND = error_responses({404: "No such ticket."})
 
 
 @router.post(
@@ -25,6 +28,7 @@ router = APIRouter(tags=["tickets"])
     response_model=TicketResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(verify_api_key)],
+    responses=RATE_LIMITED,
 )
 @limiter.limit("10/minute")
 async def create_ticket(
@@ -59,10 +63,10 @@ async def create_ticket(
 
 @router.get("/api/tickets", response_model=List[TicketResponse], dependencies=[Depends(verify_api_key)])
 async def list_tickets(
-    status_filter: Optional[TicketStatus] = None,
-    user_id: Optional[int] = Query(default=None, description="Filter tickets by user ID"),
-    limit: int = Query(default=50, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    status_filter: Optional[TicketStatus] = Query(default=None, description="Only tickets in this status."),
+    user_id: Optional[int] = Query(default=None, description="Only the tickets of this Telegram user id."),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size."),
+    offset: int = Query(default=0, ge=0, description="Tickets to skip, for paging."),
     session: AsyncSession = Depends(get_db),
 ):
     """List tickets, optionally filtered by status or `user_id`; paginated."""
@@ -80,9 +84,10 @@ async def list_tickets(
     "/api/tickets/by-support-message/{message_id}",
     response_model=TicketResponse,
     dependencies=[Depends(verify_api_key)],
+    responses=error_responses({404: "No ticket is attached to this support-group message."}),
 )
 async def get_ticket_by_support_message(
-    message_id: int,
+    message_id: Annotated[int, Path(description="Telegram message id of a ticket card in the support group.")],
     session: AsyncSession = Depends(get_db),
 ):
     """
@@ -102,10 +107,11 @@ async def get_ticket_by_support_message(
     "/api/tickets/{ticket_id}",
     response_model=TicketResponse,
     dependencies=[Depends(verify_api_key)],
+    responses=NOT_FOUND,
 )
 async def get_ticket(
-    ticket_id: int,
-    user_id: Optional[int] = Query(default=None, description="Optional user ID to enforce ownership scoping"),
+    ticket_id: Annotated[int, Path(description="Ticket id.")],
+    user_id: Optional[int] = Query(default=None, description="Restrict to this user: a ticket owned by someone else is answered 404."),
     session: AsyncSession = Depends(get_db),
 ):
     """Get one ticket. With `user_id`, a ticket belonging to another user is reported as not found."""
@@ -119,9 +125,10 @@ async def get_ticket(
     "/api/tickets/{ticket_id}/support-card",
     response_model=TicketResponse,
     dependencies=[Depends(verify_api_key)],
+    responses=NOT_FOUND,
 )
 async def attach_support_card(
-    ticket_id: int,
+    ticket_id: Annotated[int, Path(description="Ticket id.")],
     payload: TicketSupportCardRequest,
     session: AsyncSession = Depends(get_db),
 ):
@@ -141,11 +148,12 @@ async def attach_support_card(
     "/api/tickets/{ticket_id}/resolve",
     response_model=TicketResponse,
     dependencies=[Depends(verify_api_key)],
+    responses={**NOT_FOUND, **RATE_LIMITED},
 )
 @limiter.limit("15/minute")
 async def resolve_ticket(
     request: Request,
-    ticket_id: int,
+    ticket_id: Annotated[int, Path(description="Ticket id.")],
     payload: TicketResolveRequest,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),

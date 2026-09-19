@@ -5,12 +5,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.observability import get_logger
+from app.openapi_docs import error_responses
+from app.schemas import HealthResponse
 
 logger = get_logger(__name__)
 router = APIRouter(tags=["system"])
 
 
-@router.get("/health")
+@router.get(
+    "/health",
+    response_model=HealthResponse,
+    responses=error_responses({503: "The database does not answer."}),
+)
 async def health_check(session: AsyncSession = Depends(get_db)):
     """Liveness probe: pings the database and answers 503 if it is unreachable."""
     try:
