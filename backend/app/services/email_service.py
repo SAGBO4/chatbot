@@ -31,9 +31,6 @@ class EmailService:
                 server.send_message(msg)
             logger.info("Email sent successfully: %s to %s", msg["Subject"], msg["To"])
             return True
-        except (smtplib.SMTPException, OSError) as exc:
-            logger.error("Failed to send SMTP email: %s", exc)
-            return False
         except Exception as exc:
             logger.error("Failed to send SMTP email: %s", exc)
             return False

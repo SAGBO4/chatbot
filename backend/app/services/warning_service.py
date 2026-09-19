@@ -1,5 +1,5 @@
-from typing import List
-from sqlalchemy import select, func
+from typing import List, Optional
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import CommunityWarning
 
@@ -13,7 +13,7 @@ class WarningService:
         user_id: int,
         group_id: int,
         warned_by: str,
-        reason: str = None,
+        reason: Optional[str] = None,
     ) -> CommunityWarning:
         """Record a warning; a blank `reason` is stored as null."""
         warning = CommunityWarning(
@@ -38,13 +38,3 @@ class WarningService:
             .order_by(CommunityWarning.id.desc())
         )
         return list(result.scalars().all())
-
-    @staticmethod
-    async def count_warnings(session: AsyncSession, user_id: int, group_id: int) -> int:
-        """How many warnings a user has in a group."""
-        result = await session.execute(
-            select(func.count())
-            .select_from(CommunityWarning)
-            .where(CommunityWarning.user_id == user_id, CommunityWarning.group_id == group_id)
-        )
-        return int(result.scalar_one())

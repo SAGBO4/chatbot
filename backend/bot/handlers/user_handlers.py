@@ -28,7 +28,7 @@ async def handle_start(message: Message, state: FSMContext, backend_client: Opti
     """/start: welcome message, with the WebApp button when TELEGRAM_WEBAPP_URL is set."""
     await state.clear()
     lang = await get_active_language(backend_client=backend_client)
-    url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    url = settings.TELEGRAM_WEBAPP_URL
     keyboard = get_webapp_keyboard(url, lang=lang) if url else None
     await message.answer(t("welcome", lang), parse_mode="Markdown", reply_markup=keyboard)
 
@@ -37,7 +37,7 @@ async def handle_start(message: Message, state: FSMContext, backend_client: Opti
 async def handle_webapp(message: Message, backend_client: Optional[BackendClient] = None):
     """/webapp: a button that opens the Mini App."""
     lang = await get_active_language(backend_client=backend_client)
-    url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    url = settings.TELEGRAM_WEBAPP_URL
     if not url:
         await message.answer(t("webapp_not_configured", lang))
         return
@@ -51,7 +51,7 @@ async def handle_webapp(message: Message, backend_client: Optional[BackendClient
 async def handle_help(message: Message, backend_client: Optional[BackendClient] = None):
     """/help: how to use the bot."""
     lang = await get_active_language(backend_client=backend_client)
-    url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    url = settings.TELEGRAM_WEBAPP_URL
     keyboard = get_webapp_keyboard(url, lang=lang) if url else None
     await message.answer(t("help", lang), parse_mode="Markdown", reply_markup=keyboard)
 

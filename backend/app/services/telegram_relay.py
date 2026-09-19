@@ -62,9 +62,6 @@ class TelegramRelay:
                     )
                     return False
             return True
-        except httpx.HTTPError as exc:
-            logger.error("Failed to relay message to %s: %s", target_desc, exc)
-            return False
         except Exception as exc:
             logger.error("Failed to relay message to %s: %s", target_desc, exc)
             return False

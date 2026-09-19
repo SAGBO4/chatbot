@@ -48,6 +48,6 @@ async def is_authorized(user_id: int, backend_client: Optional[BackendClient] = 
     return result
 
 
-async def is_owner(user_id: int) -> bool:
+def is_owner(user_id: int) -> bool:
     """Whether user_id is the bot owner from the env, the only user who can manage the whitelist."""
     return settings.is_bot_owner(user_id)

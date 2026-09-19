@@ -80,3 +80,13 @@ async def test_whitelist_lookup_error_defaults_to_unauthorized(monkeypatch):
     result = await access_control.is_authorized(42, backend_client=mock_client)
 
     assert result is False
+
+
+def test_is_owner_is_a_plain_synchronous_check(monkeypatch):
+    """It reads the env-defined owner only (no I/O), so it must not need to be awaited."""
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 999)
+
+    assert access_control.is_owner(999) is True
+    assert access_control.is_owner(1000) is False
+    monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", None)
+    assert access_control.is_owner(999) is False

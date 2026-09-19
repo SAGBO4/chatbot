@@ -63,7 +63,7 @@ async def handle_whitelist(
     """
     requester_id = message.from_user.id
     lang = await get_active_language(backend_client=backend_client)
-    if not await is_owner(requester_id):
+    if not is_owner(requester_id):
         await message.reply(t("setup_not_owner", lang))
         return
 

@@ -58,7 +58,7 @@ async def main():
     dp = create_dispatcher(backend_client=backend_client)
 
     # Telegram only accepts an https:// URL for the menu button
-    webapp_url = getattr(settings, "TELEGRAM_WEBAPP_URL", None)
+    webapp_url = settings.TELEGRAM_WEBAPP_URL
     if webapp_url and webapp_url.startswith("https://"):
         try:
             from aiogram.types import MenuButtonWebApp, WebAppInfo

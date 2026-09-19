@@ -81,9 +81,6 @@ class AIAssistantService:
             else:
                 logger.warning("Unknown AI_PROVIDER '%s', falling back to no AI answer.", provider)
                 return None
-        except (httpx.HTTPError, KeyError, ValueError) as exc:
-            logger.error("Error communicating with AI provider '%s': %s", provider, exc)
-            return None
         except Exception as exc:
             logger.error("Error communicating with AI provider '%s': %s", provider, exc)
             return None

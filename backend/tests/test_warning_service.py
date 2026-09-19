@@ -47,9 +47,6 @@ async def test_count_and_list_warnings_scoped_per_user_and_group(async_session):
     # Different user in the same group should not be counted either
     await WarningService.add_warning(async_session, user_id=2, group_id=-100, warned_by="a", reason="r4")
 
-    count = await WarningService.count_warnings(async_session, user_id=1, group_id=-100)
-    assert count == 2
-
     warnings = await WarningService.list_warnings(async_session, user_id=1, group_id=-100)
     assert len(warnings) == 2
     assert {w.reason for w in warnings} == {"r1", "r2"}

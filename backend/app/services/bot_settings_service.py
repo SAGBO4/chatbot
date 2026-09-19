@@ -113,7 +113,7 @@ class WhitelistService:
         return result.scalars().first() is not None
 
     @staticmethod
-    async def list(session: AsyncSession) -> List[BotAdminWhitelist]:
+    async def list_entries(session: AsyncSession) -> List[BotAdminWhitelist]:
         """All entries, oldest first."""
         result = await session.execute(select(BotAdminWhitelist).order_by(BotAdminWhitelist.created_at.asc()))
         return list(result.scalars().all())

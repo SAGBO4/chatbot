@@ -883,7 +883,7 @@ async def remove_whitelist_entry(user_id: int, session: AsyncSession = Depends(g
 )
 async def list_whitelist_entries(session: AsyncSession = Depends(get_db)):
     """List the admin whitelist."""
-    entries = await WhitelistService.list(session=session)
+    entries = await WhitelistService.list_entries(session=session)
     return WhitelistListResponse(entries=entries)
 
 
