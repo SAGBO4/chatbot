@@ -1,20 +1,28 @@
 # Production Caddyfile reverse proxy configuration for Support Bot Backend
-# Protects sensitive query tokens (e.g. Brevo ?token=...) from leaking into access logs.
+# Keeps secrets (?token=..., X-Webhook-Token, X-Brevo-Token, X-API-Key) out of the access logs.
 
 support.example.com {
-    # Redact sensitive query parameters (such as token) from access logs
-    log {
-        output file /var/log/caddy/access.log
-        format filter {
-            wrap json
-            fields {
-                uri query {
-                    replace token REDACTED
-                }
-            }
-        }
-    }
+	# Caddy only masks Authorization and Cookie on its own. In the JSON access log the URI and the
+	# headers live under `request`, so the paths below start with `request>`.
+	# The query parameters match those redacted by the backend (sanitize_url_query in app/observability.py).
+	log {
+		output file /var/log/caddy/access.log
+		format filter {
+			wrap json
+			fields {
+				request>uri query {
+					replace token REDACTED
+					replace secret REDACTED
+					replace api_key REDACTED
+					replace password REDACTED
+				}
+				request>headers>X-Webhook-Token replace REDACTED
+				request>headers>X-Brevo-Token replace REDACTED
+				request>headers>X-Api-Key replace REDACTED
+			}
+		}
+	}
 
-    # Reverse proxy to FastAPI backend
-    reverse_proxy 127.0.0.1:8000
+	# Reverse proxy to FastAPI backend
+	reverse_proxy 127.0.0.1:8000
 }

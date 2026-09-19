@@ -1,8 +1,8 @@
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from backend.database import init_db
-from backend.services.bot_settings_service import BotSettingsService, WhitelistService, DEFAULT_LANGUAGE
+from app.database import init_db
+from app.services.bot_settings_service import BotSettingsService, WhitelistService, DEFAULT_LANGUAGE
 
 
 @pytest_asyncio.fixture
@@ -81,7 +81,7 @@ async def test_whitelist_add_idempotent(async_session):
     entry1 = await WhitelistService.add(async_session, 42, added_by="owner")
     entry2 = await WhitelistService.add(async_session, 42, added_by="owner_again")
     assert entry1.user_id == entry2.user_id == 42
-    entries = await WhitelistService.list(async_session)
+    entries = await WhitelistService.list_entries(async_session)
     assert len(entries) == 1
 
 
@@ -103,5 +103,5 @@ async def test_whitelist_remove_nonexistent_returns_false(async_session):
 async def test_whitelist_list_order(async_session):
     await WhitelistService.add(async_session, 1, added_by="owner")
     await WhitelistService.add(async_session, 2, added_by="owner")
-    entries = await WhitelistService.list(async_session)
+    entries = await WhitelistService.list_entries(async_session)
     assert [e.user_id for e in entries] == [1, 2]

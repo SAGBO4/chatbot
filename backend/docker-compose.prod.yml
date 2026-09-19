@@ -1,4 +1,4 @@
-version: '3.8'
+# Production stack: PostgreSQL, the API and the bot. Set POSTGRES_PASSWORD in .env (see .env.example).
 
 services:
   db:
@@ -7,7 +7,7 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-postgres}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env}
       POSTGRES_DB: ${POSTGRES_DB:-chatbot}
     volumes:
       - postgres_data:/var/lib/postgresql/data
@@ -25,13 +25,15 @@ services:
     env_file:
       - .env
     environment:
-      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@db:5432/${POSTGRES_DB:-chatbot}
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in backend/.env}@db:5432/${POSTGRES_DB:-chatbot}
     depends_on:
       db:
         condition: service_healthy
+    # Loopback only: the reverse proxy (deploy/nginx.conf, deploy/Caddyfile) is the public entry point,
+    # and going around it would skip its access-log redaction.
     ports:
-      - "8000:8000"
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000
+      - "127.0.0.1:8000:8000"
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000
     healthcheck:
       test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
       interval: 10s

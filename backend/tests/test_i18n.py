@@ -1,4 +1,4 @@
-from bot.i18n import t
+from app.i18n import t
 
 
 def test_known_key_french():
@@ -35,3 +35,25 @@ def test_missing_key_returns_key_without_crashing():
 def test_missing_format_arg_falls_back_to_unformatted_text(caplog):
     result = t("question_too_long", "fr")
     assert "{max_length}" in result
+
+
+def test_every_message_exists_in_every_supported_language():
+    from app.i18n import SUPPORTED_LANGUAGES, TRANSLATIONS
+
+    for key, versions in TRANSLATIONS.items():
+        assert set(versions) == set(SUPPORTED_LANGUAGES), f"{key}: languages are {sorted(versions)}"
+        for lang, text in versions.items():
+            assert text.strip(), f"{key} is empty in {lang}"
+
+
+def test_translations_use_the_same_placeholders_in_every_language():
+    import string
+
+    from app.i18n import TRANSLATIONS
+
+    def fields(text):
+        return {name for _, name, _, _ in string.Formatter().parse(text) if name}
+
+    for key, versions in TRANSLATIONS.items():
+        found = {lang: fields(text) for lang, text in versions.items()}
+        assert len({frozenset(v) for v in found.values()}) == 1, f"{key}: placeholders differ {found}"

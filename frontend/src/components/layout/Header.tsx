@@ -133,7 +133,7 @@ export const Header: React.FC = () => {
             <button
               onClick={handleOpenMenu}
               className="flex items-center gap-1.5 rounded-xl border border-white/[0.12] bg-white/[0.05] hover:bg-white/[0.1] hover:border-white/30 px-3 py-1.5 text-xs font-semibold text-white transition-all cursor-pointer active:scale-95 shadow-sm"
-              aria-label="Ouvrir le menu"
+              aria-label={t.openMenu}
             >
               <Menu className="h-4 w-4 text-white" />
               <span>Menu</span>
@@ -182,7 +182,7 @@ export const Header: React.FC = () => {
                 <button
                   onClick={handleCloseMenu}
                   className="rounded-xl p-2 text-neutral-400 hover:text-white hover:bg-white/[0.08] transition-colors"
-                  aria-label="Fermer le menu"
+                  aria-label={t.closeMenu}
                 >
                   <X className="h-5 w-5" />
                 </button>

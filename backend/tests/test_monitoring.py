@@ -5,9 +5,9 @@ from fastapi import status
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.exc import OperationalError
 
-from backend.main import app, lifespan
-from backend.config import settings
-from backend.database import get_db
+from app.main import app, lifespan
+from app.config import settings
+from app.database import get_db
 
 
 @pytest.mark.asyncio
@@ -79,10 +79,13 @@ async def test_sentry_initialization_when_dsn_provided():
             async with lifespan(test_app):
                 pass
 
-            mock_sentry.init.assert_called_once_with(
-                dsn="https://mockkey@sentry.io/123456",
-                traces_sample_rate=1.0,
-            )
+            mock_sentry.init.assert_called_once()
+            kwargs = mock_sentry.init.call_args.kwargs
+            assert kwargs["dsn"] == "https://mockkey@sentry.io/123456"
+            assert kwargs["traces_sample_rate"] == 1.0
+            # Secrets must be scrubbed from every kind of payload Sentry sends
+            for hook in ("before_send", "before_send_transaction", "before_breadcrumb"):
+                assert callable(kwargs[hook])
 
 
 @pytest.mark.asyncio

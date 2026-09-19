@@ -1,6 +1,6 @@
 import os
 import pytest
-from backend.config import Settings
+from app.config import Settings
 
 
 def test_settings_defaults():

@@ -1,33 +1,26 @@
-import time
 import logging
-from typing import Optional, Tuple, Union
+from typing import Optional, Union
 from bot.api_client import BackendClient
+from bot.ttl_cache import MISSING, TTLCache
 
 logger = logging.getLogger(__name__)
 
-_CACHE_TTL_SECONDS = 30.0
-
-# In-memory cache of the persisted community group id, refreshed on a short
-# TTL. Mirrors bot/admin_check.py and bot/access_control.py's pattern:
-# invalidate_community_group_cache() is called right after a successful
-# /setup_community so the same process picks up the change immediately,
-# without waiting out the TTL (design.md decision 3).
-_cached_community_group_id: Optional[Tuple[Optional[int], float]] = None
+# The persisted community group id (None when unset), cached briefly. Cleared right after a successful
+# /setup_community so this process sees the change without waiting for the TTL.
+_group_cache = TTLCache(30.0)
+_KEY = "community_group_id"
 
 
 def invalidate_community_group_cache() -> None:
-    global _cached_community_group_id
-    _cached_community_group_id = None
+    """Forget the cached community group id so the next call reads it again."""
+    _group_cache.clear()
 
 
 async def get_community_group_id(backend_client: Optional[BackendClient] = None) -> Optional[int]:
     """Returns the currently configured community group id, or None if unset."""
-    global _cached_community_group_id
-    now = time.time()
-    if _cached_community_group_id is not None:
-        value, fetched_at = _cached_community_group_id
-        if (now - fetched_at) < _CACHE_TTL_SECONDS:
-            return value
+    cached = _group_cache.get(_KEY)
+    if cached is not MISSING:
+        return cached
 
     client = backend_client or BackendClient()
     try:
@@ -37,7 +30,7 @@ async def get_community_group_id(backend_client: Optional[BackendClient] = None)
         logger.warning("Failed to resolve the configured community group id: %s", exc)
         value = None
 
-    _cached_community_group_id = (value, now)
+    _group_cache.set(_KEY, value)
     return value
 
 
@@ -45,11 +38,8 @@ async def is_community_group_chat(
     chat_id: Union[int, str], backend_client: Optional[BackendClient] = None
 ) -> bool:
     """
-    Returns True only if chat_id matches the currently configured community
-    group (resolved dynamically per community-group-setup - see
-    get_community_group_id - not a fixed environment value). Returns False
-    when no community group is configured yet, so an unconfigured deployment
-    can never accidentally match.
+    True only if chat_id is the configured community group (read from the persisted setting, not the
+    env). False while none is configured, so an unconfigured bot never matches.
     """
     community_group_id = await get_community_group_id(backend_client=backend_client)
     if community_group_id is None:

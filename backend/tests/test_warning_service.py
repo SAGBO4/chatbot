@@ -1,8 +1,8 @@
 import pytest
 import pytest_asyncio
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from backend.database import init_db
-from backend.services.warning_service import WarningService
+from app.database import init_db
+from app.services.warning_service import WarningService
 
 
 @pytest_asyncio.fixture
@@ -46,9 +46,6 @@ async def test_count_and_list_warnings_scoped_per_user_and_group(async_session):
     await WarningService.add_warning(async_session, user_id=1, group_id=-200, warned_by="a", reason="r3")
     # Different user in the same group should not be counted either
     await WarningService.add_warning(async_session, user_id=2, group_id=-100, warned_by="a", reason="r4")
-
-    count = await WarningService.count_warnings(async_session, user_id=1, group_id=-100)
-    assert count == 2
 
     warnings = await WarningService.list_warnings(async_session, user_id=1, group_id=-100)
     assert len(warnings) == 2

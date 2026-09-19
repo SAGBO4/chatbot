@@ -1,8 +1,10 @@
 import logging
 from aiogram import Bot
-from backend.config import settings
+from app.config import settings
+from app.i18n import DEFAULT_LANGUAGE, t
 from bot.api_client import BackendClient
-from bot.utils import escape_telegram_markdown, truncate_telegram_text
+from bot.messaging import call_with_markdown_fallback
+from app.telegram_text import escape_telegram_markdown, truncate_telegram_text
 
 logger = logging.getLogger(__name__)
 
@@ -14,18 +16,14 @@ async def create_ticket_and_notify_admin_group(
     user_handle: str,
     question: str,
     automated_answer: str,
+    lang: str = DEFAULT_LANGUAGE,
 ) -> dict:
     """
-    Creates a support ticket via the backend and posts its card to the
-    configured Telegram admin/support group (TELEGRAM_SUPPORT_GROUP_ID).
+    Create a ticket through the backend and post its card to the admin/support group.
 
-    Shared by the private-DM escalation flow (bot/handlers/user_handlers.py)
-    and the community-group escalation flow (bot/handlers/community_handlers.py)
-    so the ticket card and its Markdown-fallback handling only exist once.
-    Ticket internals are only ever posted to the admin group here - callers
-    are responsible for what (if anything) they show back in their own chat.
-
-    Returns the created ticket dict (as returned by the backend API).
+    Shared by the private-chat and community-group escalation flows, so the card and its
+    Markdown-to-plain-text fallback exist once. Ticket details only ever go to the admin group here;
+    callers decide what to show in their own chat. Returns the ticket dict from the backend.
     """
     ticket = await client.create_ticket(
         user_id=user_id,
@@ -39,50 +37,28 @@ async def create_ticket_and_notify_admin_group(
     if not settings.support_group_is_configured():
         return ticket
 
-    # Truncate fields if excessively long to ensure group card never overflows Telegram 4096 limit
+    # Cut long fields so the card stays under Telegram's 4096-character limit
     card_question = truncate_telegram_text(question, max_length=1000, suffix="...")
     card_answer = truncate_telegram_text(automated_answer, max_length=1800, suffix="...")
 
     safe_handle = escape_telegram_markdown(user_handle)
     safe_question = escape_telegram_markdown(card_question)
     safe_answer = escape_telegram_markdown(card_answer)
-    group_card = (
-        f"🚨 **NOUVEAU TICKET SUPPORT #{ticket_id}**\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"👤 **Utilisateur :** @{safe_handle} (`ID: {user_id}`)\n"
-        f"❓ **Question :**\n{safe_question}\n\n"
-        f"🤖 **Réponse automatique :**\n{safe_answer}\n\n"
-        f"━━━━━━━━━━━━━━━━━━━\n"
-        f"👉 *Pour répondre, répondez directement à ce message avec votre solution.*"
+    group_card = t(
+        "admin_ticket_card", lang,
+        ticket_id=ticket_id, handle=safe_handle, user_id=user_id, question=safe_question, answer=safe_answer,
     )
-    sent_card = None
-    try:
-        sent_card = await bot.send_message(
-            chat_id=support_group_id,
-            text=group_card,
-            parse_mode="Markdown",
-        )
-    except Exception as send_err:
-        logger.warning("Failed to send markdown group card, falling back to plain text: %s", send_err)
-        plain_card = (
-            f"🚨 NOUVEAU TICKET SUPPORT #{ticket_id}\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"👤 Utilisateur : @{user_handle} (ID: {user_id})\n"
-            f"❓ Question :\n{card_question}\n\n"
-            f"🤖 Réponse automatique :\n{card_answer}\n\n"
-            f"━━━━━━━━━━━━━━━━━━━\n"
-            f"👉 Pour répondre, répondez directement à ce message avec votre solution."
-        )
-        try:
-            sent_card = await bot.send_message(
-                chat_id=support_group_id,
-                text=plain_card,
-            )
-        except Exception as plain_err:
-            logger.error("Failed to send plain text group card: %s", plain_err)
+    plain_card = t(
+        "admin_ticket_card_plain", lang,
+        ticket_id=ticket_id, handle=user_handle, user_id=user_id, question=card_question, answer=card_answer,
+    )
+    sent_card = await call_with_markdown_fallback(
+        bot.send_message, chat_id=support_group_id, text=group_card,
+        plain_overrides={"text": plain_card},
+        what="Support group card", swallow_failure=True, failure_level=logging.ERROR,
+    )
 
-    # Best-effort: record the card's message id so a reply can later
-    # be matched by message identity rather than by parsing its text.
+    # Best effort: store the card's message id so a reply can be matched to the ticket by identity
     if sent_card and hasattr(sent_card, "message_id"):
         try:
             await client.attach_support_card(

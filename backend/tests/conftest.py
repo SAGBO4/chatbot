@@ -3,10 +3,10 @@ import pytest_asyncio
 import httpx
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from backend.limiter import limiter
-from backend.main import app
-from backend.database import get_db, init_db
-from backend.config import settings
+from app.limiter import limiter
+from app.main import app
+from app.database import get_db, init_db
+from app.config import settings
 
 TEST_API_KEY = "test-api-key-secret-12345"
 TEST_EMAIL_WEBHOOK_SECRET = "test-email-webhook-secret-67890"
@@ -86,11 +86,11 @@ def prevent_real_external_network_calls(request, monkeypatch):
     during tests unless explicitly tested in a dedicated service test file.
     """
     path = request.node.fspath.strpath
-    if "test_email_service" not in path and "test_feature_email_service" not in path:
-        monkeypatch.setattr("backend.services.email_service.EmailService._send_smtp_sync", lambda msg: True)
-    if "telegram_relay" not in path and "test_feature_telegram_relay" not in path:
+    if "test_email_service" not in path:
+        monkeypatch.setattr("app.services.email_service.EmailService._send_smtp_sync", lambda msg: True)
+    if "telegram_relay" not in path:
         from unittest.mock import AsyncMock
-        monkeypatch.setattr("backend.services.telegram_relay.TelegramRelay._send_telegram_message", AsyncMock(return_value=True))
+        monkeypatch.setattr("app.services.telegram_relay.TelegramRelay._send_telegram_message", AsyncMock(return_value=True))
 
 
 @pytest_asyncio.fixture

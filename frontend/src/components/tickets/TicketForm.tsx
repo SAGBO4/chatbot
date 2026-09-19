@@ -42,12 +42,12 @@ export const TicketForm: React.FC<TicketFormProps> = ({
 
     const parsedUserId = parseInt(userId, 10);
     if (isNaN(parsedUserId) || parsedUserId <= 0) {
-      setError('Identifiant utilisateur numérique invalide (ex: Telegram ID).');
+      setError(t.errInvalidUserId);
       return;
     }
 
     if (!question.trim()) {
-      setError('Veuillez renseigner le contenu de votre demande.');
+      setError(t.errEmptyRequest);
       return;
     }
 
@@ -66,7 +66,7 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         onSuccess(ticket);
       }
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de l’enregistrement du ticket';
+      const msg = (err as { message?: string })?.message || t.errTicketSave;
       setError(msg);
     } finally {
       setIsLoading(false);
@@ -131,11 +131,11 @@ export const TicketForm: React.FC<TicketFormProps> = ({
             value={userId}
             onChange={(e) => setUserId(e.target.value)}
             required
-            helperText="Telegram User ID (numérique)"
+            helperText={t.ticketUserIdHelper}
           />
           <Input
             label={t.userHandleLabel}
-            placeholder="@pseudo_telegram ou contact@exemple.com"
+            placeholder={t.ticketContactPlaceholder}
             value={userHandle}
             onChange={(e) => setUserHandle(e.target.value)}
             helperText="Optionnel"
@@ -151,7 +151,7 @@ export const TicketForm: React.FC<TicketFormProps> = ({
             value={question}
             onChange={(e) => setQuestion(e.target.value)}
             required
-            placeholder="Détaillez votre question, le modèle de portefeuille, le nœud utilisé ou le comportement inattendu..."
+            placeholder={t.ticketQuestionPlaceholder}
             className="w-full rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/[0.1] px-3.5 py-2.5 text-xs sm:text-sm text-white placeholder-neutral-500 transition-colors focus:border-white/40 focus:outline-none focus:ring-1 focus:ring-white/20"
           />
         </div>

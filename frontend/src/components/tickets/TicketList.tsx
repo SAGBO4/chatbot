@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { TicketResponse } from '@/types';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
@@ -45,12 +45,17 @@ export const TicketList: React.FC = () => {
       const data = await api.getTickets(targetUserId);
       setTickets(data);
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors du chargement des tickets';
+      const msg = (err as { message?: string })?.message || t.errTicketsLoad;
       setError(msg);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const loadErrorMessage = useRef(t.errTicketsLoad);
+  useEffect(() => {
+    loadErrorMessage.current = t.errTicketsLoad;
+  }, [t.errTicketsLoad]);
 
   useEffect(() => {
     let ignore = false;
@@ -64,7 +69,7 @@ export const TicketList: React.FC = () => {
         }
       } catch (err: unknown) {
         if (!ignore) {
-          const msg = (err as { message?: string })?.message || 'Erreur lors du chargement des tickets';
+          const msg = (err as { message?: string })?.message || loadErrorMessage.current;
           setError(msg);
           setIsLoading(false);
         }
@@ -113,7 +118,7 @@ export const TicketList: React.FC = () => {
       );
       setSelectedTicket(null);
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de la résolution du ticket';
+      const msg = (err as { message?: string })?.message || t.errTicketResolve;
       setResolveError(msg);
     } finally {
       setIsResolving(false);
@@ -287,14 +292,14 @@ export const TicketList: React.FC = () => {
 
             <h3 className="text-base font-semibold text-white mb-1 flex items-center gap-2">
               <Check className="h-4 w-4 text-white" />
-              Résolution du Ticket #{selectedTicket.id}
+              {t.resolveTitle} #{selectedTicket.id}
             </h3>
             <p className="text-xs text-neutral-400 mb-4">
-              Transmettez la procédure de solution à l&apos;utilisateur.
+              {t.resolveSubtitle}
             </p>
 
             <div className="rounded-xl bg-white/[0.04] border border-white/[0.08] p-3 mb-4 text-xs text-neutral-200">
-              <span className="font-semibold text-neutral-400 block mb-1">Question de l&apos;utilisateur :</span>
+              <span className="font-semibold text-neutral-400 block mb-1">{t.userQuestionLabel}</span>
               {selectedTicket.question}
             </div>
 
@@ -307,7 +312,7 @@ export const TicketList: React.FC = () => {
             <form onSubmit={handleConfirmResolve} className="space-y-4">
               <div>
                 <label className="block text-xs font-medium text-neutral-400 mb-1">
-                  Nom ou Identifiant de l&apos;Agent *
+                  {t.agentNameLabel}
                 </label>
                 <input
                   type="text"
@@ -320,14 +325,14 @@ export const TicketList: React.FC = () => {
 
               <div>
                 <label className="block text-xs font-medium text-neutral-400 mb-1">
-                  Procédure / Solution validée *
+                  {t.solutionLabel}
                 </label>
                 <textarea
                   rows={4}
                   required
                   value={solutionText}
                   onChange={(e) => setSolutionText(e.target.value)}
-                  placeholder="Décrivez précisément les étapes de résolution..."
+                  placeholder={t.solutionPlaceholder}
                   className="w-full rounded-xl bg-white/[0.04] border border-white/[0.1] px-3 py-2 text-xs text-white placeholder-neutral-500 focus:border-white/40 focus:outline-none"
                 />
               </div>
@@ -361,7 +366,7 @@ export const TicketList: React.FC = () => {
                   size="sm"
                   isLoading={isResolving}
                 >
-                  Valider la résolution
+                  {t.btnConfirmResolution}
                 </Button>
               </div>
             </form>

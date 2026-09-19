@@ -1,15 +1,15 @@
-fastapi>=0.110.0
-uvicorn[standard]>=0.28.0
-pydantic>=2.6.0
-pydantic-settings>=2.2.0
-aiogram>=3.10.0
-sqlalchemy>=2.0.28
-aiosqlite>=0.20.0
-httpx>=0.27.0
-pytest>=8.0.0
-pytest-asyncio>=0.23.0
-python-dotenv>=1.0.1
-alembic>=1.13.0
-slowapi>=0.1.9
-asyncpg>=0.30.0
-sentry-sdk[fastapi,aiohttp]>=2.0.0
+# Runtime dependencies. The floors are the versions the test suite runs against (see
+# requirements.lock for the full pinned set the Docker image installs).
+# Test and QA tools live in requirements-dev.txt.
+fastapi>=0.141.1
+uvicorn[standard]>=0.53.0
+pydantic>=2.13.5
+pydantic-settings>=2.15.0
+aiogram>=3.31.0
+sqlalchemy>=2.0.54
+aiosqlite>=0.22.1
+asyncpg>=0.31.0
+httpx>=0.28.1
+alembic>=1.20.0
+slowapi>=0.1.10
+sentry-sdk[fastapi,aiohttp]>=2.69.2

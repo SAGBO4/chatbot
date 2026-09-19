@@ -4,18 +4,18 @@ import httpx
 from unittest.mock import AsyncMock, patch
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 
-from backend.main import app
-from backend.database import get_db, init_db
-from backend.config import settings
-from backend.models import Base, TicketStatus, KnowledgeArticle
-from backend.services.knowledge_base import KnowledgeBaseService
-from backend.services.ai_assistant import AIAssistantService
+from app.main import app
+from app.database import get_db, init_db
+from app.config import settings
+from app.models import Base, TicketStatus, KnowledgeArticle
+from app.services.knowledge_base import KnowledgeBaseService
+from app.services.ai_assistant import AIAssistantService
 
 TEST_API_KEY = "test-api-key"
 
 
 @pytest_asyncio.fixture
-async def test_client(tmp_path, monkeypatch):
+async def api_env(tmp_path, monkeypatch):
     monkeypatch.setattr(settings, "API_KEY", TEST_API_KEY)
     monkeypatch.setattr(settings, "AI_ENABLED", False)
 
@@ -42,8 +42,8 @@ async def test_client(tmp_path, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_query_endpoint_matching_and_fallback(test_client):
-    client, session_maker = test_client
+async def test_query_endpoint_matching_and_fallback(api_env):
+    client, session_maker = api_env
 
     # Pre-populate knowledge base
     async with session_maker() as session:
@@ -166,8 +166,8 @@ async def test_ai_assistant_gemini_provider(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_ticket_lifecycle_and_feedback_loop(test_client):
-    client, session_maker = test_client
+async def test_ticket_lifecycle_and_feedback_loop(api_env):
+    client, session_maker = api_env
 
     # 1. Create ticket
     create_resp = await client.post(
@@ -217,8 +217,8 @@ async def test_ticket_lifecycle_and_feedback_loop(test_client):
 
 
 @pytest.mark.asyncio
-async def test_api_rejects_missing_or_invalid_key(test_client):
-    client, _ = test_client
+async def test_api_rejects_missing_or_invalid_key(api_env):
+    client, _ = api_env
 
     # No X-API-Key header at all
     resp_no_key = await client.post(
@@ -234,8 +234,8 @@ async def test_api_rejects_missing_or_invalid_key(test_client):
 
 
 @pytest.mark.asyncio
-async def test_api_rejected_when_key_not_configured(test_client, monkeypatch):
-    client, _ = test_client
+async def test_api_rejected_when_key_not_configured(api_env, monkeypatch):
+    client, _ = api_env
     monkeypatch.setattr(settings, "API_KEY", None)
 
     resp = await client.post("/api/query", json={"query": "test"})
@@ -243,8 +243,8 @@ async def test_api_rejected_when_key_not_configured(test_client, monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_support_card_attach_and_lookup_round_trip(test_client):
-    client, _ = test_client
+async def test_support_card_attach_and_lookup_round_trip(api_env):
+    client, _ = api_env
 
     create_resp = await client.post(
         "/api/tickets",
@@ -273,24 +273,24 @@ async def test_support_card_attach_and_lookup_round_trip(test_client):
 
 
 @pytest.mark.asyncio
-async def test_support_card_attach_on_unknown_ticket_returns_404(test_client):
-    client, _ = test_client
+async def test_support_card_attach_on_unknown_ticket_returns_404(api_env):
+    client, _ = api_env
 
     resp = await client.post("/api/tickets/999999/support-card", json={"message_id": 1})
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_support_card_lookup_unknown_message_returns_404(test_client):
-    client, _ = test_client
+async def test_support_card_lookup_unknown_message_returns_404(api_env):
+    client, _ = api_env
 
     resp = await client.get("/api/tickets/by-support-message/999999")
     assert resp.status_code == 404
 
 
 @pytest.mark.asyncio
-async def test_health_check_endpoint(test_client):
-    client, _ = test_client
+async def test_health_check_endpoint(api_env):
+    client, _ = api_env
     resp = await client.get("/health")
     assert resp.status_code == 200
     data = resp.json()
@@ -300,8 +300,8 @@ async def test_health_check_endpoint(test_client):
 
 
 @pytest.mark.asyncio
-async def test_list_tickets_status_filter_and_validation(test_client):
-    client, _ = test_client
+async def test_list_tickets_status_filter_and_validation(api_env):
+    client, _ = api_env
     # Create an open ticket
     await client.post(
         "/api/tickets",
@@ -335,8 +335,8 @@ async def test_list_tickets_status_filter_and_validation(test_client):
 
 
 @pytest.mark.asyncio
-async def test_list_knowledge_pagination(test_client):
-    client, _ = test_client
+async def test_list_knowledge_pagination(api_env):
+    client, _ = api_env
     # Query knowledge with pagination
     resp = await client.get("/api/knowledge?limit=2&offset=0")
     assert resp.status_code == 200
@@ -344,3 +344,13 @@ async def test_list_knowledge_pagination(test_client):
     assert isinstance(data, list)
     assert len(data) <= 2
 
+
+
+@pytest.mark.asyncio
+async def test_openapi_version_comes_from_the_package(api_env):
+    import app
+
+    client, _ = api_env
+    response = await client.get("/openapi.json")
+
+    assert response.json()["info"]["version"] == app.__version__ == "1.1.0"
