@@ -21,6 +21,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - `"license": "MIT"` in `frontend/package.json`.
 
 ### Changed
+- **Dependencies:** `backend/requirements.txt` is now runtime-only, with floors raised to the versions the tests actually run against (they were still `fastapi>=0.110`, `pydantic>=2.6`...), and no longer lists `python-dotenv` (pulled in by `pydantic-settings`). New `backend/requirements-dev.txt` for `pytest`, `pytest-asyncio`, `pytest-cov`, `mutmut`, `ruff`, `bandit`, `semgrep` and `pip-audit`: the README already asked for them but none was declared. CI installs it instead of a bare `pip install ruff`. `requirements.lock` was regenerated: same versions, minus `pytest` and its dependencies, so the Docker image no longer ships a test runner.
 - **Breaking:** the Python package `backend/backend/` is now `backend/app/`. The server entrypoint is `uvicorn app.main:app` (was `backend.main:app`); update any script, Docker command or import that used the old name.
 - The single 275-line README, duplicated in `backend/`, is split into a root README (overview, quickstart), `backend/README.md` and `frontend/README.md`.
 - CI: `ruff check .` now fails the build on lint errors (it was ignored with `|| true`).
