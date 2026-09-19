@@ -31,7 +31,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenMenu }) => {
 
   return (
     <nav
-      aria-label="Navigation mobile"
+      aria-label={t.mobileNavLabel}
       className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08] bg-black/85 backdrop-blur-2xl transition-all"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)' }}
     >
@@ -77,7 +77,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenMenu }) => {
               ? 'text-white font-semibold'
               : 'text-neutral-400 hover:text-white active:scale-95'
           }`}
-          aria-label="Ouvrir le menu complet"
+          aria-label={t.openFullMenu}
         >
           <div
             className={`flex h-7 w-7 items-center justify-center rounded-lg transition-colors ${

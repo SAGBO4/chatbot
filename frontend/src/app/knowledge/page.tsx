@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { KnowledgeArticle } from '@/types';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
@@ -50,12 +50,17 @@ export default function KnowledgePage() {
       const articlesData = await api.getKnowledgeArticles(limit, 0);
       setArticles(articlesData);
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors du chargement de la base de connaissances.';
+      const msg = (err as { message?: string })?.message || t.errKbLoad;
       setError(msg);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const loadErrorMessage = useRef(t.errKbLoad);
+  useEffect(() => {
+    loadErrorMessage.current = t.errKbLoad;
+  }, [t.errKbLoad]);
 
   useEffect(() => {
     let ignore = false;
@@ -69,7 +74,7 @@ export default function KnowledgePage() {
         }
       } catch (err: unknown) {
         if (!ignore) {
-          const msg = (err as { message?: string })?.message || 'Erreur lors du chargement de la base de connaissances.';
+          const msg = (err as { message?: string })?.message || loadErrorMessage.current;
           setError(msg);
           setIsLoading(false);
         }
@@ -113,7 +118,7 @@ export default function KnowledgePage() {
         setIngestSuccess(false);
       }, 1500);
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de l’ajout du guide.';
+      const msg = (err as { message?: string })?.message || t.errKbAdd;
       setModalError(msg);
     } finally {
       setIsIngesting(false);
@@ -267,7 +272,7 @@ export default function KnowledgePage() {
                   </span>
                   {art.source_ticket_id && (
                     <Badge variant="neutral" size="sm">
-                      Ticket lié #{art.source_ticket_id}
+                      {t.kbLinkedTicket} #{art.source_ticket_id}
                     </Badge>
                   )}
                 </div>
@@ -373,7 +378,7 @@ export default function KnowledgePage() {
                 </label>
                 <input
                   type="text"
-                  placeholder="seed, restauration, clés, monero, firo"
+                  placeholder={t.kbKeywordsPlaceholder}
                   value={newKeywords}
                   onChange={(e) => setNewKeywords(e.target.value)}
                   className="w-full rounded-xl bg-white/[0.04] border border-white/[0.1] px-3 py-2 text-xs text-white placeholder-neutral-500 focus:border-white/40 focus:outline-none"

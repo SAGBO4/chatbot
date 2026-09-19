@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
 import { CryptoPriceResponse } from '@/types';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
@@ -34,12 +34,17 @@ export default function CryptoPage() {
       const data = await api.getCryptoPrices();
       setPrices(data);
     } catch (err: unknown) {
-      const msg = (err as { message?: string })?.message || 'Erreur lors de la récupération des cours crypto.';
+      const msg = (err as { message?: string })?.message || t.errCryptoLoad;
       setError(msg);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const loadErrorMessage = useRef(t.errCryptoLoad);
+  useEffect(() => {
+    loadErrorMessage.current = t.errCryptoLoad;
+  }, [t.errCryptoLoad]);
 
   useEffect(() => {
     let ignore = false;
@@ -52,7 +57,7 @@ export default function CryptoPage() {
         }
       } catch (err: unknown) {
         if (!ignore) {
-          const msg = (err as { message?: string })?.message || 'Erreur lors de la récupération des cours crypto.';
+          const msg = (err as { message?: string })?.message || loadErrorMessage.current;
           setError(msg);
           setIsLoading(false);
         }
@@ -111,7 +116,7 @@ export default function CryptoPage() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-neutral-400 pointer-events-none" />
           <input
             type="text"
-            placeholder="Rechercher un actif (ex: BTC, ETH, FIRO, SOL)..."
+            placeholder={t.cryptoSearchPlaceholder}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             className="w-full rounded-xl bg-white/[0.04] backdrop-blur-md border border-white/[0.1] pl-9 pr-3 py-2 text-xs text-white placeholder-neutral-500 focus:border-white/40 focus:outline-none focus:ring-1 focus:ring-white/20"
@@ -129,14 +134,14 @@ export default function CryptoPage() {
       {isLoading && prices.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-neutral-400">
           <RefreshCw className="h-6 w-6 animate-spin text-white mb-3" />
-          <p className="text-xs">Chargement des cours crypto en direct...</p>
+          <p className="text-xs">{t.cryptoLoading}</p>
         </div>
       ) : filteredPrices.length === 0 ? (
         <Card elevated className="p-12 text-center border-white/[0.08]">
           <Coins className="h-8 w-8 mx-auto text-neutral-500 mb-3" />
-          <h3 className="text-sm font-semibold text-white">Aucun actif trouvé</h3>
+          <h3 className="text-sm font-semibold text-white">{t.cryptoNoAsset}</h3>
           <p className="text-xs text-neutral-400 mt-1">
-            Vérifiez l&apos;orthographe du symbole recherché.
+            {t.cryptoNoAssetHint}
           </p>
         </Card>
       ) : (
@@ -159,7 +164,7 @@ export default function CryptoPage() {
                       <h3 className="text-sm font-bold text-white tracking-wide">
                         {coin.symbol}
                       </h3>
-                      <span className="text-[11px] text-neutral-400">Actif Supporté</span>
+                      <span className="text-[11px] text-neutral-400">{t.cryptoSupported}</span>
                     </div>
                   </div>
 
