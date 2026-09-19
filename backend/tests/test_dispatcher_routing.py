@@ -184,7 +184,12 @@ async def test_authorized_owner_sees_setup_tutorial_when_no_community_group(disp
 async def test_non_authorized_user_falls_through_to_normal_welcome(dispatcher, monkeypatch):
     dp, bot, mock_client = dispatcher
     monkeypatch.setattr("app.config.settings.BOT_OWNER_TELEGRAM_ID", 601)
-    mock_client.is_whitelisted.return_value = False
+
+    # The setup filter calls is_authorized() without a client, which would open a real
+    # BackendClient (and a real connection attempt): decide the answer here instead.
+    async def not_authorized(user_id, backend_client=None):
+        return False
+    monkeypatch.setattr("bot.handlers.setup_handlers.is_authorized", not_authorized)
 
     async def no_group(backend_client=None):
         return None
