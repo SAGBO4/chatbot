@@ -1,10 +1,28 @@
 import logging
-from typing import List, Tuple, Optional
+from contextlib import asynccontextmanager
+from typing import AsyncIterator, List, Tuple, Optional
 import httpx
 from app.config import settings
 from app.models import KnowledgeArticle
 
 logger = logging.getLogger(__name__)
+
+
+@asynccontextmanager
+async def _borrowed_client(client: Optional[httpx.AsyncClient]) -> AsyncIterator[httpx.AsyncClient]:
+    """
+    The caller's shared client if given, else a short-lived one.
+
+    Only a client created here is closed: a caller-supplied one is shared and must outlive the call.
+    """
+    if client is not None:
+        yield client
+        return
+    session = httpx.AsyncClient(timeout=10.0)
+    try:
+        yield session
+    finally:
+        await session.aclose()
 
 
 class AIAssistantService:
@@ -96,10 +114,7 @@ class AIAssistantService:
         base_url: str,
     ) -> Optional[str]:
         """Calls an OpenAI-compatible chat completions endpoint (used by OpenAI and DeepSeek)."""
-        # Only close a client we created: a caller-supplied one is shared and must outlive this call.
-        owns_client = client is None
-        session = client or httpx.AsyncClient(timeout=10.0)
-        try:
+        async with _borrowed_client(client) as session:
             response = await session.post(
                 base_url,
                 headers={
@@ -134,9 +149,6 @@ class AIAssistantService:
             else:
                 logger.warning("AI provider error %s: %s", response.status_code, response.text)
                 return None
-        finally:
-            if owns_client:
-                await session.aclose()
 
     @staticmethod
     async def _call_gemini(
@@ -146,14 +158,11 @@ class AIAssistantService:
     ) -> Optional[str]:
         """Calls the Google Gemini generateContent endpoint."""
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
-        # See _call_openai_compatible: only close a client we created ourselves.
-        owns_client = client is None
-        session = client or httpx.AsyncClient(timeout=10.0)
         headers = {
             "Content-Type": "application/json",
             "x-goog-api-key": settings.AI_API_KEY or "",
         }
-        try:
+        async with _borrowed_client(client) as session:
             response = await session.post(
                 url,
                 headers=headers,
@@ -179,6 +188,3 @@ class AIAssistantService:
             else:
                 logger.warning("AI provider error %s: %s", response.status_code, response.text)
                 return None
-        finally:
-            if owns_client:
-                await session.aclose()
