@@ -5,7 +5,7 @@ import httpx
 from aiogram import Router, F, Bot
 from aiogram.types import Message, User
 from app.config import settings
-from bot.admin_check import is_group_admin
+from bot.admin_check import is_bot_admin
 from bot.api_client import BackendClient
 from bot.language import get_active_language
 from bot.messaging import call_with_markdown_fallback
@@ -154,9 +154,11 @@ async def handle_support_agent_reply(
     if not _is_support_group_chat(message.chat.id):
         return
 
-    # Being in the group is not enough: only a verified admin may resolve tickets, message users on
-    # the bot's behalf or feed the knowledge base (checked live with Telegram, see is_group_admin).
-    if not message.from_user or not await is_group_admin(bot, message.chat.id, message.from_user.id):
+    # Being in the group is not enough: only a bot admin (owner, whitelisted, or a native Telegram
+    # group admin) may resolve tickets, message users on the bot's behalf or feed the knowledge base.
+    if not message.from_user or not await is_bot_admin(
+        bot, message.chat.id, message.from_user.id, backend_client=backend_client
+    ):
         return
 
     client = backend_client or BackendClient()

@@ -6,7 +6,10 @@ from aiogram.filters import CommandStart, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from bot.keyboards import get_resolution_keyboard, get_webapp_keyboard
+from bot.access_control import is_authorized, is_owner
+from bot.admin_check import is_bot_admin
 from bot.api_client import BackendClient
+from bot.group_scope import is_community_group_chat
 from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
 from bot.messaging import call_with_markdown_fallback
@@ -49,12 +52,33 @@ async def handle_webapp(message: Message, backend_client: Optional[BackendClient
 
 
 @user_router.message(Command("help"))
-async def handle_help(message: Message, backend_client: Optional[BackendClient] = None):
-    """/help: how to use the bot."""
-    lang = await get_active_language(backend_client=backend_client)
+async def handle_help(message: Message, bot: Bot, backend_client: Optional[BackendClient] = None):
+    """/help: how to use the bot, plus every command the sender may run given their role and chat."""
+    client = backend_client or BackendClient()
+    lang = await get_active_language(backend_client=client)
+    user_id = message.from_user.id
+    is_group_chat = message.chat.type in ("group", "supergroup")
+
+    sections = [t("help_intro", lang), t("help_general_commands", lang)]
+
     url = settings.TELEGRAM_WEBAPP_URL
+    if url:
+        sections.append(t("help_webapp_command", lang))
+
+    sections.append(t("help_crypto_commands", lang))
+
+    if is_group_chat and await is_community_group_chat(message.chat.id, backend_client=client):
+        sections.append(t("help_community_commands", lang))
+        if await is_bot_admin(bot, message.chat.id, user_id, backend_client=client):
+            sections.append(t("help_admin_commands", lang))
+
+    if await is_authorized(user_id, backend_client=client):
+        sections.append(t("help_setup_commands", lang))
+        if is_owner(user_id):
+            sections.append(t("help_owner_commands", lang))
+
     keyboard = get_webapp_keyboard(url, lang=lang) if url else None
-    await message.answer(t("help", lang), parse_mode="Markdown", reply_markup=keyboard)
+    await message.answer("".join(sections), parse_mode="Markdown", reply_markup=keyboard)
 
 
 @user_router.message(F.chat.type == "private", F.text)

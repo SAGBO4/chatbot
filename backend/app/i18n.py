@@ -26,7 +26,7 @@ TRANSLATIONS = {
             "to our human team with one click!"
         ),
     },
-    "help": {
+    "help_intro": {
         "fr": (
             "ℹ️ **Aide**\n\n"
             "- Envoyez votre message texte décrivant votre problème.\n"
@@ -39,6 +39,66 @@ TRANSLATIONS = {
             "- After receiving the answer, click **YES** if your problem is resolved, "
             "or **NO** to automatically create a ticket with our support team."
         ),
+    },
+    "help_general_commands": {
+        "fr": (
+            "\n\n**Commandes générales**\n"
+            "`/start` — afficher le message d'accueil\n"
+            "`/help` — afficher cette aide"
+        ),
+        "en": (
+            "\n\n**General commands**\n"
+            "`/start` — show the welcome message\n"
+            "`/help` — show this help"
+        ),
+    },
+    "help_webapp_command": {
+        "fr": "\n`/webapp` — ouvrir la Mini App",
+        "en": "\n`/webapp` — open the Mini App",
+    },
+    "help_community_commands": {
+        "fr": "\n`/ask <question>` — poser une question dans le groupe communautaire",
+        "en": "\n`/ask <question>` — ask a question in the community group",
+    },
+    "help_crypto_commands": {
+        "fr": "\n`/<symbole>` — prix en direct d'une crypto-monnaie (ex : `/btc`, `/eth`, `/trx`)",
+        "en": "\n`/<symbol>` — live price of a cryptocurrency (e.g. `/btc`, `/eth`, `/trx`)",
+    },
+    "help_admin_commands": {
+        "fr": (
+            "\n\n**Commandes de modération** (admin uniquement, cible : réponse, `@username` ou ID)\n"
+            "`/mute [durée en secondes]` — rendre un membre muet\n"
+            "`/unmute` — lever le mute d'un membre\n"
+            "`/ban` — bannir un membre\n"
+            "`/kick` — expulser un membre\n"
+            "`/warn <raison>` — avertir un membre\n"
+            "`/purge [nombre]` — supprimer les dernières réponses du bot"
+        ),
+        "en": (
+            "\n\n**Moderation commands** (admin only, target: a reply, `@username`, or an id)\n"
+            "`/mute [duration in seconds]` — mute a member\n"
+            "`/unmute` — unmute a member\n"
+            "`/ban` — ban a member\n"
+            "`/kick` — kick a member\n"
+            "`/warn <reason>` — warn a member\n"
+            "`/purge [count]` — delete the bot's latest answers"
+        ),
+    },
+    "help_setup_commands": {
+        "fr": (
+            "\n\n**Commandes de configuration** (owner ou admin whitelisté)\n"
+            "`/setup_community` (dans un groupe) — définir ce groupe comme groupe communautaire\n"
+            "`/language fr|en` — changer la langue du bot"
+        ),
+        "en": (
+            "\n\n**Setup commands** (owner or whitelisted admin)\n"
+            "`/setup_community` (in a group) — set this group as the community group\n"
+            "`/language fr|en` — change the bot's language"
+        ),
+    },
+    "help_owner_commands": {
+        "fr": "\n`/whitelist add|remove <user_id>` — gérer les admins whitelistés (owner uniquement)",
+        "en": "\n`/whitelist add|remove <user_id>` — manage whitelisted admins (owner only)",
     },
     # --- messages written by the API rather than the bot (query fallbacks, email resolution, emails) ---
     "query_empty": {
@@ -314,8 +374,8 @@ TRANSLATIONS = {
         "en": "⛔ Only group administrators can use this command.",
     },
     "moderation_no_target": {
-        "fr": "⚠️ Indiquez la cible en répondant à son message, ou en donnant son ID Telegram en premier argument (ex : `/mute 123456789 3600`).",
-        "en": "⚠️ Specify the target by replying to their message, or by giving their Telegram ID as the first argument (e.g. `/mute 123456789 3600`).",
+        "fr": "⚠️ Indiquez la cible en répondant à son message, ou en donnant son `@username` ou son ID Telegram en premier argument (ex : `/mute @pseudo 3600` ou `/mute 123456789 3600`).",
+        "en": "⚠️ Specify the target by replying to their message, or by giving their `@username` or Telegram ID as the first argument (e.g. `/mute @handle 3600` or `/mute 123456789 3600`).",
     },
     "moderation_mute_error": {
         "fr": "❌ Impossible de mute cet utilisateur (voir les logs pour le détail).",

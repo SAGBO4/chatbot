@@ -10,7 +10,7 @@ from aiogram.fsm.context import FSMContext
 from app.config import settings
 from bot.keyboards import get_community_resolution_keyboard
 from bot.api_client import BackendClient
-from bot.admin_check import is_group_admin
+from bot.admin_check import is_bot_admin
 from bot.group_scope import is_community_group_chat as _is_community_group_chat
 from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
@@ -107,26 +107,19 @@ async def _pending_answer(callback: CallbackQuery, state: FSMContext, lang: str)
     return user_data
 
 
-@community_router.message(Command("ask"))
-async def handle_community_ask(
+async def _answer_community_question(
     message: Message,
-    command: CommandObject,
+    question: str,
     state: FSMContext,
     bot: Bot,
-    backend_client: Optional[BackendClient] = None,
-):
-    """`/ask <question>` in the community group: answer publicly through the same pipeline as private chats, tagging the asker."""
-    if not await _is_community_group_chat(message.chat.id, backend_client=backend_client):
-        return
-
-    client = backend_client or BackendClient()
-    lang = await get_active_language(backend_client=client)
-
-    question = (command.args or "").strip()
-    if not question:
-        await message.reply(t("community_ask_usage", lang), parse_mode="Markdown")
-        return
-
+    client: BackendClient,
+    lang: str,
+) -> None:
+    """
+    Answer `question` directly in the community group (never by DM), tagging the asker, through the
+    same knowledge-base pipeline as a private chat: query, post the answer with the YES/NO keyboard,
+    track it for /purge, and schedule the buttons' expiry.
+    """
     user_id = message.from_user.id
     user_handle = message.from_user.username or message.from_user.first_name or f"User_{user_id}"
     mention = _build_mention(message.from_user, lang)
@@ -158,6 +151,56 @@ async def handle_community_ask(
     task = asyncio.create_task(_schedule_expiry(bot, state, message.chat.id, sent.message_id, timestamp))
     _background_tasks.add(task)
     task.add_done_callback(_background_tasks.discard)
+
+
+@community_router.message(Command("ask"))
+async def handle_community_ask(
+    message: Message,
+    command: CommandObject,
+    state: FSMContext,
+    bot: Bot,
+    backend_client: Optional[BackendClient] = None,
+):
+    """`/ask <question>` in the community group: answer publicly through the same pipeline as private chats, tagging the asker."""
+    if not await _is_community_group_chat(message.chat.id, backend_client=backend_client):
+        return
+
+    client = backend_client or BackendClient()
+    lang = await get_active_language(backend_client=client)
+
+    question = (command.args or "").strip()
+    if not question:
+        await message.reply(t("community_ask_usage", lang), parse_mode="Markdown")
+        return
+
+    await _answer_community_question(message, question, state, bot, client, lang)
+
+
+@community_router.message(F.chat.type.in_({"group", "supergroup"}), F.text, ~F.text.startswith("/"))
+async def handle_community_plain_question(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+    backend_client: Optional[BackendClient] = None,
+):
+    """
+    A plain-text question typed directly in the community group (no `/ask`): answered in the group
+    itself, exactly like `/ask`, instead of silently going unanswered.
+    """
+    if not await _is_community_group_chat(message.chat.id, backend_client=backend_client):
+        return
+
+    client = backend_client or BackendClient()
+    lang = await get_active_language(backend_client=client)
+
+    question = (message.text or "").strip()
+    if not question:
+        return
+    if len(question) > TELEGRAM_MAX_MESSAGE_LENGTH:
+        await message.reply(t("question_too_long", lang, max_length=TELEGRAM_MAX_MESSAGE_LENGTH))
+        return
+
+    await _answer_community_question(message, question, state, bot, client, lang)
 
 
 @community_router.callback_query(F.data == "cresolve:yes")
@@ -261,7 +304,7 @@ async def handle_purge(
 
     lang = await get_active_language(backend_client=backend_client)
 
-    if not await is_group_admin(bot, message.chat.id, message.from_user.id):
+    if not await is_bot_admin(bot, message.chat.id, message.from_user.id, backend_client=backend_client):
         await message.reply(t("community_purge_not_admin", lang))
         return
 
