@@ -114,11 +114,15 @@ async def _answer_community_question(
     bot: Bot,
     client: BackendClient,
     lang: str,
+    photo_file_id: Optional[str] = None,
 ) -> None:
     """
     Answer `question` directly in the community group (never by DM), tagging the asker, through the
     same knowledge-base pipeline as a private chat: query, post the answer with the YES/NO keyboard,
     track it for /purge, and schedule the buttons' expiry.
+
+    `photo_file_id`: when the question came with a screenshot, its Telegram file id - remembered so a
+    later NO can forward the actual image to the support group (never run through OCR or a vision model).
     """
     user_id = message.from_user.id
     user_handle = message.from_user.username or message.from_user.first_name or f"User_{user_id}"
@@ -147,6 +151,7 @@ async def _answer_community_question(
         last_answer_timestamp=timestamp,
         last_answer_message_id=sent.message_id,
         asking_user_handle=user_handle,
+        last_photo_file_id=photo_file_id,
     )
     task = asyncio.create_task(_schedule_expiry(bot, state, message.chat.id, sent.message_id, timestamp))
     _background_tasks.add(task)
@@ -203,6 +208,34 @@ async def handle_community_plain_question(
     await _answer_community_question(message, question, state, bot, client, lang)
 
 
+@community_router.message(F.chat.type.in_({"group", "supergroup"}), F.photo)
+async def handle_community_photo_question(
+    message: Message,
+    state: FSMContext,
+    bot: Bot,
+    backend_client: Optional[BackendClient] = None,
+):
+    """
+    A screenshot posted directly in the community group: answered like a plain-text question, using
+    its caption (or a placeholder when there is none). On NO, the image itself is forwarded to the
+    support group so an agent can look at it - never run through OCR or a vision model.
+    """
+    if not await _is_community_group_chat(message.chat.id, backend_client=backend_client):
+        return
+
+    client = backend_client or BackendClient()
+    lang = await get_active_language(backend_client=client)
+
+    caption = (message.caption or "").strip()
+    if len(caption) > TELEGRAM_MAX_MESSAGE_LENGTH:
+        await message.reply(t("question_too_long", lang, max_length=TELEGRAM_MAX_MESSAGE_LENGTH))
+        return
+    question = caption or t("photo_no_caption_question", lang)
+    photo_file_id = message.photo[-1].file_id
+
+    await _answer_community_question(message, question, state, bot, client, lang, photo_file_id=photo_file_id)
+
+
 @community_router.callback_query(F.data == "cresolve:yes")
 async def handle_community_resolve_yes(
     callback: CallbackQuery, state: FSMContext, backend_client: Optional[BackendClient] = None
@@ -256,6 +289,7 @@ async def handle_community_resolve_no(
             question=last_question,
             automated_answer=last_answer,
             lang=lang,
+            photo_file_id=user_data.get("last_photo_file_id"),
         )
         ticket_id = ticket["id"]
         await callback.answer(t("ticket_created_ack", lang))

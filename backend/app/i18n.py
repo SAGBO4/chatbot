@@ -115,6 +115,13 @@ TRANSLATIONS = {
             "Would you like me to forward your request to our support team?"
         ),
     },
+    # Stands in for the question text when a user sends a screenshot with no caption: there is
+    # nothing to search the knowledge base with, so this deliberately never matches an article,
+    # which naturally leads to the same "not found, escalate?" prompt as an unmatched text question.
+    "photo_no_caption_question": {
+        "fr": "Capture d'écran envoyée sans description.",
+        "en": "Screenshot sent without a description.",
+    },
     "email_reply_to_user": {
         "fr": (
             "📬 **Réponse de l'équipe support par Email (Ticket #{ticket_id})**\n\n"
@@ -248,6 +255,12 @@ TRANSLATIONS = {
             "━━━━━━━━━━━━━━━━━━━\n"
             "👉 To reply, answer this message directly with your solution."
         ),
+    },
+    # Caption of the screenshot forwarded to the support group alongside the ticket card (best effort;
+    # never blocks ticket creation if the send fails - see create_ticket_and_notify_admin_group).
+    "admin_ticket_photo_caption": {
+        "fr": "📎 Capture d'écran jointe au ticket #{ticket_id}.",
+        "en": "📎 Screenshot attached to ticket #{ticket_id}.",
     },
     "button_yes": {"fr": "✅ OUI", "en": "✅ YES"},
     "button_no": {"fr": "❌ NON", "en": "❌ NO"},

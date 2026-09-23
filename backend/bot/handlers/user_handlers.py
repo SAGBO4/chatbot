@@ -81,6 +81,45 @@ async def handle_help(message: Message, bot: Bot, backend_client: Optional[Backe
     await message.answer("".join(sections), parse_mode="Markdown", reply_markup=keyboard)
 
 
+async def _answer_private_question(
+    message: Message,
+    question: str,
+    state: FSMContext,
+    client: BackendClient,
+    lang: str,
+    photo_file_id: Optional[str] = None,
+) -> None:
+    """
+    Answer `question` in the private chat, from the knowledge base, then ask whether it solved the
+    problem. Shared by a typed question and a screenshot (its caption, or a placeholder when none):
+    `photo_file_id` is remembered so a later NO can forward the actual image to the support group.
+    """
+    user_id = message.from_user.id
+    user_handle = message.from_user.username or message.from_user.first_name
+
+    try:
+        data = await client.query(query=question, user_id=user_id, user_handle=user_handle)
+        answer = data.get("answer", "")
+
+        # Remembered so that clicking NO can open a ticket with this question and answer
+        await state.update_data(
+            last_question=question,
+            last_answer=answer,
+            last_photo_file_id=photo_file_id,
+        )
+
+        reply_text = t("answer_prompt", lang, answer=answer)
+        reply_text = truncate_telegram_text(reply_text, max_length=TELEGRAM_MAX_MESSAGE_LENGTH, suffix=t("truncated_suffix", lang))
+        await call_with_markdown_fallback(
+            message.answer, reply_text, reply_markup=get_resolution_keyboard(lang=lang), what="Answer"
+        )
+        await state.set_state(UserQueryState.waiting_for_resolution)
+
+    except Exception as exc:
+        logger.error("Error querying backend: %s", exc)
+        await message.answer(t("query_backend_error", lang))
+
+
 @user_router.message(F.chat.type == "private", F.text)
 async def handle_user_query(
     message: Message,
@@ -95,29 +134,31 @@ async def handle_user_query(
         await message.answer(t("question_too_long", lang, max_length=TELEGRAM_MAX_MESSAGE_LENGTH))
         return
 
-    user_id = message.from_user.id
-    user_handle = message.from_user.username or message.from_user.first_name
+    await _answer_private_question(message, user_query, state, client, lang)
 
-    try:
-        data = await client.query(query=user_query, user_id=user_id, user_handle=user_handle)
-        answer = data.get("answer", "")
 
-        # Remembered so that clicking NO can open a ticket with this question and answer
-        await state.update_data(
-            last_question=user_query,
-            last_answer=answer,
-        )
+@user_router.message(F.chat.type == "private", F.photo)
+async def handle_user_photo_query(
+    message: Message,
+    state: FSMContext,
+    backend_client: Optional[BackendClient] = None,
+):
+    """
+    A screenshot sent directly in the private chat: answered like a typed question, using its caption
+    (or a placeholder when there is none - the screenshot alone can be enough). Never run through OCR
+    or a vision model; on NO, the image itself is forwarded to the support group so an agent can look
+    at it (see create_ticket_and_notify_admin_group).
+    """
+    client = backend_client or BackendClient()
+    lang = await get_active_language(backend_client=client)
+    caption = (message.caption or "").strip()
+    if len(caption) > TELEGRAM_MAX_MESSAGE_LENGTH:
+        await message.answer(t("question_too_long", lang, max_length=TELEGRAM_MAX_MESSAGE_LENGTH))
+        return
+    question = caption or t("photo_no_caption_question", lang)
+    photo_file_id = message.photo[-1].file_id
 
-        reply_text = t("answer_prompt", lang, answer=answer)
-        reply_text = truncate_telegram_text(reply_text, max_length=TELEGRAM_MAX_MESSAGE_LENGTH, suffix=t("truncated_suffix", lang))
-        await call_with_markdown_fallback(
-            message.answer, reply_text, reply_markup=get_resolution_keyboard(lang=lang), what="Answer"
-        )
-        await state.set_state(UserQueryState.waiting_for_resolution)
-
-    except Exception as exc:
-        logger.error("Error querying backend: %s", exc)
-        await message.answer(t("query_backend_error", lang))
+    await _answer_private_question(message, question, state, client, lang, photo_file_id=photo_file_id)
 
 
 @user_router.callback_query(F.data.startswith("resolve:yes"))
@@ -168,6 +209,7 @@ async def handle_resolve_no(
             question=last_question,
             automated_answer=last_answer,
             lang=lang,
+            photo_file_id=user_data.get("last_photo_file_id"),
         )
         ticket_id = ticket["id"]
 
