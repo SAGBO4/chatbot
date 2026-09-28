@@ -50,6 +50,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - Unused create-next-app SVGs and the unused `StackLogo` component in the frontend.
 
 ### Fixed
+- **CI could break on any day with no change to this repo.** `requirements.txt` pinned only a floor for SQLAlchemy (`>=2.0.54`), so a fresh install could silently resolve SQLAlchemy 2.1 - a major version the app was never tested against, and which also stopped pulling in `greenlet`, a hard dependency of its async engine (`ImportError` at test collection: "the Python 'greenlet' library is installed"). Reproduced with a clean install matching CI exactly. Now pinned to `sqlalchemy[asyncio]>=2.0.54,<2.1`, matching the version in `requirements.lock`.
 - Docs said the Dockerfile was multi-stage; it is not.
 - `SECURITY.md` said bandit, semgrep, trivy and pip-audit ran on every change; only `ruff` and the tests run in CI.
 - A test that checks the Brevo token never appears in application logs could pass without checking anything if no log was captured; it now asserts that logs were captured.
