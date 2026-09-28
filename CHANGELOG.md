@@ -18,7 +18,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - Bot: a plain-text question typed directly in the community group (without `/ask`) is now answered in the group, instead of going unanswered.
 - Bot: moderation commands (`/mute`, `/unmute`, `/ban`, `/kick`, `/warn`) can target a member by `@username`, not just a reply or a numeric id.
 - Bot: a screenshot sent directly in a private chat or the community group is answered like a typed question (its caption, or a placeholder when there is none); on escalation, the image itself is forwarded to the support group so an agent can see it — never run through OCR or a vision model.
-- Bot: 99 more supported cryptocurrencies (110 total), and Telegram's native "/" command suggestion menu, registered in French and English.
+- Bot: 99 more supported cryptocurrencies (109 total), and Telegram's native "/" command suggestion menu, registered in French and English.
 - Community files: [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1), [SECURITY.md](SECURITY.md), issue forms and a pull request template.
 - CI: a `frontend` job (`npm ci`, lint, build) next to the backend job.
 - `frontend/.env.example` and documentation of the frontend proxy: `BACKEND_API_URL`, `BACKEND_API_KEY`, `TELEGRAM_BOT_TOKEN`, and who can do what through it.

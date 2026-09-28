@@ -102,7 +102,7 @@ AI_PROVIDER=gemini
 1. Start a private chat with the bot as the configured `BOT_OWNER_TELEGRAM_ID` and send `/start` — since no community group is configured yet, the bot replies with a short setup tutorial.
 2. Add the bot as an **admin** to the Telegram group you want to use as the community group, with rights to restrict members, ban/unban users, and delete messages — otherwise `/mute`, `/ban`, `/kick`, and `/purge` will fail with a Telegram permission error.
 3. In that group, send `/setup_community`. It becomes the active community group immediately.
-4. Optionally, as the owner, run `/whitelist add <user_id>` (in DM or the admin group) to let another trusted admin also run `/setup_community` and `/language` — a whitelisted admin cannot manage the whitelist themselves, only the owner can.
+4. Optionally, as the owner, run `/whitelist add <user_id>` (in DM or the admin group) to let another trusted admin also run `/setup_community` and `/language`, moderate the community group, `/purge`, and resolve support tickets — even without native Telegram admin rights in those groups. A whitelisted admin cannot manage the whitelist themselves, only the owner can.
 5. Optionally, switch the bot's messages to English at any time with `/language en` (or back to French with `/language fr`), run by the owner or a whitelisted admin.
 
 Run `/setup_community` again at any time to point the bot at a different group — it replaces the previous one immediately.
