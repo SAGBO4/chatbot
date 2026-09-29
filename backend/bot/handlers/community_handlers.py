@@ -159,7 +159,7 @@ async def _answer_community_question(
     task.add_done_callback(_background_tasks.discard)
 
 
-@community_router.message(Command("ask"))
+@community_router.message(F.chat.type.in_({"group", "supergroup"}), Command("ask"))
 async def handle_community_ask(
     message: Message,
     command: CommandObject,
@@ -181,12 +181,33 @@ async def handle_community_ask(
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
 
+    photo = getattr(message, "photo", None)
+    reply_to = getattr(message, "reply_to_message", None)
+    reply_photo = getattr(reply_to, "photo", None) if reply_to else None
+
+    photo_file_id: Optional[str] = None
+    if photo:
+        photo_file_id = photo[-1].file_id
+    elif reply_photo:
+        photo_file_id = reply_photo[-1].file_id
+
     question = (command.args or "").strip()
+    if not question:
+        if reply_photo:
+            caption = (getattr(reply_to, "caption", None) or "").strip()
+            question = caption if caption else t("photo_no_caption_question", lang)
+        elif photo:
+            question = t("photo_no_caption_question", lang)
+
     if not question:
         await message.reply(t("community_ask_usage", lang), parse_mode="Markdown")
         return
 
-    await _answer_community_question(message, question, state, bot, client, lang)
+    if len(question) > TELEGRAM_MAX_MESSAGE_LENGTH:
+        await message.reply(t("question_too_long", lang, max_length=TELEGRAM_MAX_MESSAGE_LENGTH))
+        return
+
+    await _answer_community_question(message, question, state, bot, client, lang, photo_file_id=photo_file_id)
 
 
 @community_router.message(F.chat.type.in_({"group", "supergroup"}), F.text, ~F.text.startswith("/"))
@@ -213,7 +234,11 @@ async def handle_community_plain_question(
         await message.reply(t("question_too_long", lang, max_length=TELEGRAM_MAX_MESSAGE_LENGTH))
         return
 
-    await _answer_community_question(message, question, state, bot, client, lang)
+    reply_to = getattr(message, "reply_to_message", None)
+    reply_photo = getattr(reply_to, "photo", None) if reply_to else None
+    photo_file_id = reply_photo[-1].file_id if reply_photo else None
+
+    await _answer_community_question(message, question, state, bot, client, lang, photo_file_id=photo_file_id)
 
 
 @community_router.message(F.chat.type.in_({"group", "supergroup"}), F.photo)

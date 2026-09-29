@@ -60,12 +60,11 @@ _CRYPTO_DESCRIPTION = {"fr": "Prix en direct de {symbol}", "en": "Live price of 
 
 _DEFAULT_SCOPE_COMMANDS = ["start", "help", "list", "webapp"]
 _PRIVATE_SCOPE_COMMANDS = ["start", "help", "list", "webapp"]
-_GROUP_SCOPE_COMMANDS = ["help", "list", "ask", "webapp"]
+_GROUP_SCOPE_COMMANDS = ["help", "list", "ask"]
 _ADMIN_SCOPE_COMMANDS = [
     "help",
     "list",
     "ask",
-    "webapp",
     "setup_community",
     "language",
     "mute",

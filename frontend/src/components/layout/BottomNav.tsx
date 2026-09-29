@@ -32,7 +32,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ onOpenMenu }) => {
   return (
     <nav
       aria-label={t.mobileNavLabel}
-      className="fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08] bg-black/85 backdrop-blur-2xl transition-all"
+      className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-white/[0.08] bg-black/85 backdrop-blur-2xl transition-all"
       style={{ paddingBottom: 'max(env(safe-area-inset-bottom, 0px), 0.5rem)' }}
     >
       <div className="mx-auto flex max-w-lg items-center justify-around px-2 pt-1.5">

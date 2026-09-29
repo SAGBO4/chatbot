@@ -12,18 +12,18 @@ TRANSLATIONS = {
     # --- user_handlers.py ---
     "welcome": {
         "fr": (
-            "👋 **Bonjour et bienvenue sur notre service de support automatisé !**\n\n"
-            "Posez-moi simplement votre question dans ce chat, et je chercherai immédiatement "
-            "la solution la plus adaptée dans notre base de connaissances.\n\n"
-            "Si la réponse ne vous convient pas, vous pourrez transférer votre demande "
-            "à notre équipe humaine en un clic !"
+            "👋 **Bonjour et bienvenue sur le centre d'assistance Stack Wallet !**\n\n"
+            "Posez votre question dans ce chat pour consulter immédiatement "
+            "la documentation et les procédures de la base de connaissances.\n\n"
+            "Si la fiche technique ne résout pas votre problème, vous pourrez contacter "
+            "directement notre équipe d'ingénierie en un clic."
         ),
         "en": (
-            "👋 **Hello and welcome to our automated support service!**\n\n"
-            "Just ask your question in this chat, and I'll immediately look for "
-            "the best-matching solution in our knowledge base.\n\n"
-            "If the answer doesn't suit you, you'll be able to forward your request "
-            "to our human team with one click!"
+            "👋 **Hello and welcome to Stack Wallet Support!**\n\n"
+            "Ask your question in this chat to browse our verified knowledge base "
+            "and technical procedures.\n\n"
+            "If the documentation does not resolve your issue, you can escalate "
+            "directly to our engineering team with one click."
         ),
     },
     "help_intro": {
@@ -184,7 +184,7 @@ TRANSLATIONS = {
             "• Numéro de Ticket : #{ticket_id}\n"
             "• Utilisateur : @{handle} (ID: {user_id})\n\n"
             "❓ Question posée :\n{question}\n\n"
-            "🤖 Réponse automatique du bot :\n{answer}\n\n"
+            "📄 Documentation technique suggérée :\n{answer}\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "👉 Pour résoudre ce ticket, répondez directement à cet email avec votre solution.\n"
         ),
@@ -194,7 +194,7 @@ TRANSLATIONS = {
             "• Ticket number: #{ticket_id}\n"
             "• User: @{handle} (ID: {user_id})\n\n"
             "❓ Question asked:\n{question}\n\n"
-            "🤖 Automatic answer from the bot:\n{answer}\n\n"
+            "📄 Suggested technical documentation:\n{answer}\n\n"
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
             "👉 To resolve this ticket, reply to this email directly with your solution.\n"
         ),
@@ -242,7 +242,7 @@ TRANSLATIONS = {
             "━━━━━━━━━━━━━━━━━━━\n"
             "👤 **Utilisateur :** @{handle} (`ID: {user_id}`)\n"
             "❓ **Question :**\n{question}\n\n"
-            "🤖 **Réponse automatique :**\n{answer}\n\n"
+            "📄 **Solution documentée :**\n{answer}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "👉 *Pour répondre, répondez directement à ce message avec votre solution.*"
         ),
@@ -251,7 +251,7 @@ TRANSLATIONS = {
             "━━━━━━━━━━━━━━━━━━━\n"
             "👤 **User:** @{handle} (`ID: {user_id}`)\n"
             "❓ **Question:**\n{question}\n\n"
-            "🤖 **Automatic answer:**\n{answer}\n\n"
+            "📄 **Documented solution:**\n{answer}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "👉 *To reply, answer this message directly with your solution.*"
         ),
@@ -262,7 +262,7 @@ TRANSLATIONS = {
             "━━━━━━━━━━━━━━━━━━━\n"
             "👤 Utilisateur : @{handle} (ID: {user_id})\n"
             "❓ Question :\n{question}\n\n"
-            "🤖 Réponse automatique :\n{answer}\n\n"
+            "📄 Solution documentée :\n{answer}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "👉 Pour répondre, répondez directement à ce message avec votre solution."
         ),
@@ -271,7 +271,7 @@ TRANSLATIONS = {
             "━━━━━━━━━━━━━━━━━━━\n"
             "👤 User: @{handle} (ID: {user_id})\n"
             "❓ Question:\n{question}\n\n"
-            "🤖 Automatic answer:\n{answer}\n\n"
+            "📄 Documented solution:\n{answer}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
             "👉 To reply, answer this message directly with your solution."
         ),
@@ -300,6 +300,10 @@ TRANSLATIONS = {
         "fr": "L'URL de la WebApp n'est pas encore configurée dans le fichier `.env` (variable `TELEGRAM_WEBAPP_URL`).",
         "en": "The WebApp URL is not configured yet in the `.env` file (`TELEGRAM_WEBAPP_URL` variable).",
     },
+    "webapp_group_redirect": {
+        "fr": "ℹ️ La Mini App et le centre d'assistance sont disponibles uniquement en message privé avec le bot.",
+        "en": "ℹ️ The Mini App and support center are only available in a private message with the bot.",
+    },
     "question_too_long": {
         "fr": "⚠️ Votre question est trop longue (maximum {max_length} caractères). Veuillez raccourcir votre message et réessayer.",
         "en": "⚠️ Your question is too long (maximum {max_length} characters). Please shorten your message and try again.",
@@ -309,8 +313,8 @@ TRANSLATIONS = {
         "en": "⚠️ An error occurred while communicating with the server. Please try again later.",
     },
     "answer_prompt": {
-        "fr": "🤖 **Réponse :**\n\n{answer}\n\n━━━━━━━━━━━━━━━━━━━\n❓ **Votre problème est-il résolu ?**",
-        "en": "🤖 **Answer:**\n\n{answer}\n\n━━━━━━━━━━━━━━━━━━━\n❓ **Is your problem resolved?**",
+        "fr": "📄 **Documentation technique :**\n\n{answer}\n\n━━━━━━━━━━━━━━━━━━━\n❓ **Votre problème est-il résolu ?**",
+        "en": "📄 **Technical documentation:**\n\n{answer}\n\n━━━━━━━━━━━━━━━━━━━\n❓ **Is your problem resolved?**",
     },
     "resolved_notice": {
         "fr": "{base_text}\n\n✅ **Statut : Problème résolu.**\nMerci d'avoir utilisé notre service support ! N'hésitez pas si vous avez d'autres questions. 👋",
@@ -385,8 +389,8 @@ TRANSLATIONS = {
         "en": "ℹ️ Usage: `/ask your question`",
     },
     "community_answer_prompt": {
-        "fr": "{mention}\n\n🤖 **Réponse :**\n\n{answer}\n\n━━━━━━━━━━━━━━━━━━━\n❓ **Votre problème est-il résolu ?**",
-        "en": "{mention}\n\n🤖 **Answer:**\n\n{answer}\n\n━━━━━━━━━━━━━━━━━━━\n❓ **Is your problem resolved?**",
+        "fr": "{mention}\n\n📄 **Documentation technique :**\n\n{answer}\n\n━━━━━━━━━━━━━━━━━━━\n❓ **Votre problème est-il résolu ?**",
+        "en": "{mention}\n\n📄 **Technical documentation:**\n\n{answer}\n\n━━━━━━━━━━━━━━━━━━━\n❓ **Is your problem resolved?**",
     },
     "community_resolved_notice": {
         "fr": "{base_text}\n\n✅ **Statut : Problème résolu.**\nMerci d'avoir utilisé notre service support ! 👋",

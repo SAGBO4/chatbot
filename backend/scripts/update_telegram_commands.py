@@ -35,8 +35,8 @@ async def main() -> None:
         print("✅ Successfully registered all command scopes with Telegram:")
         print("   • Default scope (universal fallback, fr, en)")
         print("   • AllPrivateChats scope (standard DM members: /start, /help, /list, /webapp, crypto)")
-        print("   • AllGroupChats scope (standard group members: /help, /list, /ask, /webapp, crypto)")
-        print("   • AllChatAdministrators scope (group admins: /help, /list, /ask, /webapp, moderation, setup, crypto)")
+        print("   • AllGroupChats scope (standard group members: /help, /list, /ask, crypto)")
+        print("   • AllChatAdministrators scope (group admins: /help, /list, /ask, moderation, setup, crypto)")
         if settings.BOT_OWNER_TELEGRAM_ID and settings.BOT_OWNER_TELEGRAM_ID > 0:
             print(f"   • Chat scope for Owner ({settings.BOT_OWNER_TELEGRAM_ID}: /start, /help, /list, /webapp, /language, /whitelist, crypto)")
     except Exception as exc:
