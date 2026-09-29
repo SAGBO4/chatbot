@@ -47,9 +47,9 @@ def command_object(args=None):
 
 @pytest.mark.asyncio
 async def test_mute_rejected_for_non_admin(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return False
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/mute", reply_to=reply_to)
@@ -64,9 +64,9 @@ async def test_mute_rejected_for_non_admin(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_mute_outside_community_group_is_ignored(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
     message = make_admin_message(OTHER_CHAT_ID, admin_id=1, text="/mute", reply_to=reply_to)
@@ -80,9 +80,9 @@ async def test_mute_outside_community_group_is_ignored(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_mute_by_reply_with_duration(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/mute 3600", reply_to=reply_to)
@@ -101,9 +101,9 @@ async def test_mute_by_reply_with_duration(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_mute_by_explicit_user_id_indefinite(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/mute 777")
     bot = AsyncMock()
@@ -118,10 +118,45 @@ async def test_mute_by_explicit_user_id_indefinite(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_mute_without_target_replies_error(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+async def test_mute_by_username_resolves_via_telegram(monkeypatch):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
+
+    message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/mute @bob 60")
+    bot = AsyncMock()
+    bot.get_chat.return_value = MagicMock(id=321, type="private", username="bob")
+
+    await handle_mute(message, CommandObject(prefix="/", command="mute", args="@bob 60"), bot)
+
+    bot.get_chat.assert_called_once_with("@bob")
+    bot.restrict_chat_member.assert_called_once()
+    kwargs = bot.restrict_chat_member.call_args.kwargs
+    assert kwargs["user_id"] == 321
+    assert kwargs["chat_id"] == COMMUNITY_GROUP_ID
+
+
+@pytest.mark.asyncio
+async def test_mute_by_unknown_username_replies_no_target(monkeypatch):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
+        return True
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
+
+    message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/mute @ghost")
+    bot = AsyncMock()
+    bot.get_chat.side_effect = Exception("chat not found")
+
+    await handle_mute(message, CommandObject(prefix="/", command="mute", args="@ghost"), bot)
+
+    bot.restrict_chat_member.assert_not_called()
+    message.reply.assert_called_once()
+
+
+@pytest.mark.asyncio
+async def test_mute_without_target_replies_error(monkeypatch):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
+        return True
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/mute")
     bot = AsyncMock()
@@ -134,9 +169,9 @@ async def test_mute_without_target_replies_error(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_unmute_restores_permissions(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/unmute", reply_to=reply_to)
@@ -151,9 +186,9 @@ async def test_unmute_restores_permissions(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_ban_calls_ban_chat_member(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/ban", reply_to=reply_to)
@@ -166,9 +201,9 @@ async def test_ban_calls_ban_chat_member(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_kick_bans_then_unbans(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/kick", reply_to=reply_to)
@@ -182,9 +217,9 @@ async def test_kick_bans_then_unbans(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_warn_records_via_backend_and_reports_total(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/warn spam", reply_to=reply_to)
@@ -205,9 +240,9 @@ async def test_warn_records_via_backend_and_reports_total(monkeypatch):
 
 @pytest.mark.asyncio
 async def test_non_admin_cannot_warn(monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return False
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
     message = make_admin_message(COMMUNITY_GROUP_ID, admin_id=1, text="/warn spam", reply_to=reply_to)

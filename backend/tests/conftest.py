@@ -56,7 +56,7 @@ def reset_bot_process_caches():
 def default_group_admin_check(request, monkeypatch):
     """
     Support-group agent replies (handle_support_agent_reply) now require a
-    live Telegram admin check (is_group_admin) before resolving anything -
+    live Telegram admin check (is_bot_admin) before resolving anything -
     see the fix for the "any group member can resolve tickets" finding.
 
     Most existing tests simulate a legitimate agent and use a plain
@@ -71,10 +71,10 @@ def default_group_admin_check(request, monkeypatch):
         return
     from bot.handlers import support_handlers
 
-    async def _default_is_group_admin(bot, chat_id, user_id, force_refresh=False):
+    async def _default_is_bot_admin(bot, chat_id, user_id, backend_client=None, force_refresh=False):
         return True
 
-    monkeypatch.setattr(support_handlers, "is_group_admin", _default_is_group_admin)
+    monkeypatch.setattr(support_handlers, "is_bot_admin", _default_is_bot_admin)
     yield
 
 

@@ -93,3 +93,33 @@ async def test_invalidate_admin_cache_clears_entries():
     admin_check.invalidate_admin_cache()
     await admin_check.is_group_admin(bot, chat_id=-100, user_id=2)
     assert bot.get_chat_member.call_count == 4
+
+
+@pytest.mark.asyncio
+async def test_is_bot_admin_true_for_whitelisted_non_telegram_admin(monkeypatch):
+    """A whitelisted user counts as a bot admin even without native Telegram admin rights."""
+    monkeypatch.setattr(admin_check, "is_authorized", AsyncMock(return_value=True))
+    bot = AsyncMock()
+    bot.get_chat_member.return_value = MagicMock(status="member")
+    result = await admin_check.is_bot_admin(bot, chat_id=-100, user_id=1)
+    assert result is True
+    bot.get_chat_member.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_is_bot_admin_true_for_native_telegram_admin(monkeypatch):
+    """A native Telegram group admin counts as a bot admin even without being whitelisted."""
+    monkeypatch.setattr(admin_check, "is_authorized", AsyncMock(return_value=False))
+    bot = AsyncMock()
+    bot.get_chat_member.return_value = MagicMock(status="administrator")
+    result = await admin_check.is_bot_admin(bot, chat_id=-100, user_id=1)
+    assert result is True
+
+
+@pytest.mark.asyncio
+async def test_is_bot_admin_false_when_neither_whitelisted_nor_telegram_admin(monkeypatch):
+    monkeypatch.setattr(admin_check, "is_authorized", AsyncMock(return_value=False))
+    bot = AsyncMock()
+    bot.get_chat_member.return_value = MagicMock(status="member")
+    result = await admin_check.is_bot_admin(bot, chat_id=-100, user_id=1)
+    assert result is False

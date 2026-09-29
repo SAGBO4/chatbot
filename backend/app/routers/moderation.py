@@ -4,12 +4,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.observability import get_logger
+from app.openapi_docs import PROTECTED
 from app.schemas import WarningCreateRequest, WarningListResponse, WarningResponse
 from app.security import verify_api_key
 from app.services.warning_service import WarningService
 
 logger = get_logger(__name__)
-router = APIRouter(tags=["moderation"])
+router = APIRouter(tags=["moderation"], responses=PROTECTED)
 
 
 @router.post(

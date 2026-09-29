@@ -7,12 +7,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_db
 from app.limiter import limiter
 from app.observability import get_logger
+from app.openapi_docs import PROTECTED, RATE_LIMITED
 from app.schemas import KnowledgeArticleResponse, KnowledgeIngestRequest
 from app.security import verify_api_key
 from app.services.knowledge_base import KnowledgeBaseService
 
 logger = get_logger(__name__)
-router = APIRouter(tags=["knowledge"])
+router = APIRouter(tags=["knowledge"], responses=PROTECTED)
 
 
 @router.post(
@@ -20,6 +21,7 @@ router = APIRouter(tags=["knowledge"])
     response_model=KnowledgeArticleResponse,
     status_code=status.HTTP_201_CREATED,
     dependencies=[Depends(verify_api_key)],
+    responses=RATE_LIMITED,
 )
 @limiter.limit("20/minute")
 async def ingest_knowledge(
@@ -43,8 +45,8 @@ async def ingest_knowledge(
     dependencies=[Depends(verify_api_key)],
 )
 async def list_knowledge(
-    limit: int = Query(default=50, ge=1, le=100),
-    offset: int = Query(default=0, ge=0),
+    limit: int = Query(default=50, ge=1, le=100, description="Page size."),
+    offset: int = Query(default=0, ge=0, description="Articles to skip, for paging."),
     session: AsyncSession = Depends(get_db),
 ):
     """List knowledge base articles; paginated."""

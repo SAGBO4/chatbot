@@ -13,6 +13,12 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 ## [Unreleased]
 
 ### Added
+- Bot: moderation and `/purge` are no longer limited to native Telegram group admins — the owner and whitelisted admins (added via the admin app or `/whitelist`) can use them too, and the same rule now also gates support-ticket resolution in the support group.
+- Bot: `/help` lists the commands the sender may actually run, based on their role and the chat they're in.
+- Bot: a plain-text question typed directly in the community group (without `/ask`) is now answered in the group, instead of going unanswered.
+- Bot: moderation commands (`/mute`, `/unmute`, `/ban`, `/kick`, `/warn`) can target a member by `@username`, not just a reply or a numeric id.
+- Bot: a screenshot sent directly in a private chat or the community group is answered like a typed question (its caption, or a placeholder when there is none); on escalation, the image itself is forwarded to the support group so an agent can see it — never run through OCR or a vision model.
+- Bot: 99 more supported cryptocurrencies (109 total), and Telegram's native "/" command suggestion menu, registered in French and English.
 - Community files: [CONTRIBUTING.md](CONTRIBUTING.md), [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md) (Contributor Covenant 2.1), [SECURITY.md](SECURITY.md), issue forms and a pull request template.
 - CI: a `frontend` job (`npm ci`, lint, build) next to the backend job.
 - `frontend/.env.example` and documentation of the frontend proxy: `BACKEND_API_URL`, `BACKEND_API_KEY`, `TELEGRAM_BOT_TOKEN`, and who can do what through it.
@@ -22,6 +28,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - Platform-as-a-service deployments (Dokku, Heroku-style): `backend/Procfile` (`web` and `bot` processes), `backend/CHECKS` (health check on `/health`), and `DATABASE_URL` values written as `postgres://` or `postgresql://` are rewritten to `postgresql+asyncpg://`, the scheme SQLAlchemy's async driver needs. `SENTRY_DSN` is now listed in `.env.example`.
 - `SENTRY_TRACES_SAMPLE_RATE` (default `1.0`, as before) replaces the hard-coded value, so a busy deployment can trace a fraction of its requests.
 - `tests/test_i18n.py` checks that every message exists in French and English with the same placeholders.
+- The Swagger page (`/docs`) now documents the whole API: an **Authorize** button for the API key (it used to be a header field repeated on every route), the webhooks' own secrets as security schemes, every error a route can return (401, 403, 404, 429, 503...) with a shared body, a description and an example for every field of every request and response, descriptions on every parameter, tag descriptions, and an introduction covering authentication, errors and rate limits. None of the 21 operations documented an error other than validation (422) before. The generated schema is valid OpenAPI 3.1 and `tests/test_openapi_docs.py` fails if a route, field or parameter is added without documentation.
 
 ### Changed
 - **Dependencies:** `backend/requirements.txt` is now runtime-only, with floors raised to the versions the tests actually run against (they were still `fastapi>=0.110`, `pydantic>=2.6`...), and no longer lists `python-dotenv` (pulled in by `pydantic-settings`). New `backend/requirements-dev.txt` for `pytest`, `pytest-asyncio`, `pytest-cov`, `mutmut`, `ruff`, `bandit`, `semgrep` and `pip-audit`: the README already asked for them but none was declared. CI installs it instead of a bare `pip install ruff`. `requirements.lock` was regenerated: same versions, minus `pytest` and its dependencies, so the Docker image no longer ships a test runner.
@@ -44,6 +51,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - Unused create-next-app SVGs and the unused `StackLogo` component in the frontend.
 
 ### Fixed
+- **CI could break on any day with no change to this repo.** `requirements.txt` pinned only a floor for SQLAlchemy (`>=2.0.54`), so a fresh install could silently resolve SQLAlchemy 2.1 - a major version the app was never tested against, and which also stopped pulling in `greenlet`, a hard dependency of its async engine (`ImportError` at test collection: "the Python 'greenlet' library is installed"). Reproduced with a clean install matching CI exactly. Now pinned to `sqlalchemy[asyncio]>=2.0.54,<2.1`, matching the version in `requirements.lock`.
 - Docs said the Dockerfile was multi-stage; it is not.
 - `SECURITY.md` said bandit, semgrep, trivy and pip-audit ran on every change; only `ruff` and the tests run in CI.
 - A test that checks the Brevo token never appears in application logs could pass without checking anything if no log was captured; it now asserts that logs were captured.

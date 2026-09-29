@@ -308,7 +308,7 @@ async def test_support_agent_reply_rejected_for_non_admin_group_member(monkeypat
     """
     monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
     monkeypatch.setattr(
-        "bot.handlers.support_handlers.is_group_admin",
+        "bot.handlers.support_handlers.is_bot_admin",
         AsyncMock(return_value=False),
     )
 
@@ -1027,10 +1027,49 @@ async def test_bot_handlers_help_command_sends_help_text(bot_test_env):
     """
     message = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"])
     message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = False
 
-    await handle_help(message)
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
     message.answer.assert_called_once()
     assert "Aide" in message.answer.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_help_command_lists_setup_commands_for_whitelisted_admin(bot_test_env, monkeypatch):
+    """A whitelisted (non-owner) admin sees the setup commands but not the owner-only /whitelist one."""
+    monkeypatch.setattr(settings, "BOT_OWNER_TELEGRAM_ID", 999999)
+    message = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"])
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = True
+
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
+    help_text = message.answer.call_args[0][0]
+    assert "/setup_community" in help_text
+    assert "/whitelist" not in help_text
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_help_command_lists_moderation_for_bot_admin_in_community_group(
+    bot_test_env, monkeypatch
+):
+    """A bot admin in the community group sees the moderation commands."""
+    from bot.handlers import user_handlers
+
+    group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
+    message = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"])
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = False
+
+    monkeypatch.setattr(user_handlers, "is_community_group_chat", AsyncMock(return_value=True))
+    monkeypatch.setattr(user_handlers, "is_bot_admin", AsyncMock(return_value=True))
+
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
+    help_text = message.answer.call_args[0][0]
+    assert "/mute" in help_text
+    assert "/ask" in help_text
 
 
 @pytest.mark.asyncio
@@ -1335,7 +1374,7 @@ async def test_bot_handlers_agent_reply_from_non_admin_group_member_ignored(monk
     support_group_id = -100555666
     monkeypatch.setattr(settings, "TELEGRAM_SUPPORT_GROUP_ID", support_group_id)
     monkeypatch.setattr(
-        "bot.handlers.support_handlers.is_group_admin",
+        "bot.handlers.support_handlers.is_bot_admin",
         AsyncMock(return_value=False),
     )
 

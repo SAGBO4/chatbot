@@ -1,4 +1,5 @@
 import logging
+from typing import Optional
 from aiogram import Bot
 from app.config import settings
 from app.i18n import DEFAULT_LANGUAGE, t
@@ -17,6 +18,7 @@ async def create_ticket_and_notify_admin_group(
     question: str,
     automated_answer: str,
     lang: str = DEFAULT_LANGUAGE,
+    photo_file_id: Optional[str] = None,
 ) -> dict:
     """
     Create a ticket through the backend and post its card to the admin/support group.
@@ -24,6 +26,11 @@ async def create_ticket_and_notify_admin_group(
     Shared by the private-chat and community-group escalation flows, so the card and its
     Markdown-to-plain-text fallback exist once. Ticket details only ever go to the admin group here;
     callers decide what to show in their own chat. Returns the ticket dict from the backend.
+
+    `photo_file_id`: when the user's question came with a screenshot, its Telegram file id - forwarded
+    to the support group as an actual photo (not run through any transcription or vision step) right
+    after the card, so an agent can look at it. Best effort: never persisted, and a failure to send it
+    never fails ticket creation.
     """
     ticket = await client.create_ticket(
         user_id=user_id,
@@ -68,6 +75,19 @@ async def create_ticket_and_notify_admin_group(
             logger.warning(
                 "Could not attach support card message id for ticket %s: %s",
                 ticket_id, attach_exc,
+            )
+
+    if photo_file_id:
+        try:
+            await bot.send_photo(
+                chat_id=support_group_id,
+                photo=photo_file_id,
+                caption=t("admin_ticket_photo_caption", lang, ticket_id=ticket_id),
+            )
+        except Exception as photo_exc:
+            logger.warning(
+                "Could not forward the screenshot for ticket %s to the support group: %s",
+                ticket_id, photo_exc,
             )
 
     return ticket
