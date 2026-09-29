@@ -11,7 +11,8 @@ from app.config import settings
 from bot.keyboards import get_community_resolution_keyboard
 from bot.api_client import BackendClient
 from bot.admin_check import is_bot_admin
-from bot.group_scope import is_community_group_chat as _is_community_group_chat
+from bot import group_scope
+from bot.group_scope import is_community_group_chat as _is_community_group_chat, get_community_group_id
 from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.language import get_active_language
 from bot.messaging import call_with_markdown_fallback
@@ -168,6 +169,13 @@ async def handle_community_ask(
 ):
     """`/ask <question>` in the community group: answer publicly through the same pipeline as private chats, tagging the asker."""
     if not await _is_community_group_chat(message.chat.id, backend_client=backend_client):
+        client = backend_client or BackendClient()
+        lang = await get_active_language(backend_client=client)
+        community_id = await group_scope.get_community_group_id(backend_client=client)
+        if community_id is None:
+            await message.reply(t("community_not_configured", lang), parse_mode="Markdown")
+        else:
+            await message.reply(t("community_wrong_group", lang))
         return
 
     client = backend_client or BackendClient()
@@ -334,6 +342,12 @@ async def handle_purge(
     messages (moderation or crypto replies) are not tracked.
     """
     if not await _is_community_group_chat(message.chat.id, backend_client=backend_client):
+        lang = await get_active_language(backend_client=backend_client)
+        community_id = await group_scope.get_community_group_id(backend_client=backend_client)
+        if community_id is None:
+            await message.reply(t("community_not_configured", lang), parse_mode="Markdown")
+        else:
+            await message.reply(t("community_wrong_group", lang))
         return
 
     lang = await get_active_language(backend_client=backend_client)

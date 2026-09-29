@@ -62,20 +62,82 @@ async def test_mute_rejected_for_non_admin(monkeypatch):
     assert "administrateurs" in message.reply.call_args[0][0]
 
 
+@pytest.mark.parametrize(
+    "handler,cmd_name",
+    [
+        (handle_mute, "mute"),
+        (handle_unmute, "unmute"),
+        (handle_ban, "ban"),
+        (handle_kick, "kick"),
+        (handle_warn, "warn"),
+    ],
+)
+@pytest.mark.parametrize(
+    "lang,expected_text",
+    [
+        ("fr", "réservée au groupe communautaire"),
+        ("en", "reserved for the configured community group"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_mute_outside_community_group_is_ignored(monkeypatch):
+async def test_moderation_commands_outside_community_group_replies_wrong_group(
+    monkeypatch, handler, cmd_name, lang, expected_text
+):
     async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
     monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_to = make_target_reply(target_id=55)
-    message = make_admin_message(OTHER_CHAT_ID, admin_id=1, text="/mute", reply_to=reply_to)
+    message = make_admin_message(OTHER_CHAT_ID, admin_id=1, text=f"/{cmd_name}", reply_to=reply_to)
     bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = lang
 
-    await handle_mute(message, command_object(), bot)
+    await handler(message, command_object(cmd_name), bot, backend_client=mock_client)
 
     bot.restrict_chat_member.assert_not_called()
-    message.reply.assert_not_called()
+    bot.ban_chat_member.assert_not_called()
+    mock_client.create_warning.assert_not_called()
+    message.reply.assert_called_once()
+    assert expected_text in message.reply.call_args[0][0]
+
+
+@pytest.mark.parametrize(
+    "handler,cmd_name",
+    [
+        (handle_mute, "mute"),
+        (handle_unmute, "unmute"),
+        (handle_ban, "ban"),
+        (handle_kick, "kick"),
+        (handle_warn, "warn"),
+    ],
+)
+@pytest.mark.parametrize(
+    "lang,expected_text",
+    [
+        ("fr", "n'a pas encore été configuré"),
+        ("en", "has not been configured yet"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_moderation_commands_when_community_not_configured_replies_setup_community(
+    monkeypatch, handler, cmd_name, lang, expected_text
+):
+    monkeypatch.setattr("bot.group_scope.get_community_group_id", AsyncMock(return_value=None))
+    reply_to = make_target_reply(target_id=55)
+    message = make_admin_message(OTHER_CHAT_ID, admin_id=1, text=f"/{cmd_name}", reply_to=reply_to)
+    bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = lang
+
+    await handler(message, command_object(cmd_name), bot, backend_client=mock_client)
+
+    bot.restrict_chat_member.assert_not_called()
+    bot.ban_chat_member.assert_not_called()
+    mock_client.create_warning.assert_not_called()
+    message.reply.assert_called_once()
+    assert expected_text in message.reply.call_args[0][0]
+    assert "/setup_community" in message.reply.call_args[0][0]
 
 
 @pytest.mark.asyncio
