@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { fileToDataUrl } from '@/lib/utils';
 import { TicketResponse } from '@/types';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
 import { useTelegram } from '@/lib/telegram/TelegramContext';
@@ -214,27 +215,7 @@ export const TicketForm: React.FC<TicketFormProps> = ({
     try {
       const selectedCatObj = categories.find((c) => c.id === category);
       const catLabel = selectedCatObj ? selectedCatObj.label : 'Général';
-      let finalQuestion = `[Catégorie: ${catLabel}]\n${question.trim()}`;
-
-      // If an image is attached, upload it first
-      if (attachment) {
-        const formData = new FormData();
-        formData.append('file', attachment.file);
-
-        const uploadRes = await fetch('/api/attachments', {
-          method: 'POST',
-          body: formData,
-        });
-
-        if (!uploadRes.ok) {
-          throw new Error(t.ticketAttachmentError);
-        }
-
-        const uploadData = await uploadRes.json();
-        if (uploadData.url) {
-          finalQuestion += `\n\n[Pièce jointe: ${uploadData.url}]`;
-        }
-      }
+      const finalQuestion = `[Catégorie: ${catLabel}]\n${question.trim()}`;
 
       const ticket = await api.createTicket({
         user_id: parsedUserId,
@@ -242,6 +223,21 @@ export const TicketForm: React.FC<TicketFormProps> = ({
         question: finalQuestion,
         automated_answer: initialAutomatedAnswer || undefined,
       });
+
+      // The ticket exists either way by this point: a failed screenshot upload is reported to the
+      // user but never treated as a failed submission. Forwarded straight to the support group over
+      // Telegram, never written to disk or stored on the ticket (see backend/app/attachments.py).
+      if (attachment) {
+        try {
+          const dataUrl = await fileToDataUrl(attachment.file);
+          const result = await api.attachTicketPhoto(ticket.id, dataUrl);
+          if (!result.forwarded) {
+            toast({ title: t.ticketAttachmentError, variant: 'error' });
+          }
+        } catch {
+          toast({ title: t.ticketAttachmentError, variant: 'error' });
+        }
+      }
 
       triggerHaptic('heavy');
       setCreatedTicket(ticket);

@@ -83,3 +83,36 @@ class TelegramRelay:
             return True
 
         return await cls._send_telegram_message(chat_id=group_id, text=text, target_desc="support group")
+
+    @classmethod
+    async def send_photo_to_support_group(cls, content: bytes, mime_type: str, filename: str, caption: str) -> bool:
+        """
+        Sends an image straight to the Telegram Support Group (multipart `sendPhoto`), never written
+        to disk: the ticket web portal's attachment upload has no other route to Telegram (unlike a
+        screenshot sent to the bot directly, there is no chat message to carry a `file_id` already).
+        """
+        if not settings.TELEGRAM_BOT_TOKEN or settings.TELEGRAM_BOT_TOKEN == "placeholder_token":  # nosec B105
+            logger.info("Telegram photo relay simulated (bot token unset): %s", filename)  # nosemgrep
+            return True
+        if not settings.support_group_is_configured():
+            logger.info("Telegram photo relay simulated (support group unset): %s", filename)
+            return True
+
+        url = f"https://api.telegram.org/bot{settings.TELEGRAM_BOT_TOKEN}/sendPhoto"
+        client, owns_client = await cls._get_client()
+        try:
+            resp = await client.post(
+                url,
+                data={"chat_id": settings.TELEGRAM_SUPPORT_GROUP_ID, "caption": truncate_telegram_text(caption, max_length=1024)},
+                files={"photo": (filename, content, mime_type)},
+            )
+            if resp.status_code != 200:
+                logger.error("Failed to relay photo to support group (status %s): %s", resp.status_code, resp.text)
+                return False
+            return True
+        except Exception as exc:
+            logger.error("Failed to relay photo to support group: %s", exc)
+            return False
+        finally:
+            if owns_client:
+                await client.aclose()
