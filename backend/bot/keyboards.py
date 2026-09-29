@@ -31,11 +31,20 @@ def get_community_resolution_keyboard(lang: str = DEFAULT_LANGUAGE) -> InlineKey
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
-def get_webapp_keyboard(url: str, text: Optional[str] = None, lang: str = DEFAULT_LANGUAGE) -> InlineKeyboardMarkup:
-    """Inline keyboard with a button that opens the Mini App; `text` overrides the default label."""
-    buttons = [
-        [
-            InlineKeyboardButton(text=text or t("button_webapp", lang), web_app=WebAppInfo(url=url)),
-        ]
-    ]
-    return InlineKeyboardMarkup(inline_keyboard=buttons)
+def get_webapp_keyboard(
+    url: str,
+    text: Optional[str] = None,
+    lang: str = DEFAULT_LANGUAGE,
+    is_group: bool = False,
+) -> InlineKeyboardMarkup:
+    """
+    Inline keyboard with a button that opens the Mini App; `text` overrides the default label.
+    In group chats, Telegram rejects web_app buttons with BadRequest, so a standard url button is used.
+    """
+    button_text = text or t("button_webapp", lang)
+    if is_group:
+        button = InlineKeyboardButton(text=button_text, url=url)
+    else:
+        button = InlineKeyboardButton(text=button_text, web_app=WebAppInfo(url=url))
+    return InlineKeyboardMarkup(inline_keyboard=[[button]])
+
