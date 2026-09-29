@@ -13,6 +13,7 @@ from app import __version__
 from app.config import settings
 from app.database import async_session_maker, init_db
 from app.limiter import RateLimitExceeded, _rate_limit_exceeded_handler, limiter
+from app.openapi_docs import API_DESCRIPTION, TAGS_METADATA
 from app.observability import get_logger, sanitize_url_query, setup_observability
 from app.routers import admin, crypto, knowledge, moderation, query, system, tickets, webhooks
 from app.services.ai_assistant import AIAssistantService
@@ -55,7 +56,8 @@ async def lifespan(app: FastAPI):
 
 app = FastAPI(
     title="Telegram Support Bot Backend API",
-    description="Backend API for telegram support bot with knowledge base, multi-channel ticketing and email sync",
+    description=API_DESCRIPTION,
+    openapi_tags=TAGS_METADATA,
     version=__version__,
     lifespan=lifespan,
 )

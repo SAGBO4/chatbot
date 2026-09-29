@@ -3,9 +3,43 @@ import hashlib
 import hmac
 from typing import Optional
 
-from fastapi import Header, HTTPException, status
+from fastapi import HTTPException, Security, status
+from fastapi.security import APIKeyHeader, APIKeyQuery
 
 from app.config import settings
+
+# The credentials are declared as OpenAPI security schemes, so /docs offers an Authorize button instead of a
+# header field on every route. `auto_error=False`: the verify_* functions below give the precise error.
+api_key_header = APIKeyHeader(
+    name="X-API-Key",
+    scheme_name="ApiKey",
+    auto_error=False,
+    description="The shared secret configured as `API_KEY` on the server (the bot and the web portal send it).",
+)
+webhook_signature_header = APIKeyHeader(
+    name="X-Webhook-Signature",
+    scheme_name="WebhookSignature",
+    auto_error=False,
+    description="Hex HMAC-SHA256 of the raw request body, keyed with `EMAIL_WEBHOOK_SECRET` (a `sha256=` prefix is accepted).",
+)
+brevo_token_header = APIKeyHeader(
+    name="X-Webhook-Token",
+    scheme_name="BrevoTokenHeader",
+    auto_error=False,
+    description="Shared secret `BREVO_INBOUND_SECRET`. Preferred over the query parameter: it stays out of access logs.",
+)
+brevo_alt_token_header = APIKeyHeader(
+    name="X-Brevo-Token",
+    scheme_name="BrevoAltTokenHeader",
+    auto_error=False,
+    description="Same secret as `X-Webhook-Token`, for callers that cannot use that header name.",
+)
+brevo_token_query = APIKeyQuery(
+    name="token",
+    scheme_name="BrevoTokenQuery",
+    auto_error=False,
+    description="Same secret as `X-Webhook-Token`, kept for compatibility (the server redacts it from its logs).",
+)
 
 
 def verify_email_webhook_signature(raw_body: bytes, signature: Optional[str]) -> None:
@@ -43,7 +77,7 @@ def verify_email_webhook_signature(raw_body: bytes, signature: Optional[str]) ->
         )
 
 
-def verify_api_key(x_api_key: Optional[str] = Header(default=None)) -> None:
+def verify_api_key(x_api_key: Optional[str] = Security(api_key_header)) -> None:
     """
     Verifies the shared API key sent by trusted callers (the Telegram bot).
 

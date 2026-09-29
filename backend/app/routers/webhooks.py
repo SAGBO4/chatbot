@@ -1,7 +1,7 @@
 """Inbound support reply emails: the generic HMAC-signed endpoint and Brevo's batch endpoint."""
 from typing import Optional
 
-from fastapi import APIRouter, BackgroundTasks, Depends, Header, HTTPException, Request
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Request, Security
 from pydantic import ValidationError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,11 +12,21 @@ from app.email_parsing import find_ticket_id
 from app.limiter import limiter
 from app.models import Ticket
 from app.observability import get_logger
-from app.schemas import BrevoInboundWebhookRequest, InboundEmailWebhookRequest
-from app.security import verify_brevo_inbound_token, verify_email_webhook_signature
+from app.openapi_docs import RATE_LIMITED, error_responses
+from app.schemas import BrevoBatchResponse, BrevoInboundWebhookRequest, InboundEmailResult, InboundEmailWebhookRequest
+from app.security import (
+    brevo_alt_token_header,
+    brevo_token_header,
+    brevo_token_query,
+    verify_brevo_inbound_token,
+    verify_email_webhook_signature,
+    webhook_signature_header,
+)
 
 logger = get_logger(__name__)
-router = APIRouter(tags=["webhooks"])
+router = APIRouter(tags=["webhooks"], responses=RATE_LIMITED)
+
+EMAIL_DISABLED = "Email support is disabled (`EMAIL_ENABLED` is false) or the webhook secret is not configured."
 
 # How the single-email endpoint reports the statuses of resolve_inbound_email as HTTP errors. The batch
 # endpoint returns them as data instead, so one bad item does not fail the whole batch.
@@ -28,13 +38,26 @@ HTTP_ERROR_FOR_STATUS = {
 }
 
 
-@router.post("/api/webhooks/email-inbound")
+@router.post(
+    "/api/webhooks/email-inbound",
+    summary="Resolve a ticket from a signed email",
+    responses={
+        200: {"model": InboundEmailResult, "description": "The ticket was resolved, or had already been (`status`)."},
+        **error_responses({
+            400: "The subject has no `[Ticket #<id>]` reference, or the reply has no new text.",
+            401: "The `X-Webhook-Signature` header is missing or does not match the body.",
+            403: "The sender is not in `ALLOWED_SUPPORT_EMAIL_SENDERS`.",
+            404: "No such ticket.",
+            503: EMAIL_DISABLED,
+        }),
+    },
+)
 @limiter.limit("30/minute")
 async def handle_inbound_email(
     request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
-    x_webhook_signature: Optional[str] = Header(default=None),
+    x_webhook_signature: Optional[str] = Security(webhook_signature_header),
 ):
     """
     Resolve a ticket from a support reply email (ticket id taken from the subject, `[Ticket #123]`).
@@ -64,15 +87,25 @@ async def handle_inbound_email(
     return result
 
 
-@router.post("/api/webhooks/email-inbound/brevo")
+@router.post(
+    "/api/webhooks/email-inbound/brevo",
+    summary="Resolve tickets from a Brevo inbound batch",
+    responses={
+        200: {"model": BrevoBatchResponse, "description": "One result per item; a failing item does not fail the batch."},
+        **error_responses({
+            401: "The shared secret is missing or wrong (checked before the body is read).",
+            503: EMAIL_DISABLED,
+        }),
+    },
+)
 @limiter.limit("30/minute")
 async def handle_brevo_inbound_email(
     request: Request,
     background_tasks: BackgroundTasks,
     session: AsyncSession = Depends(get_db),
-    token: Optional[str] = None,
-    x_webhook_token: Optional[str] = Header(default=None),
-    x_brevo_token: Optional[str] = Header(default=None),
+    token: Optional[str] = Security(brevo_token_query),
+    x_webhook_token: Optional[str] = Security(brevo_token_header),
+    x_brevo_token: Optional[str] = Security(brevo_alt_token_header),
 ):
     """
     Resolve tickets from Brevo's Inbound Parsing webhook: a batch (`items[]`) of parsed emails
