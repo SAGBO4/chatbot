@@ -45,9 +45,11 @@ async def handle_webapp(message: Message, backend_client: Optional[BackendClient
     if not url:
         await message.answer(t("webapp_not_configured", lang))
         return
+    chat = getattr(message, "chat", None)
+    is_group = bool(chat and getattr(chat, "type", None) in ("group", "supergroup"))
     await message.answer(
         t("webapp_prompt", lang),
-        reply_markup=get_webapp_keyboard(url, text=t("button_open_webapp", lang)),
+        reply_markup=get_webapp_keyboard(url, text=t("button_open_webapp", lang), lang=lang, is_group=is_group),
     )
 
 
@@ -86,8 +88,14 @@ async def handle_help(message: Message, bot: Bot, backend_client: Optional[Backe
             if is_owner(user_id):
                 sections.append(t("help_owner_commands", lang))
 
-    keyboard = get_webapp_keyboard(url, lang=lang) if url else None
-    await message.answer("".join(sections), parse_mode="Markdown", reply_markup=keyboard)
+    keyboard = get_webapp_keyboard(url, lang=lang, is_group=is_group_chat) if url else None
+    await call_with_markdown_fallback(
+        message.answer,
+        "".join(sections),
+        reply_markup=keyboard,
+        what="Help/list command",
+    )
+
 
 
 async def _answer_private_question(

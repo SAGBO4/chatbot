@@ -1589,3 +1589,63 @@ async def test_bot_handlers_backend_error_on_query_answers_user_friendly_error(b
 
     msg.answer.assert_called_once()
     assert "Une erreur est survenue" in msg.answer.call_args[0][0]
+
+
+def test_get_webapp_keyboard_group_vs_private():
+    """Groups receive a standard url button, while private chats receive a web_app button."""
+    from bot.keyboards import get_webapp_keyboard
+
+    # Private chat
+    kb_private = get_webapp_keyboard("https://example.com/app", is_group=False)
+    btn_private = kb_private.inline_keyboard[0][0]
+    assert btn_private.web_app is not None
+    assert btn_private.web_app.url == "https://example.com/app"
+    assert btn_private.url is None
+
+    # Group chat
+    kb_group = get_webapp_keyboard("https://example.com/app", is_group=True)
+    btn_group = kb_group.inline_keyboard[0][0]
+    assert btn_group.web_app is None
+    assert btn_group.url == "https://example.com/app"
+
+
+@pytest.mark.asyncio
+async def test_handle_help_in_group_uses_url_button_when_webapp_url_configured(monkeypatch, bot_test_env):
+    """In group chats, handle_help attaches a url button rather than a web_app button to prevent Telegram BadRequest."""
+    monkeypatch.setattr(settings, "TELEGRAM_WEBAPP_URL", "https://app.example.com")
+    group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
+    msg = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"], text="/help")
+    msg.answer = AsyncMock()
+
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = False
+
+    await handle_help(msg, bot_test_env["bot"], backend_client=client)
+
+    msg.answer.assert_called_once()
+    markup = msg.answer.call_args.kwargs.get("reply_markup")
+    assert markup is not None
+    btn = markup.inline_keyboard[0][0]
+    assert btn.url == "https://app.example.com"
+    assert btn.web_app is None
+
+
+@pytest.mark.asyncio
+async def test_handle_webapp_in_group_uses_url_button(monkeypatch):
+    """In group chats, /webapp attaches a url button rather than a web_app button."""
+    from bot.handlers.user_handlers import handle_webapp
+
+    monkeypatch.setattr(settings, "TELEGRAM_WEBAPP_URL", "https://app.example.com")
+    group_chat = MagicMock(spec=Chat, id=-100777, type="group")
+    msg = MagicMock(spec=Message, chat=group_chat, text="/webapp")
+    msg.answer = AsyncMock()
+
+    await handle_webapp(msg)
+
+    msg.answer.assert_called_once()
+    markup = msg.answer.call_args.kwargs.get("reply_markup")
+    assert markup is not None
+    btn = markup.inline_keyboard[0][0]
+    assert btn.url == "https://app.example.com"
+    assert btn.web_app is None
+
