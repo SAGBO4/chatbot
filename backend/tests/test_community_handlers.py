@@ -55,17 +55,52 @@ def make_group_message(chat_id, user_id, text, username="alice"):
     return message
 
 
+@pytest.mark.parametrize(
+    "lang,expected_text",
+    [
+        ("fr", "réservée au groupe communautaire"),
+        ("en", "reserved for the configured community group"),
+    ],
+)
 @pytest.mark.asyncio
-async def test_ask_outside_community_group_is_ignored(memory_storage):
+async def test_ask_outside_community_group_replies_wrong_group(memory_storage, lang, expected_text):
     message = make_group_message(chat_id=-999999, user_id=1, text="/ask mon problème")
     state = make_fsm_context(memory_storage, 1, -999999)
     mock_client = AsyncMock()
+    mock_client.get_setting.return_value = lang
     command = CommandObject(prefix="/", command="ask", args="mon problème")
 
     await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=mock_client)
 
     mock_client.query.assert_not_called()
     message.answer.assert_not_called()
+    message.reply.assert_called_once()
+    assert expected_text in message.reply.call_args[0][0]
+
+
+@pytest.mark.parametrize(
+    "lang,expected_text",
+    [
+        ("fr", "n'a pas encore été configuré"),
+        ("en", "has not been configured yet"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_ask_when_community_not_configured_replies_setup_community(memory_storage, monkeypatch, lang, expected_text):
+    monkeypatch.setattr("bot.group_scope.get_community_group_id", AsyncMock(return_value=None))
+    message = make_group_message(chat_id=-999999, user_id=1, text="/ask mon problème")
+    state = make_fsm_context(memory_storage, 1, -999999)
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = lang
+    command = CommandObject(prefix="/", command="ask", args="mon problème")
+
+    await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=mock_client)
+
+    mock_client.query.assert_not_called()
+    message.answer.assert_not_called()
+    message.reply.assert_called_once()
+    assert expected_text in message.reply.call_args[0][0]
+    assert "/setup_community" in message.reply.call_args[0][0]
 
 
 @pytest.mark.asyncio
@@ -310,6 +345,50 @@ async def test_purge_deletes_recent_bot_messages_for_admin(memory_storage, monke
     assert mock_bot.delete_message.call_count == 2
     message.reply.assert_called_once()
     assert "2 message" in message.reply.call_args[0][0]
+
+
+@pytest.mark.parametrize(
+    "lang,expected_text",
+    [
+        ("fr", "réservée au groupe communautaire"),
+        ("en", "reserved for the configured community group"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_purge_outside_community_group_replies_wrong_group(lang, expected_text):
+    message = make_group_message(chat_id=-999999, user_id=1, text="/purge 5")
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = lang
+
+    await handle_purge(message, bot=mock_bot, backend_client=mock_client)
+
+    mock_bot.delete_message.assert_not_called()
+    message.reply.assert_called_once()
+    assert expected_text in message.reply.call_args[0][0]
+
+
+@pytest.mark.parametrize(
+    "lang,expected_text",
+    [
+        ("fr", "n'a pas encore été configuré"),
+        ("en", "has not been configured yet"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_purge_when_community_not_configured_replies_setup_community(monkeypatch, lang, expected_text):
+    monkeypatch.setattr("bot.group_scope.get_community_group_id", AsyncMock(return_value=None))
+    message = make_group_message(chat_id=-999999, user_id=1, text="/purge 5")
+    mock_bot = AsyncMock()
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = lang
+
+    await handle_purge(message, bot=mock_bot, backend_client=mock_client)
+
+    mock_bot.delete_message.assert_not_called()
+    message.reply.assert_called_once()
+    assert expected_text in message.reply.call_args[0][0]
+    assert "/setup_community" in message.reply.call_args[0][0]
 
 
 def _is_markdown(call):

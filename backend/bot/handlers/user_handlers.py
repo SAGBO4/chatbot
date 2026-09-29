@@ -51,31 +51,40 @@ async def handle_webapp(message: Message, backend_client: Optional[BackendClient
     )
 
 
-@user_router.message(Command("help"))
+@user_router.message(Command("help", "list"))
 async def handle_help(message: Message, bot: Bot, backend_client: Optional[BackendClient] = None):
-    """/help: how to use the bot, plus every command the sender may run given their role and chat."""
+    """/help, /list: how to use the bot, plus every command the sender may run given their role and chat."""
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
     user_id = message.from_user.id
     is_group_chat = message.chat.type in ("group", "supergroup")
 
-    sections = [t("help_intro", lang), t("help_general_commands", lang)]
-
     url = settings.TELEGRAM_WEBAPP_URL
-    if url:
-        sections.append(t("help_webapp_command", lang))
+    sections = []
 
-    sections.append(t("help_crypto_commands", lang))
+    if is_group_chat:
+        sections.append(t("help_group_intro", lang))
+        sections.append(t("help_group_member_commands", lang))
+        if url:
+            sections.append(t("help_webapp_command", lang))
+        sections.append(t("help_crypto_commands", lang))
 
-    if is_group_chat and await is_community_group_chat(message.chat.id, backend_client=client):
-        sections.append(t("help_community_commands", lang))
         if await is_bot_admin(bot, message.chat.id, user_id, backend_client=client):
             sections.append(t("help_admin_commands", lang))
+            sections.append(t("help_setup_commands", lang))
+            if is_owner(user_id):
+                sections.append(t("help_owner_commands", lang))
+    else:
+        sections.append(t("help_intro", lang))
+        sections.append(t("help_general_commands", lang))
+        if url:
+            sections.append(t("help_webapp_command", lang))
+        sections.append(t("help_crypto_commands", lang))
 
-    if await is_authorized(user_id, backend_client=client):
-        sections.append(t("help_setup_commands", lang))
-        if is_owner(user_id):
-            sections.append(t("help_owner_commands", lang))
+        if await is_authorized(user_id, backend_client=client):
+            sections.append(t("help_setup_commands", lang))
+            if is_owner(user_id):
+                sections.append(t("help_owner_commands", lang))
 
     keyboard = get_webapp_keyboard(url, lang=lang) if url else None
     await message.answer("".join(sections), parse_mode="Markdown", reply_markup=keyboard)

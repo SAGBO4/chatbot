@@ -44,21 +44,41 @@ TRANSLATIONS = {
         "fr": (
             "\n\n**Commandes générales**\n"
             "`/start` — afficher le message d'accueil\n"
-            "`/help` — afficher cette aide"
+            "`/help` — afficher cette aide\n"
+            "`/list` — afficher la liste des commandes"
         ),
         "en": (
             "\n\n**General commands**\n"
             "`/start` — show the welcome message\n"
-            "`/help` — show this help"
+            "`/help` — show this help\n"
+            "`/list` — show the list of commands"
+        ),
+    },
+    "help_group_intro": {
+        "fr": "ℹ️ **Aide du groupe**\n\nVoici les commandes autorisées :",
+        "en": "ℹ️ **Group Help**\n\nHere are the authorized commands:",
+    },
+    "help_group_member_commands": {
+        "fr": (
+            "\n\n**Commandes membres**\n"
+            "`/help` — afficher cette aide\n"
+            "`/list` — afficher la liste des commandes\n"
+            "`/ask <question>` — poser une question dans le groupe"
+        ),
+        "en": (
+            "\n\n**Member commands**\n"
+            "`/help` — show this help\n"
+            "`/list` — show the list of commands\n"
+            "`/ask <question>` — ask a question in the group"
         ),
     },
     "help_webapp_command": {
-        "fr": "\n`/webapp` — ouvrir la Mini App",
-        "en": "\n`/webapp` — open the Mini App",
+        "fr": "\n`/webapp` — ouvrir la Mini App Support",
+        "en": "\n`/webapp` — open the Support Mini App",
     },
     "help_community_commands": {
-        "fr": "\n`/ask <question>` — poser une question dans le groupe communautaire",
-        "en": "\n`/ask <question>` — ask a question in the community group",
+        "fr": "\n`/ask <question>` — poser une question dans le groupe",
+        "en": "\n`/ask <question>` — ask a question in the group",
     },
     "help_crypto_commands": {
         "fr": "\n`/<symbole>` — prix en direct d'une crypto-monnaie (ex : `/btc`, `/eth`, `/trx`)",
@@ -348,6 +368,14 @@ TRANSLATIONS = {
     },
 
     # --- community_handlers.py ---
+    "community_not_configured": {
+        "fr": "⚠️ Le groupe communautaire n'a pas encore été configuré. Le propriétaire du bot doit exécuter `/setup_community` dans le groupe dédié.",
+        "en": "⚠️ The community group has not been configured yet. The bot owner must run `/setup_community` in the dedicated group.",
+    },
+    "community_wrong_group": {
+        "fr": "ℹ️ Cette commande est réservée au groupe communautaire configuré.",
+        "en": "ℹ️ This command is reserved for the configured community group.",
+    },
     "community_mention_fallback": {
         "fr": "Utilisateur {user_id}",
         "en": "User {user_id}",

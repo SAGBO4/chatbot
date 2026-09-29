@@ -1033,6 +1033,20 @@ async def test_bot_handlers_help_command_sends_help_text(bot_test_env):
     await handle_help(message, bot_test_env["bot"], backend_client=client)
     message.answer.assert_called_once()
     assert "Aide" in message.answer.call_args[0][0]
+    assert "/list" in message.answer.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_list_command_alias(bot_test_env):
+    """The /list command calls handle_help and returns the command list."""
+    message = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"], text="/list")
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = False
+
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
+    message.answer.assert_called_once()
+    assert "/list" in message.answer.call_args[0][0]
 
 
 @pytest.mark.asyncio
@@ -1070,6 +1084,157 @@ async def test_bot_handlers_help_command_lists_moderation_for_bot_admin_in_commu
     help_text = message.answer.call_args[0][0]
     assert "/mute" in help_text
     assert "/ask" in help_text
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_help_command_in_group_for_standard_member_does_not_list_admin_or_setup(
+    bot_test_env, monkeypatch
+):
+    """A standard (non-admin) member in a group sees member commands (/ask, /help, /list, crypto) but no moderation or setup."""
+    from bot.handlers import user_handlers
+
+    group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
+    message = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"])
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = False
+
+    monkeypatch.setattr(user_handlers, "is_bot_admin", AsyncMock(return_value=False))
+
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
+    help_text = message.answer.call_args[0][0]
+    assert "/ask" in help_text
+    assert "/help" in help_text
+    assert "/list" in help_text
+    assert "/mute" not in help_text
+    assert "/ban" not in help_text
+    assert "/kick" not in help_text
+    assert "/warn" not in help_text
+    assert "/purge" not in help_text
+    assert "/setup_community" not in help_text
+    assert "/whitelist" not in help_text
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_help_command_for_owner_in_private_chat(bot_test_env, monkeypatch):
+    """The bot owner in private chat sees /whitelist and /language."""
+    owner_id = bot_test_env["user"].id
+    monkeypatch.setattr(settings, "BOT_OWNER_TELEGRAM_ID", owner_id)
+    message = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"])
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = True
+
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
+    help_text = message.answer.call_args[0][0]
+    assert "/whitelist" in help_text
+    assert "/language" in help_text
+    assert "/start" in help_text
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_help_in_private_chat_for_standard_member_excludes_privileged_commands(bot_test_env, monkeypatch):
+    """Standard member in private chat sees general commands but NEVER setup, moderation, or owner commands."""
+    monkeypatch.setattr(settings, "BOT_OWNER_TELEGRAM_ID", 999999)
+    message = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"])
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = False
+
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
+    help_text = message.answer.call_args[0][0]
+
+    # Authorized commands
+    assert "/start" in help_text
+    assert "/help" in help_text
+    assert "/list" in help_text
+
+    # Forbidden commands
+    assert "/whitelist" not in help_text
+    assert "/language" not in help_text
+    assert "/setup_community" not in help_text
+    assert "/mute" not in help_text
+    assert "/ban" not in help_text
+    assert "/kick" not in help_text
+    assert "/warn" not in help_text
+    assert "/purge" not in help_text
+    assert "/ask" not in help_text
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_list_in_group_for_standard_member(bot_test_env, monkeypatch):
+    """The /list command in a group chat for standard member shows only member commands."""
+    from bot.handlers import user_handlers
+
+    group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
+    message = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"], text="/list")
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = False
+
+    monkeypatch.setattr(user_handlers, "is_bot_admin", AsyncMock(return_value=False))
+
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
+    text = message.answer.call_args[0][0]
+    assert "/help" in text
+    assert "/list" in text
+    assert "/ask" in text
+    assert "/mute" not in text
+    assert "/ban" not in text
+    assert "/setup_community" not in text
+    assert "/whitelist" not in text
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_help_in_group_for_owner_shows_all_commands(bot_test_env, monkeypatch):
+    """The bot owner in a group chat sees member, moderation, setup, AND owner commands."""
+    from bot.handlers import user_handlers
+
+    owner_id = bot_test_env["user"].id
+    monkeypatch.setattr(settings, "BOT_OWNER_TELEGRAM_ID", owner_id)
+    group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
+    message = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"])
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = True
+
+    monkeypatch.setattr(user_handlers, "is_bot_admin", AsyncMock(return_value=True))
+
+    await handle_help(message, bot_test_env["bot"], backend_client=client)
+    help_text = message.answer.call_args[0][0]
+    assert "/ask" in help_text
+    assert "/mute" in help_text
+    assert "/setup_community" in help_text
+    assert "/whitelist" in help_text
+
+
+@pytest.mark.asyncio
+async def test_bot_handlers_help_bilingual_english(bot_test_env, monkeypatch):
+    """Verify English localization of /help for both DM and group."""
+    from bot.handlers import user_handlers
+
+    client = bot_test_env["client"]
+    client.get_setting.return_value = "en"
+    client.is_whitelisted.return_value = False
+
+    # 1. Private chat
+    dm_msg = MagicMock(spec=Message, chat=bot_test_env["chat"], from_user=bot_test_env["user"])
+    dm_msg.answer = AsyncMock()
+    await handle_help(dm_msg, bot_test_env["bot"], backend_client=client)
+    dm_text = dm_msg.answer.call_args[0][0]
+    assert "General commands" in dm_text
+    assert "/start" in dm_text
+
+    # 2. Group chat
+    group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
+    group_msg = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"])
+    group_msg.answer = AsyncMock()
+    monkeypatch.setattr(user_handlers, "is_bot_admin", AsyncMock(return_value=False))
+    await handle_help(group_msg, bot_test_env["bot"], backend_client=client)
+    group_text = group_msg.answer.call_args[0][0]
+    assert "Member commands" in group_text
+    assert "/ask" in group_text
+
 
 
 @pytest.mark.asyncio

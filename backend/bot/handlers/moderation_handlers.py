@@ -5,7 +5,8 @@ from aiogram import Router, Bot
 from aiogram.types import Message, ChatPermissions
 from aiogram.filters import Command, CommandObject
 from bot.admin_check import is_bot_admin, invalidate_admin_cache
-from bot.group_scope import is_community_group_chat
+from bot import group_scope
+from bot.group_scope import is_community_group_chat, get_community_group_id
 from bot.api_client import BackendClient
 from bot.language import get_active_language
 from app.i18n import t
@@ -103,10 +104,17 @@ async def _moderation_target(
     """
     What every moderation command needs before acting: `(lang, user_id, display_name, rest_args)`.
 
-    None when the command must not run: outside the community group (ignored silently), sent by someone
-    who is not a group admin, or with no member to act on (both answered with a message).
+    None when the command must not run: outside the community group or unconfigured (answered with
+    an explicit help message), sent by someone who is not a group admin, or with no member to act on
+    (all answered with a message).
     """
     if not await is_community_group_chat(message.chat.id, backend_client=backend_client):
+        lang = await get_active_language(backend_client=backend_client)
+        community_id = await group_scope.get_community_group_id(backend_client=backend_client)
+        if community_id is None:
+            await message.reply(t("community_not_configured", lang), parse_mode="Markdown")
+        else:
+            await message.reply(t("community_wrong_group", lang))
         return None
     lang = await get_active_language(backend_client=backend_client)
     if not await _check_admin(message, bot, lang, backend_client=backend_client):
