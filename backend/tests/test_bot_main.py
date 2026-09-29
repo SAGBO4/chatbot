@@ -119,9 +119,9 @@ def test_build_commands_skips_unknown_command_names():
 
 def test_command_scope_lists_strict_partitioning():
     """Verify that command scope lists strictly separate regular member vs admin vs owner commands."""
-    # Standard group members: help, list, ask, webapp (no admin, no setup, no owner)
-    assert set(_GROUP_SCOPE_COMMANDS) == {"help", "list", "ask", "webapp"}
-    forbidden_in_group = {"mute", "unmute", "ban", "kick", "warn", "purge", "setup_community", "language", "whitelist"}
+    # Standard group members: help, list, ask (no admin, no setup, no owner, no webapp)
+    assert set(_GROUP_SCOPE_COMMANDS) == {"help", "list", "ask"}
+    forbidden_in_group = {"webapp", "mute", "unmute", "ban", "kick", "warn", "purge", "setup_community", "language", "whitelist"}
     assert not any(cmd in _GROUP_SCOPE_COMMANDS for cmd in forbidden_in_group)
 
     # Standard private DM members: start, help, list, webapp (no whitelist, no language, no setup_community, no moderation)
@@ -129,10 +129,11 @@ def test_command_scope_lists_strict_partitioning():
     forbidden_in_dm = {"whitelist", "language", "setup_community", "mute", "unmute", "ban", "kick", "warn", "purge", "ask"}
     assert not any(cmd in _PRIVATE_SCOPE_COMMANDS for cmd in forbidden_in_dm)
 
-    # Admins in groups: moderation + setup, but NOT owner-only whitelist
+    # Admins in groups: moderation + setup, but NOT owner-only whitelist and NOT webapp
     admin_set = set(_ADMIN_SCOPE_COMMANDS)
-    assert {"help", "list", "ask", "webapp", "setup_community", "language", "mute", "unmute", "ban", "kick", "warn", "purge"} == admin_set
+    assert {"help", "list", "ask", "setup_community", "language", "mute", "unmute", "ban", "kick", "warn", "purge"} == admin_set
     assert "whitelist" not in admin_set
+    assert "webapp" not in admin_set
 
     # Owner in private DM: whitelist and language
     owner_set = set(_OWNER_PRIVATE_SCOPE_COMMANDS)
@@ -162,9 +163,9 @@ async def test_configure_command_suggestions_exact_commands_per_scope(monkeypatc
     assert "help" in group_cmds_fr
     assert "list" in group_cmds_fr
     assert "ask" in group_cmds_fr
-    assert "webapp" in group_cmds_fr
+    assert "webapp" not in group_cmds_fr
     assert "btc" in group_cmds_fr
-    for forbidden in ("mute", "unmute", "ban", "kick", "warn", "purge", "whitelist", "setup_community", "language"):
+    for forbidden in ("webapp", "mute", "unmute", "ban", "kick", "warn", "purge", "whitelist", "setup_community", "language"):
         assert forbidden not in group_cmds_fr
 
     # 2. Standard member in DM (BotCommandScopeAllPrivateChats)
@@ -179,9 +180,10 @@ async def test_configure_command_suggestions_exact_commands_per_scope(monkeypatc
 
     # 3. Admins (BotCommandScopeAllChatAdministrators)
     admin_cmds_fr = scope_to_commands[(BotCommandScopeAllChatAdministrators, None, "fr")]
-    for allowed in ("help", "list", "ask", "webapp", "setup_community", "language", "mute", "unmute", "ban", "kick", "warn", "purge", "btc"):
+    for allowed in ("help", "list", "ask", "setup_community", "language", "mute", "unmute", "ban", "kick", "warn", "purge", "btc"):
         assert allowed in admin_cmds_fr
     assert "whitelist" not in admin_cmds_fr
+    assert "webapp" not in admin_cmds_fr
 
     # 4. Owner DM (BotCommandScopeChat)
     owner_cmds_fr = scope_to_commands[(BotCommandScopeChat, owner_id, "fr")]

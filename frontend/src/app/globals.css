@@ -1,29 +1,47 @@
 @import "tailwindcss";
 
 @theme {
-  --color-stack-dark: #000000;
-  --color-stack-darker: #050505;
-  --color-stack-surface: #0a0a0c;
-  --color-stack-card: #0e0e12;
-  --color-stack-card-hover: #16161b;
-  --color-stack-border: rgba(255, 255, 255, 0.08);
-  --color-stack-border-light: rgba(255, 255, 255, 0.15);
-  
-  --color-stack-text: #ffffff;
-  --color-stack-muted: #a1a1aa;
-  --color-stack-dim: #71717a;
-  
-  --color-stack-success: #22c55e;
-  --color-stack-warning: #f59e0b;
-  --color-stack-error: #ef4444;
+  --color-zinc-950: #050507;
+  --color-zinc-900: #0c0c0f;
+  --color-zinc-850: #121216;
+  --color-zinc-800: #1e1e24;
+  --color-zinc-700: #2e2e36;
+  --color-zinc-600: #4a4a55;
+  --color-zinc-400: #a1a1aa;
+  --color-zinc-300: #d4d4d8;
+  --color-zinc-200: #e4e4e7;
+  --color-zinc-100: #f4f4f5;
+
+  --color-brand-green: #10b981;
+  --color-brand-cyan: #06b6d4;
 
   --font-sans: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   --font-mono: "Geist Mono", "JetBrains Mono", Menlo, Monaco, Consolas, monospace;
 }
 
 :root {
-  --background: #000000;
-  --foreground: #ffffff;
+  --background: #050507;
+  --foreground: #f4f4f5;
+  --card: #0c0c0f;
+  --card-foreground: #f4f4f5;
+  --popover: #0c0c0f;
+  --popover-foreground: #f4f4f5;
+  --primary: #ffffff;
+  --primary-foreground: #000000;
+  --secondary: #121216;
+  --secondary-foreground: #f4f4f5;
+  --muted: #18181e;
+  --muted-foreground: #a1a1aa;
+  --accent: #1e1e24;
+  --accent-foreground: #ffffff;
+  --destructive: #ef4444;
+  --destructive-foreground: #ffffff;
+  --border: rgba(255, 255, 255, 0.08);
+  --border-subtle: rgba(255, 255, 255, 0.05);
+  --border-strong: rgba(255, 255, 255, 0.18);
+  --input: rgba(255, 255, 255, 0.08);
+  --ring: rgba(255, 255, 255, 0.25);
+  --radius: 0.75rem;
 }
 
 html,
@@ -40,49 +58,102 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* Glassmorphic utilities for Telegram WebApp - Pure Monochrome */
-.glass-panel {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.6);
+/* Subtle dot grid backdrop matching Stack Wallet monochrome identity */
+.bg-grid-dots {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.07) 1px, transparent 1px);
+  background-size: 24px 24px;
 }
 
-.glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+/* React Bits style: Spotlight Card with pure white luminescence */
+.spotlight-card {
+  position: relative;
+  background-color: #0c0c0f;
   border: 1px solid rgba(255, 255, 255, 0.08);
-  box-shadow: 0 4px 24px -1px rgba(0, 0, 0, 0.5);
+  border-radius: 1rem;
+  overflow: hidden;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
-.glass-input {
-  background: rgba(255, 255, 255, 0.04);
-  backdrop-filter: blur(14px);
-  -webkit-backdrop-filter: blur(14px);
-  border: 1px solid rgba(255, 255, 255, 0.12);
-}
-
-/* Soft ambient monochrome background glow */
-.ambient-glow {
+.spotlight-card::before {
+  content: "";
   position: absolute;
-  top: -8%;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 100%;
-  max-width: 680px;
-  height: 380px;
-  background: radial-gradient(circle, rgba(255, 255, 255, 0.08) 0%, rgba(255, 255, 255, 0.02) 45%, transparent 70%);
-  filter: blur(60px);
+  inset: 0;
+  border-radius: inherit;
+  background: radial-gradient(
+    650px circle at var(--mouse-x, -1000px) var(--mouse-y, -1000px),
+    rgba(255, 255, 255, 0.07),
+    rgba(255, 255, 255, 0.02) 40%,
+    transparent 65%
+  );
   pointer-events: none;
-  z-index: 0;
+  z-index: 1;
+  opacity: 0;
+  transition: opacity 0.3s ease;
 }
 
-/* Scrollbar styles */
+.spotlight-card:hover::before {
+  opacity: 1;
+}
+
+.spotlight-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  box-shadow: 0 12px 35px -10px rgba(0, 0, 0, 0.9), 0 0 24px -6px rgba(255, 255, 255, 0.06);
+}
+
+/* React Bits style: Shiny metallic badge with titanium and silver reflection */
+@keyframes shiny-shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+@keyframes shiny-sweep {
+  0% {
+    background-position: 150% center;
+  }
+  100% {
+    background-position: -50% center;
+  }
+}
+
+.shiny-badge {
+  position: relative;
+  background: linear-gradient(
+    110deg,
+    rgba(255, 255, 255, 0.04) 0%,
+    rgba(255, 255, 255, 0.12) 45%,
+    rgba(255, 255, 255, 0.28) 50%,
+    rgba(255, 255, 255, 0.12) 55%,
+    rgba(255, 255, 255, 0.04) 100%
+  );
+  background-size: 250% 100%;
+  animation: shiny-shimmer 8s linear infinite;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+/* Bento card top highlight with crisp platinum hairline */
+.bento-highlight {
+  position: relative;
+}
+
+.bento-highlight::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 10%;
+  right: 10%;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  pointer-events: none;
+}
+
+/* Modern clean scrollbar */
 ::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 6px;
+  height: 6px;
 }
 
 ::-webkit-scrollbar-track {
@@ -90,10 +161,19 @@ body {
 }
 
 ::-webkit-scrollbar-thumb {
-  background: rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.12);
   border-radius: 9999px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: rgba(255, 255, 255, 0.3);
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* Hide scrollbar for smooth mobile swipe rows */
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

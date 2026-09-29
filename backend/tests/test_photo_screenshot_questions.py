@@ -8,15 +8,23 @@ is identical to an unmatched text question (the "not found, escalate?" prompt).
 """
 import pytest
 from unittest.mock import AsyncMock, MagicMock
+from aiogram.filters import CommandObject
 from aiogram.types import User, Chat, Message, CallbackQuery, PhotoSize
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.storage.memory import MemoryStorage, StorageKey
 
-from bot.handlers.user_handlers import handle_user_photo_query, handle_resolve_no
+from bot.handlers.user_handlers import (
+    handle_user_photo_query,
+    handle_resolve_no,
+    handle_user_ask,
+    handle_user_query,
+)
 from bot.handlers import community_handlers
 from bot.handlers.community_handlers import (
     handle_community_photo_question,
     handle_community_resolve_no,
+    handle_community_ask,
+    handle_community_plain_question,
 )
 from bot.ticket_escalation import create_ticket_and_notify_admin_group
 from bot.api_client import BackendClient
@@ -50,6 +58,7 @@ def make_private_photo_message(user_id: int, caption=None, file_id="full_res_fil
     message.caption = caption
     message.photo = make_photo_sizes(file_id)
     message.answer = AsyncMock()
+    message.reply_to_message = None
     return message
 
 
@@ -62,6 +71,41 @@ def make_group_photo_message(chat_id, user_id, caption=None, file_id="full_res_f
     message.photo = make_photo_sizes(file_id)
     message.answer = AsyncMock()
     message.reply = AsyncMock()
+    message.reply_to_message = None
+    return message
+
+
+def make_replied_photo_message(file_id="replied_photo_id", caption=None):
+    replied = MagicMock(spec=Message)
+    replied.photo = make_photo_sizes(file_id)
+    replied.caption = caption
+    replied.text = None
+    return replied
+
+
+def make_private_text_message(user_id: int, text="/ask", reply_to_message=None):
+    message = MagicMock(spec=Message)
+    message.chat = MagicMock(spec=Chat, id=user_id, type="private")
+    message.from_user = MagicMock(spec=User, id=user_id, username=f"user{user_id}", first_name="User")
+    message.text = text
+    message.caption = None
+    message.photo = None
+    message.answer = AsyncMock()
+    message.reply = AsyncMock()
+    message.reply_to_message = reply_to_message
+    return message
+
+
+def make_group_text_message(chat_id, user_id: int, text="/ask", reply_to_message=None, username="alice"):
+    message = MagicMock(spec=Message)
+    message.chat = MagicMock(spec=Chat, id=chat_id, type="supergroup")
+    message.from_user = MagicMock(spec=User, id=user_id, username=username, first_name="Alice")
+    message.text = text
+    message.caption = None
+    message.photo = None
+    message.answer = AsyncMock()
+    message.reply = AsyncMock()
+    message.reply_to_message = reply_to_message
     return message
 
 
@@ -364,3 +408,310 @@ async def test_create_ticket_never_sends_a_photo_when_the_support_group_is_not_c
     )
 
     bot.send_photo.assert_not_called()
+
+
+# ---------------------------------------------------------------------------
+# Community group: /ask with photos or replies to photos
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_community_ask_photo_message_with_args(memory_storage):
+    message = make_group_photo_message(COMMUNITY_GROUP_ID, 11, caption="/ask Mon wallet est vide", file_id="wallet_photo")
+    state = make_fsm_context(memory_storage, 11, COMMUNITY_GROUP_ID)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Vérifiez le réseau."}
+    sent_message = MagicMock(message_id=880)
+    message.answer.return_value = sent_message
+    command = CommandObject(prefix="/", command="ask", args="Mon wallet est vide")
+
+    await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=client)
+
+    client.query.assert_called_once_with(query="Mon wallet est vide", user_id=11, user_handle="alice")
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "wallet_photo"
+    assert data["last_question"] == "Mon wallet est vide"
+
+
+@pytest.mark.asyncio
+async def test_community_ask_photo_message_without_args_uses_placeholder(memory_storage):
+    message = make_group_photo_message(COMMUNITY_GROUP_ID, 12, caption="/ask", file_id="wallet_photo_no_args")
+    state = make_fsm_context(memory_storage, 12, COMMUNITY_GROUP_ID)
+    client = AsyncMock()
+    client.query.return_value = {"found": False, "answer": "Pas de réponse."}
+    sent_message = MagicMock(message_id=881)
+    message.answer.return_value = sent_message
+    command = CommandObject(prefix="/", command="ask", args=None)
+
+    await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=client)
+
+    client.query.assert_called_once()
+    assert client.query.call_args.kwargs["query"]  # placeholder question
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "wallet_photo_no_args"
+
+
+@pytest.mark.asyncio
+async def test_community_ask_reply_to_photo_with_args(memory_storage):
+    replied = make_replied_photo_message(file_id="replied_error_screen")
+    message = make_group_text_message(COMMUNITY_GROUP_ID, 13, text="/ask Pourquoi cette erreur ?", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 13, COMMUNITY_GROUP_ID)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Erreur temporaire."}
+    sent_message = MagicMock(message_id=882)
+    message.answer.return_value = sent_message
+    command = CommandObject(prefix="/", command="ask", args="Pourquoi cette erreur ?")
+
+    await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=client)
+
+    client.query.assert_called_once_with(query="Pourquoi cette erreur ?", user_id=13, user_handle="alice")
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "replied_error_screen"
+    assert data["last_question"] == "Pourquoi cette erreur ?"
+
+
+@pytest.mark.asyncio
+async def test_community_ask_reply_to_photo_without_args_uses_replied_caption(memory_storage):
+    replied = make_replied_photo_message(file_id="replied_captioned_photo", caption="Problème de synchronisation")
+    message = make_group_text_message(COMMUNITY_GROUP_ID, 14, text="/ask", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 14, COMMUNITY_GROUP_ID)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Attendez la fin du scan."}
+    sent_message = MagicMock(message_id=883)
+    message.answer.return_value = sent_message
+    command = CommandObject(prefix="/", command="ask", args=None)
+
+    await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=client)
+
+    client.query.assert_called_once_with(query="Problème de synchronisation", user_id=14, user_handle="alice")
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "replied_captioned_photo"
+    assert data["last_question"] == "Problème de synchronisation"
+
+
+@pytest.mark.asyncio
+async def test_community_ask_reply_to_photo_without_args_uses_placeholder_when_no_caption(memory_storage):
+    replied = make_replied_photo_message(file_id="replied_nocaption_photo", caption=None)
+    message = make_group_text_message(COMMUNITY_GROUP_ID, 15, text="/ask", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 15, COMMUNITY_GROUP_ID)
+    client = AsyncMock()
+    client.query.return_value = {"found": False, "answer": "Pas de réponse."}
+    sent_message = MagicMock(message_id=884)
+    message.answer.return_value = sent_message
+    command = CommandObject(prefix="/", command="ask", args=None)
+
+    await handle_community_ask(message, command, state, bot=AsyncMock(), backend_client=client)
+
+    client.query.assert_called_once()
+    assert client.query.call_args.kwargs["query"]  # placeholder question
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "replied_nocaption_photo"
+
+
+@pytest.mark.asyncio
+async def test_community_ask_reply_to_photo_escalation_forwards_photo(memory_storage, monkeypatch):
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    replied = make_replied_photo_message(file_id="replied_escalated_photo")
+    message = make_group_text_message(COMMUNITY_GROUP_ID, 16, text="/ask Bug critique", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 16, COMMUNITY_GROUP_ID)
+    client = AsyncMock()
+    client.query.return_value = {"found": False, "answer": "Pas de solution connue."}
+    sent_message = MagicMock(message_id=885)
+    message.answer.return_value = sent_message
+    command = CommandObject(prefix="/", command="ask", args="Bug critique")
+
+    bot = AsyncMock()
+    bot.send_message.return_value = MagicMock(message_id=3001)
+
+    await handle_community_ask(message, command, state, bot=bot, backend_client=client)
+
+    cb_message = MagicMock(spec=Message)
+    cb_message.text = "..."
+    cb_message.edit_text = AsyncMock()
+    user = MagicMock(spec=User, id=16, username="alice", first_name="Alice")
+    callback = MagicMock(spec=CallbackQuery, id="cb_comm_escalate", from_user=user, data="cresolve:no", message=cb_message)
+    callback.answer = AsyncMock()
+
+    client.create_ticket.return_value = {"id": 99, "user_id": 16, "status": "OPEN"}
+
+    await handle_community_resolve_no(callback, state, bot=bot, backend_client=client)
+
+    bot.send_photo.assert_called_once()
+    assert bot.send_photo.call_args.kwargs["photo"] == "replied_escalated_photo"
+
+
+@pytest.mark.asyncio
+async def test_community_plain_text_reply_to_photo(memory_storage):
+    replied = make_replied_photo_message(file_id="plain_reply_photo")
+    message = make_group_text_message(COMMUNITY_GROUP_ID, 17, text="C'est quoi ce bug ?", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 17, COMMUNITY_GROUP_ID)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Explication."}
+    sent_message = MagicMock(message_id=886)
+    message.answer.return_value = sent_message
+
+    await handle_community_plain_question(message, state, bot=AsyncMock(), backend_client=client)
+
+    client.query.assert_called_once_with(query="C'est quoi ce bug ?", user_id=17, user_handle="alice")
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "plain_reply_photo"
+
+
+# ---------------------------------------------------------------------------
+# Private chat: /ask with photos or replies to photos
+# ---------------------------------------------------------------------------
+
+
+@pytest.mark.asyncio
+async def test_private_ask_with_args(memory_storage):
+    message = make_private_text_message(20, text="/ask Comment sécuriser mon compte ?")
+    state = make_fsm_context(memory_storage, 20, 20)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Activez la 2FA."}
+    command = CommandObject(prefix="/", command="ask", args="Comment sécuriser mon compte ?")
+
+    await handle_user_ask(message, command, state, backend_client=client)
+
+    client.query.assert_called_once_with(query="Comment sécuriser mon compte ?", user_id=20, user_handle="user20")
+    message.answer.assert_called_once()
+    data = await state.get_data()
+    assert data["last_question"] == "Comment sécuriser mon compte ?"
+    assert data["last_photo_file_id"] is None
+
+
+@pytest.mark.asyncio
+async def test_private_ask_photo_with_args(memory_storage):
+    message = make_private_photo_message(21, caption="/ask Mon solde est erroné", file_id="private_solde_photo")
+    state = make_fsm_context(memory_storage, 21, 21)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Attendez les confirmations."}
+    command = CommandObject(prefix="/", command="ask", args="Mon solde est erroné")
+
+    await handle_user_ask(message, command, state, backend_client=client)
+
+    client.query.assert_called_once_with(query="Mon solde est erroné", user_id=21, user_handle="user21")
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "private_solde_photo"
+    assert data["last_question"] == "Mon solde est erroné"
+
+
+@pytest.mark.asyncio
+async def test_private_ask_photo_without_args_uses_placeholder(memory_storage):
+    message = make_private_photo_message(22, caption="/ask", file_id="private_photo_no_args")
+    state = make_fsm_context(memory_storage, 22, 22)
+    client = AsyncMock()
+    client.query.return_value = {"found": False, "answer": "Je n'ai pas trouvé."}
+    command = CommandObject(prefix="/", command="ask", args=None)
+
+    await handle_user_ask(message, command, state, backend_client=client)
+
+    client.query.assert_called_once()
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "private_photo_no_args"
+
+
+@pytest.mark.asyncio
+async def test_private_ask_reply_to_photo_with_args(memory_storage):
+    replied = make_replied_photo_message(file_id="private_replied_screen")
+    message = make_private_text_message(23, text="/ask Que faire face à cette erreur ?", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 23, 23)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Redémarrez l'app."}
+    command = CommandObject(prefix="/", command="ask", args="Que faire face à cette erreur ?")
+
+    await handle_user_ask(message, command, state, backend_client=client)
+
+    client.query.assert_called_once_with(query="Que faire face à cette erreur ?", user_id=23, user_handle="user23")
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "private_replied_screen"
+
+
+@pytest.mark.asyncio
+async def test_private_ask_reply_to_photo_without_args_uses_replied_caption(memory_storage):
+    replied = make_replied_photo_message(file_id="private_replied_caption_photo", caption="Problème de retrait")
+    message = make_private_text_message(24, text="/ask", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 24, 24)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Vérifiez vos fonds."}
+    command = CommandObject(prefix="/", command="ask", args=None)
+
+    await handle_user_ask(message, command, state, backend_client=client)
+
+    client.query.assert_called_once_with(query="Problème de retrait", user_id=24, user_handle="user24")
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "private_replied_caption_photo"
+
+
+@pytest.mark.asyncio
+async def test_private_ask_reply_to_photo_without_args_uses_placeholder_when_no_caption(memory_storage):
+    replied = make_replied_photo_message(file_id="private_replied_nocaption_photo", caption=None)
+    message = make_private_text_message(25, text="/ask", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 25, 25)
+    client = AsyncMock()
+    client.query.return_value = {"found": False, "answer": "Pas de réponse."}
+    command = CommandObject(prefix="/", command="ask", args=None)
+
+    await handle_user_ask(message, command, state, backend_client=client)
+
+    client.query.assert_called_once()
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "private_replied_nocaption_photo"
+
+
+@pytest.mark.asyncio
+async def test_private_ask_reply_to_photo_escalation_forwards_photo(memory_storage, monkeypatch):
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+    replied = make_replied_photo_message(file_id="private_escalate_photo_id")
+    message = make_private_text_message(26, text="/ask Blocage complet", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 26, 26)
+    client = AsyncMock()
+    client.query.return_value = {"found": False, "answer": "Pas de solution."}
+    command = CommandObject(prefix="/", command="ask", args="Blocage complet")
+
+    await handle_user_ask(message, command, state, backend_client=client)
+
+    cb_message = MagicMock(spec=Message)
+    cb_message.text = "..."
+    cb_message.edit_text = AsyncMock()
+    user = MagicMock(spec=User, id=26, username="user26", first_name="User")
+    callback = MagicMock(spec=CallbackQuery, id="cb_priv_escalate", from_user=user, data="resolve:no:0", message=cb_message)
+    callback.answer = AsyncMock()
+
+    client.create_ticket.return_value = {"id": 105, "user_id": 26, "status": "OPEN"}
+    bot = AsyncMock()
+    bot.send_message.return_value = MagicMock(message_id=4001)
+
+    await handle_resolve_no(callback, state, bot=bot, backend_client=client)
+
+    bot.send_photo.assert_called_once()
+    assert bot.send_photo.call_args.kwargs["photo"] == "private_escalate_photo_id"
+
+
+@pytest.mark.asyncio
+async def test_private_ask_without_args_or_photo_shows_usage(memory_storage):
+    message = make_private_text_message(27, text="/ask")
+    state = make_fsm_context(memory_storage, 27, 27)
+    client = AsyncMock()
+    command = CommandObject(prefix="/", command="ask", args=None)
+
+    await handle_user_ask(message, command, state, backend_client=client)
+
+    client.query.assert_not_called()
+    message.answer.assert_called_once()
+    assert "/ask" in message.answer.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_private_plain_text_reply_to_photo(memory_storage):
+    replied = make_replied_photo_message(file_id="priv_plain_reply_photo")
+    message = make_private_text_message(28, text="Comment régler cela ?", reply_to_message=replied)
+    state = make_fsm_context(memory_storage, 28, 28)
+    client = AsyncMock()
+    client.query.return_value = {"found": True, "answer": "Voici comment."}
+
+    await handle_user_query(message, state, backend_client=client)
+
+    client.query.assert_called_once_with(query="Comment régler cela ?", user_id=28, user_handle="user28")
+    data = await state.get_data()
+    assert data["last_photo_file_id"] == "priv_plain_reply_photo"
+

@@ -25,6 +25,11 @@ backend/data/*.db*
 tutorial_vps.html
 *.pdf
 
+# Test artifacts
+test_artifacts/
+frontend/public/uploads/*
+!frontend/public/uploads/.gitkeep
+
 # OS cruft
 .DS_Store
 Thumbs.db

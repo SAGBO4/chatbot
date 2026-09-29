@@ -4,6 +4,8 @@ import React, { useState, useEffect } from 'react';
 import { api } from '@/lib/api';
 import { WarningListResponse } from '@/types';
 import { useTranslation } from '@/lib/i18n/LanguageContext';
+import { useTelegram } from '@/lib/telegram/TelegramContext';
+import { useToast } from '@/components/ui/Toast';
 import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
@@ -23,11 +25,11 @@ import {
   ArrowLeft,
 } from 'lucide-react';
 import Link from 'next/link';
-import { useTelegram } from '@/lib/telegram/TelegramContext';
 
 export default function SettingsPage() {
   const { t, locale } = useTranslation();
   const { isAdmin, isLoadingAdmin } = useTelegram();
+  const { toast } = useToast();
 
   // Settings state
   const [communityGroupId, setCommunityGroupId] = useState('');
@@ -116,10 +118,20 @@ export default function SettingsPage() {
         api.setAdminSetting('language', botLanguage.trim() || 'fr'),
       ]);
       setSettingsSuccess(true);
+      toast({
+        title: locale === 'fr' ? 'Configuration sauvegardée' : 'Settings saved',
+        description: t.settingsSaved,
+        variant: 'success',
+      });
       setTimeout(() => setSettingsSuccess(false), 3000);
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || t.errSettingsSave;
       setSettingsError(msg);
+      toast({
+        title: 'Erreur',
+        description: msg,
+        variant: 'error',
+      });
     } finally {
       setIsSavingSettings(false);
     }
@@ -135,10 +147,20 @@ export default function SettingsPage() {
     try {
       await api.addWhitelist(parsedId);
       setNewWhitelistId('');
+      toast({
+        title: locale === 'fr' ? 'Administrateur ajouté' : 'Admin added',
+        description: `ID: ${parsedId}`,
+        variant: 'success',
+      });
       refreshData();
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || t.errWhitelistAdd;
       setWhitelistError(msg);
+      toast({
+        title: 'Erreur',
+        description: msg,
+        variant: 'error',
+      });
     } finally {
       setIsAddingWhitelist(false);
     }
@@ -148,6 +170,11 @@ export default function SettingsPage() {
     try {
       await api.removeWhitelist(userId);
       setWhitelist((prev) => prev.filter((item) => item.user_id !== userId));
+      toast({
+        title: locale === 'fr' ? 'Administrateur retiré' : 'Admin removed',
+        description: `ID: ${userId}`,
+        variant: 'default',
+      });
     } catch (err: unknown) {
       const msg = (err as { message?: string })?.message || t.errWhitelistRemove;
       setWhitelistError(msg);
@@ -191,7 +218,7 @@ export default function SettingsPage() {
 
   if (isLoadingAdmin) {
     return (
-      <div className="flex flex-col items-center justify-center min-h-[60vh] text-neutral-400">
+      <div className="flex flex-col items-center justify-center min-h-[60vh] text-zinc-400">
         <RefreshCw className="h-6 w-6 animate-spin text-white mb-3" />
         <p className="text-xs">{locale === 'fr' ? 'Vérification des droits administrateur...' : 'Verifying admin permissions...'}</p>
       </div>
@@ -201,17 +228,17 @@ export default function SettingsPage() {
   if (!isAdmin) {
     return (
       <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <Card elevated className="p-8 border-white/[0.1]">
+        <Card elevated className="p-8 border-white/[0.1] bg-[#0c0c0f]">
           <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-rose-500/10 text-rose-400 border border-rose-500/20 mx-auto mb-4">
             <ShieldCheck className="h-6 w-6" />
           </div>
           <h2 className="text-lg font-bold text-white mb-2">
             {locale === 'fr' ? 'Accès Administrateur Requis' : 'Admin Access Required'}
           </h2>
-          <p className="text-xs text-neutral-400 leading-relaxed mb-6">
+          <p className="text-xs text-zinc-400 leading-relaxed mb-6 font-normal">
             {locale === 'fr'
-              ? 'Cette section est strictement réservée aux administrateurs et modérateurs autorisés du bot Stack Wallet. Votre compte Telegram ne dispose pas de ces privilèges.'
-              : 'This section is strictly restricted to authorized Stack Wallet bot administrators and moderators. Your Telegram account does not have these privileges.'}
+              ? 'Cette section est strictement réservée aux administrateurs et modérateurs autorisés de Stack Wallet. Votre compte Telegram ne dispose pas de ces privilèges.'
+              : 'This section is strictly restricted to authorized Stack Wallet administrators and moderators. Your Telegram account does not have these privileges.'}
           </p>
           <Link href="/">
             <Button variant="primary" size="sm" className="w-full justify-center">
@@ -225,35 +252,35 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:py-12">
+    <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8 lg:py-12">
       {/* Header */}
       <div className="mb-8">
         <Link
           href="/"
-          className="inline-flex items-center gap-1.5 text-xs text-neutral-400 hover:text-white mb-2 transition-colors"
+          className="inline-flex items-center gap-1.5 text-xs text-zinc-400 hover:text-white mb-2.5 transition-colors"
         >
           <ArrowLeft className="h-3.5 w-3.5" />
           <span>{t.navSupport}</span>
         </Link>
-        <div className="flex items-center gap-2">
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
+        <div className="flex items-center gap-2.5 flex-wrap">
+          <h1 className="text-xl sm:text-2xl lg:text-3xl font-bold tracking-tight text-white">
             {t.settingsTitle}
           </h1>
-          <span className="rounded-full bg-white/10 border border-white/20 px-2.5 py-0.5 text-[10px] font-medium text-white">
-            Administration
+          <span className="rounded-full bg-white/10 border border-white/20 px-2.5 py-0.5 text-[11px] font-semibold text-zinc-200 shadow-sm">
+            Admin Console
           </span>
         </div>
-        <p className="text-xs sm:text-sm text-neutral-400 mt-1">{t.settingsSub}</p>
+        <p className="text-xs sm:text-sm text-zinc-400 mt-1 max-w-xl font-normal leading-relaxed">{t.settingsSub}</p>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Left: Settings & Whitelist */}
         <div className="space-y-6">
           {/* Settings Card */}
-          <Card elevated className="p-5 border-white/[0.08]">
-            <div className="flex items-center justify-between pb-3 border-b border-white/[0.08] mb-4">
+          <Card elevated className="p-6 border-white/[0.08] bg-[#0c0c0f]">
+            <div className="flex items-center justify-between pb-3.5 border-b border-white/[0.08] mb-5">
               <div className="flex items-center gap-2.5">
-                <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.08] text-white border border-white/[0.15]">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.08] text-white border border-white/[0.15]">
                   <Settings className="h-4 w-4" />
                 </div>
                 <h3 className="text-sm font-semibold text-white">{t.groupConfigCard}</h3>
@@ -266,7 +293,7 @@ export default function SettingsPage() {
             {settingsError && <Alert type="error" className="mb-4">{settingsError}</Alert>}
             {settingsSuccess && <Alert type="success" className="mb-4">{t.settingsSaved}</Alert>}
 
-            <form onSubmit={handleSaveSettings} className="space-y-3.5">
+            <form onSubmit={handleSaveSettings} className="space-y-4">
               <Input
                 label={t.currentGroupId}
                 value={communityGroupId}
@@ -283,24 +310,24 @@ export default function SettingsPage() {
                 helperText={t.helperBotLanguage}
               />
 
-              <div className="flex justify-end pt-1">
-                <Button type="submit" variant="primary" size="sm" isLoading={isSavingSettings}>
+              <div className="flex justify-end pt-2">
+                <Button type="submit" variant="primary" size="sm" isLoading={isSavingSettings} className="shadow-lg shadow-white/10">
                   <Save className="h-3.5 w-3.5 mr-1.5" />
-                  Sauvegarder
+                  {locale === 'fr' ? 'Sauvegarder' : 'Save'}
                 </Button>
               </div>
             </form>
           </Card>
 
           {/* Whitelist Card */}
-          <Card elevated className="p-5 border-white/[0.08]">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-white/[0.08] mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.08] text-white border border-white/[0.15]">
+          <Card elevated className="p-6 border-white/[0.08] bg-[#0c0c0f]">
+            <div className="flex items-center gap-2.5 pb-3.5 border-b border-white/[0.08] mb-5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.08] text-white border border-white/[0.15]">
                 <ShieldCheck className="h-4 w-4" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">{t.adminWhitelistTitle}</h3>
-                <p className="text-[11px] text-neutral-400">{t.adminWhitelistSub}</p>
+                <p className="text-[11px] text-zinc-400">{t.adminWhitelistSub}</p>
               </div>
             </div>
 
@@ -325,13 +352,13 @@ export default function SettingsPage() {
 
             {checkResult && (
               <div
-                className={`p-2.5 rounded-xl border flex items-center gap-2 text-xs font-medium mb-4 ${
+                className={`p-3 rounded-xl border flex items-center gap-2 text-xs font-medium mb-4 ${
                   checkResult.is_whitelisted
-                    ? 'bg-emerald-950/20 border-emerald-500/30 text-emerald-300'
+                    ? 'bg-white/10 border-white/20 text-zinc-200'
                     : 'bg-rose-950/20 border-rose-500/30 text-rose-300'
                 }`}
               >
-                {checkResult.is_whitelisted ? <CheckCircle2 className="h-4 w-4" /> : <XCircle className="h-4 w-4" />}
+                {checkResult.is_whitelisted ? <CheckCircle2 className="h-4 w-4 shrink-0 text-zinc-200" /> : <XCircle className="h-4 w-4 shrink-0 text-rose-400" />}
                 <span>
                   {checkResult.is_whitelisted ? t.whitelistedSuccess : t.whitelistedDenied}
                 </span>
@@ -351,14 +378,14 @@ export default function SettingsPage() {
               </div>
               <Button type="submit" variant="primary" size="sm" isLoading={isAddingWhitelist} className="shrink-0">
                 <Plus className="h-3.5 w-3.5 mr-1" />
-                Ajouter
+                {locale === 'fr' ? 'Ajouter' : 'Add'}
               </Button>
             </form>
 
             {/* Whitelist table */}
             <div className="space-y-1.5 mt-3 max-h-48 overflow-y-auto">
               {whitelist.length === 0 ? (
-                <p className="text-xs text-neutral-500 italic text-center py-2">{t.whitelistEmpty}</p>
+                <p className="text-xs text-zinc-500 italic text-center py-2">{t.whitelistEmpty}</p>
               ) : (
                 whitelist.map((item) => (
                   <div
@@ -367,12 +394,12 @@ export default function SettingsPage() {
                   >
                     <div>
                       <span className="font-mono font-semibold text-white">ID: {item.user_id}</span>
-                      <span className="text-[10px] text-neutral-400 ml-2">{t.addedBy} {item.added_by}</span>
+                      <span className="text-[10px] text-zinc-400 ml-2">{t.addedBy} {item.added_by}</span>
                     </div>
                     <button
                       onClick={() => handleRemoveWhitelist(item.user_id)}
-                      className="text-neutral-400 hover:text-rose-400 p-1 cursor-pointer transition-colors"
-                      title="Supprimer"
+                      className="text-zinc-400 hover:text-rose-400 p-1 cursor-pointer transition-colors"
+                      title={locale === 'fr' ? 'Supprimer' : 'Delete'}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -385,18 +412,18 @@ export default function SettingsPage() {
 
         {/* Right: Moderation Warnings Audit */}
         <div>
-          <Card elevated className="p-5 border-white/[0.08]">
-            <div className="flex items-center gap-2.5 pb-3 border-b border-white/[0.08] mb-4">
-              <div className="flex h-8 w-8 items-center justify-center rounded-xl bg-white/[0.08] text-white border border-white/[0.15]">
+          <Card elevated className="p-6 border-white/[0.08] bg-[#0c0c0f]">
+            <div className="flex items-center gap-2.5 pb-3.5 border-b border-white/[0.08] mb-5">
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-white/[0.08] text-white border border-white/[0.15]">
                 <AlertTriangle className="h-4 w-4 text-amber-400" />
               </div>
               <div>
                 <h3 className="text-sm font-semibold text-white">{t.moderationCardTitle}</h3>
-                <p className="text-[11px] text-neutral-400">{t.moderationCardDesc}</p>
+                <p className="text-[11px] text-zinc-400">{t.moderationCardDesc}</p>
               </div>
             </div>
 
-            <form onSubmit={handleQueryWarnings} className="space-y-3 mb-4">
+            <form onSubmit={handleQueryWarnings} className="space-y-3.5 mb-4">
               <Input
                 type="number"
                 value={warnUserId}
@@ -412,7 +439,7 @@ export default function SettingsPage() {
                 placeholder={t.placeholderGroupId}
                 required
               />
-              <div className="flex justify-end">
+              <div className="flex justify-end pt-1">
                 <Button type="submit" variant="secondary" size="sm" isLoading={isQueryingWarns}>
                   <Search className="h-3.5 w-3.5 mr-1 text-white" />
                   {t.btnQueryWarnings}
@@ -425,14 +452,14 @@ export default function SettingsPage() {
             {warningData && (
               <div className="space-y-3 pt-2">
                 <div className="p-3.5 rounded-xl bg-white/[0.04] border border-white/[0.08] flex items-center justify-between">
-                  <span className="text-xs text-neutral-400 font-medium">{t.warningsTotal}</span>
+                  <span className="text-xs text-zinc-400 font-medium">{t.warningsTotal}</span>
                   <Badge variant={warningData.count > 0 ? 'warning' : 'success'} size="sm">
                     {warningData.count} avertissement(s)
                   </Badge>
                 </div>
 
                 {warningData.warnings.length === 0 ? (
-                  <p className="text-xs text-neutral-500 italic text-center py-3">
+                  <p className="text-xs text-zinc-500 italic text-center py-3">
                     {t.noWarnings}
                   </p>
                 ) : (
@@ -444,12 +471,12 @@ export default function SettingsPage() {
                       >
                         <div className="flex items-center justify-between">
                           <span className="font-semibold text-white">Avertissement #{w.id}</span>
-                          <span className="text-[10px] text-neutral-400">
+                          <span className="text-[10px] text-zinc-400">
                             {new Date(w.created_at).toLocaleDateString()}
                           </span>
                         </div>
-                        <p className="text-neutral-200">{w.reason || t.noReason}</p>
-                        <div className="text-[10px] text-neutral-400">Émis par : {w.warned_by}</div>
+                        <p className="text-zinc-200">{w.reason || t.noReason}</p>
+                        <div className="text-[10px] text-zinc-400">Émis par : {w.warned_by}</div>
                       </div>
                     ))}
                   </div>

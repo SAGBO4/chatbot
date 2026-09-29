@@ -9,8 +9,8 @@ export const Footer: React.FC = () => {
   const { t } = useTranslation();
 
   return (
-    <footer className="w-full border-t border-white/[0.08] bg-black/60 backdrop-blur-xl pt-6 pb-24 sm:pb-8 text-xs text-neutral-400">
-      <div className="mx-auto flex max-w-5xl flex-col items-center justify-between gap-4 px-4 sm:flex-row sm:px-6">
+    <footer className="w-full border-t border-white/[0.08] bg-black/60 backdrop-blur-xl pt-6 pb-20 md:pb-8 text-xs text-zinc-400">
+      <div className="mx-auto flex max-w-7xl flex-col items-center justify-between gap-4 px-4 sm:px-6 lg:px-8 sm:flex-row">
         <div className="flex items-center gap-2 text-center sm:text-left">
           <span className="font-bold text-white tracking-wide text-xs">
             Stack <span className="text-neutral-400">Support</span>
