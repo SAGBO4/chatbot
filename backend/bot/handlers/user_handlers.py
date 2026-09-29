@@ -2,7 +2,7 @@ import logging
 from typing import Optional
 from aiogram import Router, F, Bot
 from aiogram.types import Message, CallbackQuery
-from aiogram.filters import CommandStart, Command
+from aiogram.filters import CommandStart, Command, CommandObject
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import State, StatesGroup
 from bot.keyboards import get_resolution_keyboard, get_webapp_keyboard
@@ -41,15 +41,20 @@ async def handle_start(message: Message, state: FSMContext, backend_client: Opti
 async def handle_webapp(message: Message, backend_client: Optional[BackendClient] = None):
     """/webapp: a button that opens the Mini App."""
     lang = await get_active_language(backend_client=backend_client)
+    chat = getattr(message, "chat", None)
+    is_group = bool(chat and getattr(chat, "type", None) in ("group", "supergroup"))
+    if is_group:
+        await message.answer(t("webapp_group_redirect", lang))
+        return
+
     url = settings.TELEGRAM_WEBAPP_URL
     if not url:
         await message.answer(t("webapp_not_configured", lang))
         return
-    chat = getattr(message, "chat", None)
-    is_group = bool(chat and getattr(chat, "type", None) in ("group", "supergroup"))
+
     await message.answer(
         t("webapp_prompt", lang),
-        reply_markup=get_webapp_keyboard(url, text=t("button_open_webapp", lang), lang=lang, is_group=is_group),
+        reply_markup=get_webapp_keyboard(url, text=t("button_open_webapp", lang), lang=lang, is_group=False),
     )
 
 
@@ -67,8 +72,6 @@ async def handle_help(message: Message, bot: Bot, backend_client: Optional[Backe
     if is_group_chat:
         sections.append(t("help_group_intro", lang))
         sections.append(t("help_group_member_commands", lang))
-        if url:
-            sections.append(t("help_webapp_command", lang))
         sections.append(t("help_crypto_commands", lang))
 
         if await is_bot_admin(bot, message.chat.id, user_id, backend_client=client):
@@ -88,7 +91,7 @@ async def handle_help(message: Message, bot: Bot, backend_client: Optional[Backe
             if is_owner(user_id):
                 sections.append(t("help_owner_commands", lang))
 
-    keyboard = get_webapp_keyboard(url, lang=lang, is_group=is_group_chat) if url else None
+    keyboard = None if is_group_chat else (get_webapp_keyboard(url, lang=lang, is_group=False) if url else None)
     await call_with_markdown_fallback(
         message.answer,
         "".join(sections),
@@ -137,6 +140,51 @@ async def _answer_private_question(
         await message.answer(t("query_backend_error", lang))
 
 
+@user_router.message(F.chat.type == "private", Command("ask"))
+async def handle_user_ask(
+    message: Message,
+    command: CommandObject,
+    state: FSMContext,
+    backend_client: Optional[BackendClient] = None,
+):
+    """
+    /ask in private chat: answer from the knowledge base, supporting:
+    - /ask <question>
+    - photo message with caption /ask [<question>]
+    - reply to a photo with /ask [<question>]
+    """
+    client = backend_client or BackendClient()
+    lang = await get_active_language(backend_client=client)
+
+    photo = getattr(message, "photo", None)
+    reply_to = getattr(message, "reply_to_message", None)
+    reply_photo = getattr(reply_to, "photo", None) if reply_to else None
+
+    photo_file_id: Optional[str] = None
+    if photo:
+        photo_file_id = photo[-1].file_id
+    elif reply_photo:
+        photo_file_id = reply_photo[-1].file_id
+
+    question = (command.args or "").strip()
+    if not question:
+        if reply_photo:
+            caption = (getattr(reply_to, "caption", None) or "").strip()
+            question = caption if caption else t("photo_no_caption_question", lang)
+        elif photo:
+            question = t("photo_no_caption_question", lang)
+
+    if not question:
+        await message.answer(t("community_ask_usage", lang), parse_mode="Markdown")
+        return
+
+    if len(question) > TELEGRAM_MAX_MESSAGE_LENGTH:
+        await message.answer(t("question_too_long", lang, max_length=TELEGRAM_MAX_MESSAGE_LENGTH))
+        return
+
+    await _answer_private_question(message, question, state, client, lang, photo_file_id=photo_file_id)
+
+
 @user_router.message(F.chat.type == "private", F.text)
 async def handle_user_query(
     message: Message,
@@ -151,7 +199,11 @@ async def handle_user_query(
         await message.answer(t("question_too_long", lang, max_length=TELEGRAM_MAX_MESSAGE_LENGTH))
         return
 
-    await _answer_private_question(message, user_query, state, client, lang)
+    reply_to = getattr(message, "reply_to_message", None)
+    reply_photo = getattr(reply_to, "photo", None) if reply_to else None
+    photo_file_id = reply_photo[-1].file_id if reply_photo else None
+
+    await _answer_private_question(message, user_query, state, client, lang, photo_file_id=photo_file_id)
 
 
 @user_router.message(F.chat.type == "private", F.photo)

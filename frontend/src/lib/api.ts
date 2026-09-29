@@ -85,7 +85,7 @@ export const api = {
   },
 
   /**
-   * POST /api/query - Submit question to knowledge base / AI
+   * POST /api/query - Submit question to knowledge base
    */
   async querySupport(request: QueryRequest): Promise<QueryResponse> {
     try {
@@ -264,7 +264,7 @@ export const api = {
    */
   async getCryptoPrices(symbols = ['btc', 'eth', 'firo', 'sol', 'ltc', 'doge', 'xrp']): Promise<CryptoPriceResponse[]> {
     const results = await Promise.allSettled(
-      symbols.map((sym) => this.getCryptoPrice(sym))
+      symbols.map((sym) => api.getCryptoPrice(sym))
     );
     const fulfilled: CryptoPriceResponse[] = [];
     for (const r of results) {
@@ -325,7 +325,7 @@ export const api = {
   },
 
   /**
-   * GET /api/admin/settings/{key} - Get a specific bot setting
+   * GET /api/admin/settings/{key} - Get a specific configuration setting
    */
   async getAdminSetting(key: string): Promise<BotSettingResponse> {
     try {
@@ -345,7 +345,7 @@ export const api = {
   },
 
   /**
-   * PUT /api/admin/settings/{key} - Update a bot setting
+   * PUT /api/admin/settings/{key} - Update a configuration setting
    */
   async setAdminSetting(key: string, value: string, updatedBy = 'Admin Web'): Promise<BotSettingResponse> {
     try {

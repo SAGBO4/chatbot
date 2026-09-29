@@ -34,6 +34,10 @@ yarn-error.log*
 .env*
 !.env.example
 
+# user uploads
+public/uploads/*
+!public/uploads/.gitkeep
+
 # vercel
 .vercel
 

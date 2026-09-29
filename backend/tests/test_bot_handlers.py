@@ -1610,8 +1610,8 @@ def test_get_webapp_keyboard_group_vs_private():
 
 
 @pytest.mark.asyncio
-async def test_handle_help_in_group_uses_url_button_when_webapp_url_configured(monkeypatch, bot_test_env):
-    """In group chats, handle_help attaches a url button rather than a web_app button to prevent Telegram BadRequest."""
+async def test_handle_help_in_group_never_attaches_webapp_or_links(monkeypatch, bot_test_env):
+    """In group chats, handle_help never attaches webapp keyboard or links."""
     monkeypatch.setattr(settings, "TELEGRAM_WEBAPP_URL", "https://app.example.com")
     group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
     msg = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"], text="/help")
@@ -1624,15 +1624,15 @@ async def test_handle_help_in_group_uses_url_button_when_webapp_url_configured(m
 
     msg.answer.assert_called_once()
     markup = msg.answer.call_args.kwargs.get("reply_markup")
-    assert markup is not None
-    btn = markup.inline_keyboard[0][0]
-    assert btn.url == "https://app.example.com"
-    assert btn.web_app is None
+    assert markup is None
+    answer_text = msg.answer.call_args[0][0]
+    assert "/webapp" not in answer_text
+    assert "https://app.example.com" not in answer_text
 
 
 @pytest.mark.asyncio
-async def test_handle_webapp_in_group_uses_url_button(monkeypatch):
-    """In group chats, /webapp attaches a url button rather than a web_app button."""
+async def test_handle_webapp_in_group_sends_redirect_message_without_keyboard(monkeypatch):
+    """In group chats, /webapp sends a redirect message without any keyboard or webapp link."""
     from bot.handlers.user_handlers import handle_webapp
 
     monkeypatch.setattr(settings, "TELEGRAM_WEBAPP_URL", "https://app.example.com")
@@ -1644,8 +1644,7 @@ async def test_handle_webapp_in_group_uses_url_button(monkeypatch):
 
     msg.answer.assert_called_once()
     markup = msg.answer.call_args.kwargs.get("reply_markup")
-    assert markup is not None
-    btn = markup.inline_keyboard[0][0]
-    assert btn.url == "https://app.example.com"
-    assert btn.web_app is None
+    assert markup is None
+    text = msg.answer.call_args[0][0]
+    assert "message privé" in text or "private message" in text
 

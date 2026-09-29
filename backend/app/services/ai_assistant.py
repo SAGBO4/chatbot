@@ -63,12 +63,14 @@ class AIAssistantService:
         context_str = "\n\n".join(context_snippets)
 
         return (
-            "You are a helpful, concise technical support assistant. "
+            "You are a helpful, concise technical support assistant providing an official technical documentation excerpt for Stack Wallet. "
+            "Never introduce yourself, never say 'I', 'in my opinion', 'as an assistant', or 'hope this helps'. "
+            "Do NOT use conversational filler. Give only direct, objective, verified technical instructions step-by-step. "
             "Answer the user's question using ONLY the solutions provided below. "
             "Always answer in the same language as the user's question (French or English).\n\n"
             f"--- PROVIDED CONTEXT ---\n{context_str}\n\n"
             f"--- USER QUESTION ---\n{query}\n\n"
-            "--- ANSWER ---"
+            "--- TECHNICAL RESOLUTION ---"
         )
 
     @classmethod
