@@ -51,6 +51,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - Unused create-next-app SVGs and the unused `StackLogo` component in the frontend.
 
 ### Fixed
+- `backend/app.json`'s Dokku healthcheck used `"type": "path"`, which isn't one of the types Dokku documents (`startup`, `liveness`, `readiness`); it now uses `startup`, with the port and a name/description. `backend/CHECKS` is simplified to `/health` now that `app.json` carries the real check.
 - **CI could break on any day with no change to this repo.** `requirements.txt` pinned only a floor for SQLAlchemy (`>=2.0.54`), so a fresh install could silently resolve SQLAlchemy 2.1 - a major version the app was never tested against, and which also stopped pulling in `greenlet`, a hard dependency of its async engine (`ImportError` at test collection: "the Python 'greenlet' library is installed"). Reproduced with a clean install matching CI exactly. Now pinned to `sqlalchemy[asyncio]>=2.0.54,<2.1`, matching the version in `requirements.lock`.
 - Docs said the Dockerfile was multi-stage; it is not.
 - `SECURITY.md` said bandit, semgrep, trivy and pip-audit ran on every change; only `ruff` and the tests run in CI.

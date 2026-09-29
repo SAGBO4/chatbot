@@ -1,0 +1,16 @@
+{
+  "healthchecks": {
+    "web": [
+      {
+        "type": "startup",
+        "name": "api health",
+        "description": "The API answers 200 on /health once the database is reachable",
+        "path": "/health",
+        "port": 8000,
+        "attempts": 6,
+        "wait": 5,
+        "timeout": 5
+      }
+    ]
+  }
+}
