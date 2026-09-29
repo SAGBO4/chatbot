@@ -12,7 +12,7 @@
 
 A Telegram support bot with a knowledge base and an AI feedback loop: it answers questions, escalates to your team the moment it's stuck, and learns from every resolution — so the next person asking the same thing gets an instant answer instead of another ticket.
 
----
+------
 
 ## How it works
 
