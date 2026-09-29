@@ -109,6 +109,11 @@ async function proxy(
         return forbidden('Telegram authentication required to create a ticket.');
       }
     }
+
+    const isAttachment = path.length === 3 && seg2 === 'attachment' && request.method === 'POST';
+    if (isAttachment && verifiedUserId === null && !devFallback) {
+      return forbidden('Telegram authentication required to attach a screenshot.');
+    }
   }
 
   const headers = new Headers();

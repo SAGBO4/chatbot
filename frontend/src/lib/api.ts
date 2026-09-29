@@ -125,6 +125,27 @@ export const api = {
   },
 
   /**
+   * POST /api/tickets/{id}/attachment - forward a screenshot to the support group for this ticket.
+   * Never stored: `dataUrl` is relayed straight to Telegram and discarded (see backend/app/attachments.py).
+   */
+  async attachTicketPhoto(ticketId: number, dataUrl: string): Promise<{ forwarded: boolean }> {
+    try {
+      const res = await fetch(`${API_BASE}/tickets/${ticketId}/attachment`, {
+        method: 'POST',
+        headers: getHeaders(),
+        body: JSON.stringify({ data_url: dataUrl }),
+      });
+      return await handleResponse<{ forwarded: boolean }>(res);
+    } catch (err: unknown) {
+      if ((err as ApiError)?.message) throw err;
+      throw {
+        message: 'Failed to upload the screenshot.',
+        status: 0,
+      } as ApiError;
+    }
+  },
+
+  /**
    * GET /api/tickets - List tickets with status or user_id filtering
    */
   async getTickets(userId?: number, statusFilter?: string): Promise<TicketResponse[]> {

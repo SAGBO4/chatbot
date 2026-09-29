@@ -4,6 +4,7 @@ from typing import Annotated, List, Optional
 from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, Path, Query, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.attachments import InvalidAttachment, decode_data_url, extension_for
 from app.background import safe_background_task
 from app.config import settings
 from app.database import get_db
@@ -11,10 +12,18 @@ from app.limiter import limiter
 from app.models import TicketStatus
 from app.observability import get_logger
 from app.openapi_docs import PROTECTED, RATE_LIMITED, error_responses
-from app.schemas import TicketCreateRequest, TicketResolveRequest, TicketResponse, TicketSupportCardRequest
+from app.schemas import (
+    TicketAttachmentRequest,
+    TicketAttachmentResponse,
+    TicketCreateRequest,
+    TicketResolveRequest,
+    TicketResponse,
+    TicketSupportCardRequest,
+)
 from app.security import verify_api_key
 from app.services.bot_settings_service import BotSettingsService
 from app.services.email_service import EmailService
+from app.services.telegram_relay import TelegramRelay
 from app.services.ticket_service import TicketService
 
 logger = get_logger(__name__)
@@ -142,6 +151,41 @@ async def attach_support_card(
     if not ticket:
         raise HTTPException(status_code=404, detail="Ticket not found")
     return ticket
+
+
+@router.post(
+    "/api/tickets/{ticket_id}/attachment",
+    response_model=TicketAttachmentResponse,
+    dependencies=[Depends(verify_api_key)],
+    responses={**NOT_FOUND, **RATE_LIMITED, **error_responses({400: "Not a supported image, or over 5 MB decoded."})},
+)
+@limiter.limit("10/minute")
+async def attach_ticket_photo(
+    request: Request,
+    ticket_id: Annotated[int, Path(description="Ticket id.")],
+    payload: TicketAttachmentRequest,
+    session: AsyncSession = Depends(get_db),
+):
+    """
+    Forward a screenshot to the support group for this ticket (the web portal's equivalent of a
+    screenshot sent straight to the bot). Never written to disk or stored on the ticket: this call
+    only relays it to Telegram, best effort, exactly like the bot's own screenshot-question flow.
+    """
+    ticket = await TicketService.get_ticket(session=session, ticket_id=ticket_id)
+    if not ticket:
+        raise HTTPException(status_code=404, detail="Ticket not found")
+
+    try:
+        decoded = decode_data_url(payload.data_url)
+    except InvalidAttachment as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+
+    filename = f"ticket-{ticket_id}.{extension_for(decoded.mime_type)}"
+    caption = f"📎 Screenshot for ticket #{ticket_id} (@{ticket.user_handle or ticket.user_id})"
+    forwarded = await TelegramRelay.send_photo_to_support_group(
+        content=decoded.content, mime_type=decoded.mime_type, filename=filename, caption=caption
+    )
+    return TicketAttachmentResponse(forwarded=forwarded)
 
 
 @router.post(
