@@ -282,3 +282,24 @@ async def test_crypto_commands_are_case_insensitive(dispatcher, command_text, us
     await dp.feed_update(bot, update)
 
     mock_client.get_crypto_price.assert_called_once_with("btc")
+
+
+@pytest.mark.parametrize(
+    "chat_id,chat_type,user_id",
+    [(12345, "private", 901), (COMMUNITY_GROUP_ID, "supergroup", 902)],
+)
+@pytest.mark.asyncio
+async def test_list_command_routes_in_private_and_group_chats(dispatcher, chat_id, chat_type, user_id):
+    dp, bot, mock_client = dispatcher
+    bot.session.reset_mock()
+    update = make_command_update(40, chat_id, user_id=user_id, command_text="/list", chat_type=chat_type)
+
+    await dp.feed_update(bot, update)
+
+    assert bot.session.called
+    call_args = bot.session.call_args[0]
+    # In aiogram, the first argument to session is TelegramMethod (e.g. SendMessage)
+    telegram_method = call_args[1] if len(call_args) > 1 else call_args[0]
+    sent_text = getattr(telegram_method, "text", "")
+    assert "/list" in sent_text
+    assert "/help" in sent_text
