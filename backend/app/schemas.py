@@ -210,6 +210,23 @@ class WhitelistRemoveResponse(BaseModel):
     user_id: int = Field(description="The user that was removed.")
 
 
+class TicketAttachmentRequest(BaseModel):
+    data_url: str = Field(
+        ...,
+        description=(
+            "The image as a data: URL (data:<mime>;base64,<data>). Accepted types: PNG, JPEG, WebP, "
+            "GIF. Limited to 5 MB decoded; never persisted, only forwarded to the support group."
+        ),
+        examples=["data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="],
+    )
+
+
+class TicketAttachmentResponse(BaseModel):
+    forwarded: bool = Field(
+        description="Whether the image reached the support group (false only if Telegram rejected it; never fails ticket creation).",
+    )
+
+
 class HealthResponse(BaseModel):
     status: str = Field(description="`ok` when the API is up.", examples=["ok"])
     database: str = Field(description="`connected` when the database answered a ping.", examples=["connected"])
