@@ -13,6 +13,9 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 ## [Unreleased]
 
 ### Added
+- Bot: `/list` (alias of `/help`) and Telegram's native "/" command menu now shows a different set per scope — private chat, group member, group admin, and a chat-specific menu for the owner — instead of one list for everyone.
+- Bot: running a moderation command, `/ask` or `/purge` outside the configured community group (or before one is configured at all) now replies explaining why, instead of silently doing nothing.
+- Bot: `/ask` works in a private chat too, and both `/ask` and a plain question accept a screenshot sent with it or replied to, not just one sent as its own message.
 - Bot: moderation and `/purge` are no longer limited to native Telegram group admins — the owner and whitelisted admins (added via the admin app or `/whitelist`) can use them too, and the same rule now also gates support-ticket resolution in the support group.
 - Bot: `/help` lists the commands the sender may actually run, based on their role and the chat they're in.
 - Bot: a plain-text question typed directly in the community group (without `/ask`) is now answered in the group, instead of going unanswered.
@@ -51,6 +54,7 @@ No version has been tagged yet, so changes are listed under **Unreleased**, and 
 - Unused create-next-app SVGs and the unused `StackLogo` component in the frontend.
 
 ### Fixed
+- **`/help` in a group disclosed `/setup_community` and `/whitelist` to a plain native Telegram admin of that group**, even when they were never whitelisted or the bot owner. It was gated on `is_bot_admin()`, which also grants a native group admin (for moderation, on purpose); `setup_handlers.py` only ever accepted `is_authorized()` (owner/whitelist) for those two commands, so the help text listed commands the reader could not actually run. Reproduced, then gated on `is_authorized()` to match.
 - `backend/app.json`'s Dokku healthcheck used `"type": "path"`, which isn't one of the types Dokku documents (`startup`, `liveness`, `readiness`); it now uses `startup`, with the port and a name/description. `backend/CHECKS` is simplified to `/health` now that `app.json` carries the real check.
 - **CI could break on any day with no change to this repo.** `requirements.txt` pinned only a floor for SQLAlchemy (`>=2.0.54`), so a fresh install could silently resolve SQLAlchemy 2.1 - a major version the app was never tested against, and which also stopped pulling in `greenlet`, a hard dependency of its async engine (`ImportError` at test collection: "the Python 'greenlet' library is installed"). Reproduced with a clean install matching CI exactly. Now pinned to `sqlalchemy[asyncio]>=2.0.54,<2.1`, matching the version in `requirements.lock`.
 - Docs said the Dockerfile was multi-stage; it is not.
