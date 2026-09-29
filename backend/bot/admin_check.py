@@ -1,6 +1,8 @@
 import logging
 from typing import Optional
 from aiogram import Bot
+from bot.access_control import is_authorized
+from bot.api_client import BackendClient
 from bot.ttl_cache import MISSING, TTLCache
 
 logger = logging.getLogger(__name__)
@@ -46,3 +48,22 @@ async def is_group_admin(bot: Bot, chat_id: int, user_id: int, force_refresh: bo
 
     _admin_status_cache.set(cache_key, result)
     return result
+
+
+async def is_bot_admin(
+    bot: Bot,
+    chat_id: int,
+    user_id: int,
+    backend_client: Optional[BackendClient] = None,
+) -> bool:
+    """
+    Whether user_id may run admin-level bot actions (moderation, purge, support resolution) in
+    chat_id: the bot owner, a whitelisted admin (added via the admin app or /whitelist), or a
+    native Telegram group admin/creator.
+
+    Group role alone used to gate these actions, which left admins promoted through the admin app
+    unable to use them unless they also happened to hold real Telegram admin rights in that group.
+    """
+    if await is_authorized(user_id, backend_client=backend_client):
+        return True
+    return await is_group_admin(bot, chat_id, user_id)

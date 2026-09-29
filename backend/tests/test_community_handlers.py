@@ -11,6 +11,7 @@ from aiogram.fsm.storage.memory import MemoryStorage, StorageKey
 from bot.handlers import community_handlers
 from bot.handlers.community_handlers import (
     handle_community_ask,
+    handle_community_plain_question,
     handle_community_resolve_yes,
     handle_community_resolve_no,
     handle_purge,
@@ -125,6 +126,51 @@ async def test_ask_keeps_a_reference_to_the_button_expiry_task(memory_storage):
     assert not community_handlers._background_tasks, "finished tasks must be dropped from the set"
 
 
+@pytest.mark.asyncio
+async def test_plain_question_outside_community_group_is_ignored(memory_storage):
+    message = make_group_message(chat_id=-999999, user_id=1, text="mon problème sans /ask")
+    state = make_fsm_context(memory_storage, 1, -999999)
+    mock_client = AsyncMock()
+
+    await handle_community_plain_question(message, state, bot=AsyncMock(), backend_client=mock_client)
+
+    mock_client.query.assert_not_called()
+    message.answer.assert_not_called()
+
+
+@pytest.mark.asyncio
+async def test_plain_question_in_community_group_is_answered_in_group_not_dm(memory_storage):
+    """A question typed without /ask still gets answered publicly in the group, not by DM."""
+    message = make_group_message(chat_id=COMMUNITY_GROUP_ID, user_id=42, text="comment reset mdp")
+    state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
+    mock_client = AsyncMock()
+    mock_client.query.return_value = {"found": True, "answer": "Cliquez sur mot de passe oublié."}
+    sent_message = MagicMock(message_id=888)
+    message.answer.return_value = sent_message
+
+    await handle_community_plain_question(message, state, bot=AsyncMock(), backend_client=mock_client)
+
+    mock_client.query.assert_called_once_with(query="comment reset mdp", user_id=42, user_handle="alice")
+    # Answered via message.answer (replies in the group the message came from), never a DM.
+    message.answer.assert_called_once()
+    reply_text = message.answer.call_args[0][0]
+    assert "@alice" in reply_text
+    assert "Cliquez sur mot de passe oublié" in reply_text
+    assert 888 in community_handlers._recent_bot_messages[COMMUNITY_GROUP_ID]
+
+
+@pytest.mark.asyncio
+async def test_plain_question_empty_text_is_ignored(memory_storage):
+    message = make_group_message(chat_id=COMMUNITY_GROUP_ID, user_id=1, text="   ")
+    state = make_fsm_context(memory_storage, 1, COMMUNITY_GROUP_ID)
+    mock_client = AsyncMock()
+
+    await handle_community_plain_question(message, state, bot=AsyncMock(), backend_client=mock_client)
+
+    mock_client.query.assert_not_called()
+    message.answer.assert_not_called()
+
+
 def make_callback(storage, chat_id, user_id, data, text="Réponse précédente"):
     cb_message = MagicMock(spec=Message)
     cb_message.chat = MagicMock(spec=Chat, id=chat_id, type="supergroup")
@@ -208,9 +254,9 @@ async def test_resolve_no_creates_ticket_and_only_posts_neutral_ack_in_community
 
 @pytest.mark.asyncio
 async def test_purge_rejects_non_admin(memory_storage, monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return False
-    monkeypatch.setattr(community_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(community_handlers, "is_bot_admin", fake_is_admin)
 
     message = make_group_message(chat_id=COMMUNITY_GROUP_ID, user_id=1, text="/purge 5")
     community_handlers._recent_bot_messages[COMMUNITY_GROUP_ID].append(123)
@@ -251,9 +297,9 @@ async def test_expire_resolution_buttons_noop_when_already_resolved(memory_stora
 
 @pytest.mark.asyncio
 async def test_purge_deletes_recent_bot_messages_for_admin(memory_storage, monkeypatch):
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(community_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(community_handlers, "is_bot_admin", fake_is_admin)
 
     message = make_group_message(chat_id=COMMUNITY_GROUP_ID, user_id=1, text="/purge 2")
     community_handlers._recent_bot_messages[COMMUNITY_GROUP_ID].extend([1, 2, 3])

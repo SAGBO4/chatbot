@@ -4,7 +4,7 @@ from typing import List, Optional, Tuple
 from aiogram import Router, Bot
 from aiogram.types import Message, ChatPermissions
 from aiogram.filters import Command, CommandObject
-from bot.admin_check import is_group_admin, invalidate_admin_cache
+from bot.admin_check import is_bot_admin, invalidate_admin_cache
 from bot.group_scope import is_community_group_chat
 from bot.api_client import BackendClient
 from bot.language import get_active_language
@@ -40,10 +40,29 @@ UNMUTED_PERMISSIONS = ChatPermissions(
 )
 
 
-def _resolve_target(message: Message, command: CommandObject) -> Tuple[Optional[int], Optional[str], List[str]]:
+async def _resolve_username(bot: Bot, username: str) -> Optional[Tuple[int, str]]:
     """
-    Who a moderation command targets: the author of the replied-to message, or a numeric Telegram
-    user id given as the first argument.
+    Resolves `@username` to `(user_id, display_name)` via the Telegram Bot API.
+
+    Telegram only lets a bot look up a username this way if it already knows about that user (it has
+    seen them in a chat the bot is in), so an unknown or mistyped handle simply resolves to None.
+    """
+    try:
+        chat = await bot.get_chat(f"@{username}")
+    except Exception as exc:
+        logger.info("Could not resolve @%s to a user id: %s", username, exc)
+        return None
+    if chat.type != "private":
+        return None
+    return chat.id, chat.username or username
+
+
+async def _resolve_target(
+    message: Message, command: CommandObject, bot: Bot
+) -> Tuple[Optional[int], Optional[str], List[str]]:
+    """
+    Who a moderation command targets: the author of the replied-to message, a `@username` handle, or
+    a numeric Telegram user id, given as the first argument.
 
     Returns `(user_id, display_name, rest_args)`; `rest_args` are the remaining arguments (a mute
     duration, a warn reason). `(None, None, [])` when there is no target.
@@ -55,15 +74,24 @@ def _resolve_target(message: Message, command: CommandObject) -> Tuple[Optional[
         display_name = target.username or target.first_name or f"User_{target.id}"
         return target.id, display_name, args
 
+    if args and args[0].startswith("@") and len(args[0]) > 1:
+        resolved = await _resolve_username(bot, args[0][1:])
+        if resolved is None:
+            return None, None, []
+        user_id, display_name = resolved
+        return user_id, display_name, args[1:]
+
     if args and args[0].lstrip("-").isdigit():
         return int(args[0]), f"User_{args[0]}", args[1:]
 
     return None, None, []
 
 
-async def _check_admin(message: Message, bot: Bot, lang: str) -> bool:
-    """Check the sender is a group admin (live, via Telegram); reply with a refusal if not."""
-    if not await is_group_admin(bot, message.chat.id, message.from_user.id):
+async def _check_admin(
+    message: Message, bot: Bot, lang: str, backend_client: Optional[BackendClient] = None
+) -> bool:
+    """Check the sender is a bot admin (owner, whitelisted, or a native group admin); reply if not."""
+    if not await is_bot_admin(bot, message.chat.id, message.from_user.id, backend_client=backend_client):
         await message.reply(t("moderation_not_admin", lang))
         return False
     return True
@@ -81,10 +109,10 @@ async def _moderation_target(
     if not await is_community_group_chat(message.chat.id, backend_client=backend_client):
         return None
     lang = await get_active_language(backend_client=backend_client)
-    if not await _check_admin(message, bot, lang):
+    if not await _check_admin(message, bot, lang, backend_client=backend_client):
         return None
 
-    user_id, display_name, rest = _resolve_target(message, command)
+    user_id, display_name, rest = await _resolve_target(message, command, bot)
     if user_id is None:
         await message.reply(t("moderation_no_target", lang), parse_mode="Markdown")
         return None

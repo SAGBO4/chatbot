@@ -83,9 +83,9 @@ async def test_moderation_handlers_mute_success_in_english(monkeypatch):
         return True
     monkeypatch.setattr(moderation_handlers, "is_community_group_chat", fake_is_community)
 
-    async def fake_is_admin(bot, chat_id, user_id):
+    async def fake_is_admin(bot, chat_id, user_id, backend_client=None):
         return True
-    monkeypatch.setattr(moderation_handlers, "is_group_admin", fake_is_admin)
+    monkeypatch.setattr(moderation_handlers, "is_bot_admin", fake_is_admin)
 
     reply_target = MagicMock(spec=Message)
     reply_target.from_user = MagicMock(spec=User, id=55, username="bob", first_name="Bob")
