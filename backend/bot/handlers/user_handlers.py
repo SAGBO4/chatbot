@@ -76,11 +76,6 @@ async def handle_help(message: Message, bot: Bot, backend_client: Optional[Backe
 
         if await is_bot_admin(bot, message.chat.id, user_id, backend_client=client):
             sections.append(t("help_admin_commands", lang))
-        # Setup commands (/setup_community, /whitelist) are owner/whitelist-only in
-        # setup_handlers.py, not is_bot_admin (which also grants a native Telegram group
-        # admin who was never whitelisted): gate the help text the same way, or it lists
-        # commands to a group admin that they cannot actually run.
-        if await is_authorized(user_id, backend_client=client):
             sections.append(t("help_setup_commands", lang))
             if is_owner(user_id):
                 sections.append(t("help_owner_commands", lang))

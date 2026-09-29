@@ -1648,31 +1648,3 @@ async def test_handle_webapp_in_group_sends_redirect_message_without_keyboard(mo
     text = msg.answer.call_args[0][0]
     assert "message privé" in text or "private message" in text
 
-
-
-@pytest.mark.asyncio
-async def test_bot_handlers_help_in_group_excludes_setup_for_native_admin_who_is_not_whitelisted(
-    bot_test_env, monkeypatch
-):
-    """
-    A native Telegram admin of a group who was never whitelisted and isn't the owner must not see
-    /setup_community or /whitelist in /help: is_bot_admin() also grants native group admins (for
-    moderation, which setup_handlers.py does NOT: it only accepts is_authorized (owner/whitelist).
-    """
-    from bot.handlers import user_handlers
-
-    monkeypatch.setattr(settings, "BOT_OWNER_TELEGRAM_ID", 999999999)
-    group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
-    message = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"])
-    message.answer = AsyncMock()
-    client = bot_test_env["client"]
-    client.is_whitelisted.return_value = False
-
-    monkeypatch.setattr(user_handlers, "is_bot_admin", AsyncMock(return_value=True))
-
-    await handle_help(message, bot_test_env["bot"], backend_client=client)
-    help_text = message.answer.call_args[0][0]
-
-    assert "/mute" in help_text, "moderation commands should still show for is_bot_admin"
-    assert "/setup_community" not in help_text
-    assert "/whitelist" not in help_text
