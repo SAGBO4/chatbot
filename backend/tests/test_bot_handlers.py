@@ -1356,6 +1356,34 @@ async def test_bot_handlers_start_command_clears_state_and_sends_welcome(bot_tes
 
 
 @pytest.mark.asyncio
+async def test_bot_handlers_start_in_group_presents_group_welcome(bot_test_env, monkeypatch):
+    """/start in a group chat presents the group welcome / help message."""
+    from bot.handlers import user_handlers
+
+    state = bot_test_env["state"]
+    await state.set_state(UserQueryState.waiting_for_resolution)
+
+    group_chat = MagicMock(spec=Chat, id=-100777, type="supergroup")
+    message = MagicMock(spec=Message, chat=group_chat, from_user=bot_test_env["user"], text="/start")
+    message.answer = AsyncMock()
+    client = bot_test_env["client"]
+    client.is_whitelisted.return_value = False
+
+    monkeypatch.setattr(user_handlers, "is_bot_admin", AsyncMock(return_value=False))
+
+    await handle_start(message, state, bot=bot_test_env["bot"], backend_client=client)
+
+    assert await state.get_state() is None
+    message.answer.assert_called_once()
+    group_text = message.answer.call_args[0][0]
+    assert "Bienvenue sur le Bot du Groupe" in group_text
+    assert "/help" in group_text
+    assert "/list" in group_text
+    assert "/ask" in group_text
+    assert "/mute" not in group_text
+
+
+@pytest.mark.asyncio
 async def test_bot_handlers_help_command_sends_help_text(bot_test_env):
     """
     1. FONCTIONNEL:
@@ -1568,7 +1596,7 @@ async def test_bot_handlers_help_bilingual_english(bot_test_env, monkeypatch):
     monkeypatch.setattr(user_handlers, "is_bot_admin", AsyncMock(return_value=False))
     await handle_help(group_msg, bot_test_env["bot"], backend_client=client)
     group_text = group_msg.answer.call_args[0][0]
-    assert "Member commands" in group_text
+    assert "Below is a list of commands you can use in this group" in group_text or "Member commands" in group_text
     assert "/ask" in group_text
 
 

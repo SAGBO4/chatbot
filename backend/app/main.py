@@ -32,14 +32,20 @@ async def lifespan(app: FastAPI):
     """
     setup_observability("Backend API")
     await init_db()
-    if settings.community_group_is_configured():
-        async with async_session_maker() as seed_session:
+    async with async_session_maker() as seed_session:
+        if settings.community_group_is_configured():
             try:
                 await BotSettingsService.seed_legacy_community_group(
                     seed_session, int(settings.TELEGRAM_COMMUNITY_GROUP_ID)
                 )
             except Exception as exc:
                 logger.warning("Failed to seed legacy community group setting: %s", exc)
+        try:
+            await BotSettingsService.seed_default_language(
+                seed_session, getattr(settings, "DEFAULT_BOT_LANGUAGE", "en")
+            )
+        except Exception as exc:
+            logger.warning("Failed to seed default bot language: %s", exc)
     client = httpx.AsyncClient(timeout=15.0)
     app.state.http_client = client
     TelegramRelay.set_shared_client(client)
