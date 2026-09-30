@@ -61,7 +61,22 @@ def test_community_feature_defaults():
     s = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t")
     assert s.COMMUNITY_RESOLUTION_TIMEOUT_SECONDS == 600
     assert s.CRYPTO_PROVIDER_TIMEOUT_SECONDS == 10.0
-    assert s.CRYPTO_CACHE_TTL_SECONDS == 45
+    assert s.CRYPTO_CACHE_TTL_SECONDS == 120
+    assert s.COINGECKO_API_KEY is None
+
+
+def test_coingecko_api_key_sanitization():
+    # Empty string is normalized to None
+    s_empty = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", COINGECKO_API_KEY="")
+    assert s_empty.COINGECKO_API_KEY is None
+
+    # Whitespace-only string is normalized to None
+    s_spaces = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", COINGECKO_API_KEY="   ")
+    assert s_spaces.COINGECKO_API_KEY is None
+
+    # Padded key is stripped
+    s_padded = Settings(_env_file=None, TELEGRAM_BOT_TOKEN="t", COINGECKO_API_KEY="  CG-demo-123  ")
+    assert s_padded.COINGECKO_API_KEY == "CG-demo-123"
 
 
 def test_is_bot_owner_unset_grants_no_one():

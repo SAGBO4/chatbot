@@ -3,8 +3,9 @@ import logging
 from typing import Dict, Optional
 import httpx
 from app.config import settings
+from app.observability import get_logger
 
-logger = logging.getLogger(__name__)
+logger = get_logger(__name__)
 
 COINGECKO_SIMPLE_PRICE_URL = "https://api.coingecko.com/api/v3/simple/price"
 
@@ -132,6 +133,8 @@ FALLBACK_MARKET_DATA: Dict[str, Dict[str, float]] = {
     "dogecoin": {"price_usd": 0.125, "change_24h_pct": -0.45, "market_cap_usd": 18000000000.0, "volume_24h_usd": 850000000.0},
     "ripple": {"price_usd": 0.585, "change_24h_pct": 1.75, "market_cap_usd": 33000000000.0, "volume_24h_usd": 1100000000.0},
     "monero": {"price_usd": 162.40, "change_24h_pct": 3.20, "market_cap_usd": 2980000000.0, "volume_24h_usd": 65000000.0},
+    "epic-cash": {"price_usd": 0.42, "change_24h_pct": -7.50, "market_cap_usd": 8180000.0, "volume_24h_usd": 73000.0},
+    "stellar": {"price_usd": 0.22, "change_24h_pct": -1.40, "market_cap_usd": 7770000000.0, "volume_24h_usd": 450000000.0},
 }
 
 
@@ -172,6 +175,19 @@ class CryptoService:
             if (time.time() - fetched_at) < settings.CRYPTO_CACHE_TTL_SECONDS:
                 return data
 
+        headers = {}
+        if settings.COINGECKO_API_KEY and settings.COINGECKO_API_KEY.strip():
+            headers["x-cg-demo-api-key"] = settings.COINGECKO_API_KEY.strip()
+
+        def _get_stale_or_fallback() -> Optional[Dict[str, float]]:
+            if client is None:
+                if asset_id in cls._cache:
+                    logger.info("Serving stale cached data for asset %s", asset_id)
+                    return cls._cache[asset_id][0]
+                if asset_id in FALLBACK_MARKET_DATA:
+                    return FALLBACK_MARKET_DATA[asset_id]
+            return None
+
         effective_client = client or cls._shared_client
         owns_client = effective_client is None
         session = effective_client or httpx.AsyncClient(timeout=settings.CRYPTO_PROVIDER_TIMEOUT_SECONDS)
@@ -185,22 +201,19 @@ class CryptoService:
                     "include_24hr_vol": "true",
                     "include_24hr_change": "true",
                 },
+                headers=headers,
                 timeout=settings.CRYPTO_PROVIDER_TIMEOUT_SECONDS,
             )
         except (httpx.TimeoutException, httpx.HTTPError) as exc:
             logger.warning("CoinGecko request failed for asset %s: %s", asset_id, exc)
-            if client is None and asset_id in FALLBACK_MARKET_DATA:
-                return FALLBACK_MARKET_DATA[asset_id]
-            return None
+            return _get_stale_or_fallback()
         finally:
             if owns_client:
                 await session.aclose()
 
         if response.status_code != 200:
-            logger.warning("CoinGecko error %s for asset %s: %s", response.status_code, asset_id, response.text)
-            if client is None and asset_id in FALLBACK_MARKET_DATA:
-                return FALLBACK_MARKET_DATA[asset_id]
-            return None
+            logger.warning("CoinGecko error %s for asset %s: %s", response.status_code, asset_id, response.text[:200])
+            return _get_stale_or_fallback()
 
         try:
             payload = response.json()
@@ -213,9 +226,7 @@ class CryptoService:
             }
         except (KeyError, ValueError, TypeError) as exc:
             logger.warning("Malformed CoinGecko response for asset %s: %s", asset_id, exc)
-            if client is None and asset_id in FALLBACK_MARKET_DATA:
-                return FALLBACK_MARKET_DATA[asset_id]
-            return None
+            return _get_stale_or_fallback()
 
         cls._cache[asset_id] = (result, time.time())
         return result

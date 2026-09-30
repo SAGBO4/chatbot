@@ -209,12 +209,12 @@ export default function CryptoPage() {
             <select
               value={sortBy}
               onChange={(e) => setSortBy(e.target.value as typeof sortBy)}
-              className="rounded-lg bg-white/[0.05] border border-white/[0.1] px-2.5 py-1 text-xs text-white focus:outline-none focus:border-white/30 cursor-pointer"
+              className="rounded-lg bg-white border border-white px-2.5 py-1 text-xs font-semibold text-zinc-950 focus:outline-none focus:ring-2 focus:ring-white/20 cursor-pointer shadow-sm"
             >
-              <option value="market_cap" className="bg-[#0c0c0f] text-white">{t.cryptoSortMarketCap}</option>
-              <option value="price" className="bg-[#0c0c0f] text-white">{t.cryptoSortPrice}</option>
-              <option value="change" className="bg-[#0c0c0f] text-white">{t.cryptoSortChange}</option>
-              <option value="name" className="bg-[#0c0c0f] text-white">{t.cryptoSortName}</option>
+              <option value="market_cap" className="bg-white text-zinc-950">{t.cryptoSortMarketCap}</option>
+              <option value="price" className="bg-white text-zinc-950">{t.cryptoSortPrice}</option>
+              <option value="change" className="bg-white text-zinc-950">{t.cryptoSortChange}</option>
+              <option value="name" className="bg-white text-zinc-950">{t.cryptoSortName}</option>
             </select>
           </div>
 
