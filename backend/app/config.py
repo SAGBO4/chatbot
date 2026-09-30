@@ -39,7 +39,17 @@ class Settings(BaseSettings):
 
     # Crypto market data (CoinGecko)
     CRYPTO_PROVIDER_TIMEOUT_SECONDS: float = 10.0
-    CRYPTO_CACHE_TTL_SECONDS: int = 45
+    CRYPTO_CACHE_TTL_SECONDS: int = 120
+    COINGECKO_API_KEY: Optional[str] = None
+
+    @field_validator("COINGECKO_API_KEY", mode="before")
+    @classmethod
+    def _clean_coingecko_api_key(cls, value):
+        """A blank `COINGECKO_API_KEY=` means unset (None); strips whitespace."""
+        if isinstance(value, str):
+            v = value.strip()
+            return v if v else None
+        return value
 
     # Backend
     BACKEND_HOST: str = "0.0.0.0"  # nosec: B104

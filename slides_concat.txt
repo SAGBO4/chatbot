@@ -1,0 +1,11 @@
+file 'slides_yt/scene1.png'
+duration 16.8
+file 'slides_yt/scene2.png'
+duration 15.7
+file 'slides_yt/scene3.png'
+duration 14.5
+file 'slides_yt/scene4.png'
+duration 15.5
+file 'slides_yt/scene5.png'
+duration 18.0
+file 'slides_yt/scene5.png'

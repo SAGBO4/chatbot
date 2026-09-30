@@ -53,6 +53,8 @@ async def create_ticket(
         user_handle=payload.user_handle,
         question=payload.question,
         automated_answer=payload.automated_answer,
+        source_chat_id=payload.source_chat_id,
+        source_message_id=payload.source_message_id,
     )
 
     if settings.is_email_configured():

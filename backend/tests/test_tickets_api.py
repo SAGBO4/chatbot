@@ -651,3 +651,31 @@ async def test_ticket_creation_and_resolution_bypasses_email_tasks_when_disabled
         mock_send_created.assert_not_called()
         mock_send_resolved.assert_not_called()
 
+
+@pytest.mark.asyncio
+async def test_ticket_creation_persists_and_returns_source_chat_and_message_id(app_test_env):
+    """Creating a ticket with source_chat_id and source_message_id persists and returns them."""
+    client, _, _ = app_test_env
+    resp = await client.post(
+        "/api/tickets",
+        json={
+            "user_id": 888,
+            "user_handle": "alice_test",
+            "question": "Group question",
+            "source_chat_id": -100123456,
+            "source_message_id": 4321,
+        },
+    )
+    assert resp.status_code == 201
+    data = resp.json()
+    assert data["source_chat_id"] == -100123456
+    assert data["source_message_id"] == 4321
+
+    # Fetching ticket returns source fields
+    get_resp = await client.get(f"/api/tickets/{data['id']}")
+    assert get_resp.status_code == 200
+    get_data = get_resp.json()
+    assert get_data["source_chat_id"] == -100123456
+    assert get_data["source_message_id"] == 4321
+
+

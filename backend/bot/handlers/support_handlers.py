@@ -196,7 +196,7 @@ async def handle_support_agent_reply(
 
         user_id = target_user_id or resolved_ticket.get("user_id")
 
-        # Forward the solution to the user
+        # 1. Forward the solution to the user (Private DM / Inbox)
         if user_id:
             capped_solution = truncate_telegram_text(solution_text, max_length=FORWARDED_SOLUTION_MAX_LENGTH, lang=lang)
             safe_solution = escape_telegram_markdown(capped_solution)
@@ -208,6 +208,102 @@ async def handle_support_agent_reply(
                 bot.send_message, chat_id=user_id, text=user_notification,
                 what=f"Notification to user {user_id}", swallow_failure=True, failure_level=logging.ERROR,
             )
+
+        # 2. If the ticket originated in a community group, also reply in the group.
+        # Strict privacy enforcement:
+        # A community group must have a negative chat_id (< 0 in Telegram).
+        # If source_chat_id is absent, matches user_id, is positive (private chat),
+        # or matches the support/admin group itself, nothing is ever broadcast to a group.
+        source_chat_id = resolved_ticket.get("source_chat_id")
+        source_message_id = resolved_ticket.get("source_message_id")
+        is_community_group = False
+        source_chat_id_int: Optional[int] = None
+        if source_chat_id is not None:
+            try:
+                source_chat_id_int = int(source_chat_id)
+                uid_int = int(user_id or 0)
+                if (
+                    source_chat_id_int < 0
+                    and source_chat_id_int != uid_int
+                    and not _is_support_group_chat(source_chat_id_int)
+                ):
+                    is_community_group = True
+            except (ValueError, TypeError):
+                is_community_group = False
+
+        if is_community_group and source_chat_id_int is not None:
+            capped_solution = truncate_telegram_text(solution_text, max_length=FORWARDED_SOLUTION_MAX_LENGTH, lang=lang)
+            safe_solution = escape_telegram_markdown(capped_solution)
+            safe_agent = escape_telegram_markdown(agent_name)
+            raw_handle = resolved_ticket.get("user_handle") or f"User_{user_id}"
+            if raw_handle.startswith("@"):
+                mention_str = raw_handle
+            elif raw_handle.replace("_", "").isalnum() and not raw_handle.startswith("User_"):
+                mention_str = f"@{raw_handle}"
+            else:
+                mention_str = raw_handle
+            safe_mention = escape_telegram_markdown(mention_str)
+
+            group_notification = t(
+                "support_community_group_notification",
+                lang,
+                ticket_id=ticket_id,
+                mention=safe_mention,
+                solution=safe_solution,
+                agent=safe_agent,
+            )
+            plain_group_notification = t(
+                "support_community_group_notification_plain",
+                lang,
+                ticket_id=ticket_id,
+                mention=mention_str,
+                solution=capped_solution,
+                agent=agent_name,
+            )
+
+            source_msg_id_int: Optional[int] = None
+            if source_message_id is not None:
+                try:
+                    source_msg_id_int = int(source_message_id)
+                except (ValueError, TypeError):
+                    source_msg_id_int = None
+
+            if source_msg_id_int:
+                try:
+                    await call_with_markdown_fallback(
+                        bot.send_message,
+                        chat_id=source_chat_id_int,
+                        text=group_notification,
+                        plain_overrides={"text": plain_group_notification},
+                        reply_to_message_id=source_msg_id_int,
+                        allow_sending_without_reply=True,
+                        what=f"Notification to community group {source_chat_id_int}",
+                        swallow_failure=False,
+                    )
+                except Exception as send_err:
+                    logger.warning(
+                        "Replying to source message %s failed, sending unattached to group %s: %s",
+                        source_msg_id_int, source_chat_id_int, send_err,
+                    )
+                    await call_with_markdown_fallback(
+                        bot.send_message,
+                        chat_id=source_chat_id_int,
+                        text=group_notification,
+                        plain_overrides={"text": plain_group_notification},
+                        what=f"Unattached notification to community group {source_chat_id_int}",
+                        swallow_failure=True,
+                        failure_level=logging.WARNING,
+                    )
+            else:
+                await call_with_markdown_fallback(
+                    bot.send_message,
+                    chat_id=source_chat_id_int,
+                    text=group_notification,
+                    plain_overrides={"text": plain_group_notification},
+                    what=f"Unattached notification to community group {source_chat_id_int}",
+                    swallow_failure=True,
+                    failure_level=logging.WARNING,
+                )
 
         # Confirm in the support group
         await message.reply(

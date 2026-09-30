@@ -60,13 +60,19 @@ class BackendClient:
         return response
 
     async def query(
-        self, query: str, user_id: int, user_handle: Optional[str] = None
+        self,
+        query: str,
+        user_id: Optional[int] = None,
+        user_handle: Optional[str] = None,
+        language: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Ask the knowledge base (`POST /api/query`)."""
-        response = await self._request(
-            "post", "/api/query", json={"query": query, "user_id": user_id, "user_handle": user_handle}
-        )
+        payload: Dict[str, Any] = {"query": query, "user_id": user_id, "user_handle": user_handle}
+        if language is not None:
+            payload["language"] = language
+        response = await self._request("post", "/api/query", json=payload)
         return response.json()
+
 
     async def create_ticket(
         self,
@@ -74,17 +80,24 @@ class BackendClient:
         user_handle: Optional[str],
         question: str,
         automated_answer: Optional[str] = None,
+        source_chat_id: Optional[int] = None,
+        source_message_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Open a support ticket (`POST /api/tickets`)."""
+        payload: Dict[str, Any] = {
+            "user_id": user_id,
+            "user_handle": user_handle,
+            "question": question,
+            "automated_answer": automated_answer,
+        }
+        if source_chat_id is not None:
+            payload["source_chat_id"] = source_chat_id
+        if source_message_id is not None:
+            payload["source_message_id"] = source_message_id
         response = await self._request(
             "post",
             "/api/tickets",
-            json={
-                "user_id": user_id,
-                "user_handle": user_handle,
-                "question": question,
-                "automated_answer": automated_answer,
-            },
+            json=payload,
         )
         return response.json()
 

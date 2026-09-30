@@ -22,6 +22,11 @@ class QueryRequest(BaseModel):
     )
     user_id: Optional[int] = Field(default=None, description="Telegram id of the user asking.", examples=[123456789])
     user_handle: Optional[str] = Field(default=None, description="Telegram @username of the user, if any.", examples=["alice"])
+    language: Optional[str] = Field(
+        default=None,
+        description="Preferred language for the response ('fr' or 'en'). Defaults to the configured bot language.",
+        examples=["fr", "en"],
+    )
 
 
 class QueryResponse(BaseModel):
@@ -47,6 +52,12 @@ class TicketCreateRequest(BaseModel):
     automated_answer: Optional[str] = Field(
         default=None, max_length=MAX_SOLUTION_LENGTH,
         description="The answer the bot gave, so the agent sees what already failed.",
+    )
+    source_chat_id: Optional[int] = Field(
+        default=None, description="Telegram chat id where the ticket originated (group id if opened in a group)."
+    )
+    source_message_id: Optional[int] = Field(
+        default=None, description="Telegram message id of the question in the source chat."
     )
 
 
@@ -76,6 +87,8 @@ class TicketResponse(BaseModel):
     created_at: datetime = Field(description="When the ticket was opened (UTC).")
     resolved_at: Optional[datetime] = Field(default=None, description="When the ticket was resolved (UTC).")
     support_group_message_id: Optional[int] = Field(default=None, description="Telegram message id of the ticket card in the support group.")
+    source_chat_id: Optional[int] = Field(default=None, description="Telegram chat id where the ticket originated.")
+    source_message_id: Optional[int] = Field(default=None, description="Telegram message id of the question in the source chat.")
     is_newly_resolved: Optional[bool] = Field(
         default=None,
         description="Only set by the resolve endpoint: false when another agent had already resolved the ticket.",

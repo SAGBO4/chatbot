@@ -14,18 +14,26 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
-_QUERY_SECRET_RE = re.compile(r"([?&](?:token|secret|api_key|password)=)[^&]+", re.IGNORECASE)
+_QUERY_SECRET_RE = re.compile(r"([?&](?:token|secret|api_key|password|x_cg_demo_api_key|x_cg_pro_api_key)=)[^&]+", re.IGNORECASE)
 _BOT_TOKEN_RE = re.compile(r"(/bot)\d+:[A-Za-z0-9_-]+")
+_COINGECKO_KEY_RE = re.compile(r"CG-[A-Za-z0-9_-]{10,}")
+_HEADER_SECRET_RE = re.compile(r"((?:x-cg-(?:demo|pro)-api-key|x-api-key)[\'\"]?\s*[:=]\s*[\'\"]?)[^\s\'\",]+", re.IGNORECASE)
 
 
 def sanitize_url_query(url: str) -> str:
-    """Redact the values of sensitive query parameters (token, secret, api_key, password) in a URL."""
+    """Redact the values of sensitive query parameters (token, secret, api_key, password, CoinGecko keys) in a URL."""
     return _QUERY_SECRET_RE.sub(r"\1[REDACTED]", url)
 
 
 def redact_secrets(text: str) -> str:
-    """Redact sensitive query parameters and Telegram bot tokens in a string."""
-    return _BOT_TOKEN_RE.sub(r"\1[REDACTED]", sanitize_url_query(text))
+    """Redact sensitive query parameters, Telegram bot tokens, CoinGecko keys and headers in a string."""
+    text = _QUERY_SECRET_RE.sub(r"\1[REDACTED]", text)
+    text = _BOT_TOKEN_RE.sub(r"\1[REDACTED]", text)
+    text = _COINGECKO_KEY_RE.sub("CG-[REDACTED]", text)
+    text = _HEADER_SECRET_RE.sub(r"\1[REDACTED]", text)
+    if getattr(settings, "COINGECKO_API_KEY", None) and len(settings.COINGECKO_API_KEY) >= 8:
+        text = text.replace(settings.COINGECKO_API_KEY, "[REDACTED]")
+    return text
 
 
 class SensitiveDataFilter(logging.Filter):

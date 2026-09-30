@@ -1,15 +1,16 @@
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
-from app.i18n import t
+from app.i18n import SUPPORTED_LANGUAGES, t
 from app.schemas import QueryResponse
 from app.services.ai_assistant import AIAssistantService
 from app.services.bot_settings_service import BotSettingsService
 from app.services.knowledge_base import KnowledgeBaseService
+from app.services.specialized_agents import AgentCoordinator
 
 
 class QueryOrchestrator:
-    """Answers a user question from the knowledge base, optionally rephrased by the AI."""
+    """Answers a user question from the knowledge base using language-specialized support agents."""
 
     @staticmethod
     async def process_query(
@@ -17,21 +18,28 @@ class QueryOrchestrator:
         query: str,
         user_id: Optional[int] = None,
         user_handle: Optional[str] = None,
+        language: Optional[str] = None,
     ) -> QueryResponse:
         """
-        Search the knowledge base and answer with the best article. When AI is enabled, the LLM
-        rephrases that article using the top matches; if it fails, the article text is used as is.
+        Search the knowledge base and answer using the specialized agent corresponding
+        to the configured language (or explicit language parameter).
 
-        Nothing above the confidence threshold gives `found=False` and a fallback message offering
-        to escalate; both fallback messages are in the bot language (the persisted `language` setting). `user_id` and `user_handle` are accepted but not used.
+        Ensures that responses are strictly monolingual in French or English, preventing
+        duplicate bilingual responses.
         """
-        clean_query = query.strip()
+        clean_query = (query or "").strip()
+        configured_language = await BotSettingsService.get_language(session)
+        clean_language = language.strip().lower() if isinstance(language, str) else None
+        target_language = clean_language if clean_language in SUPPORTED_LANGUAGES else configured_language
+        if target_language not in SUPPORTED_LANGUAGES:
+            target_language = "fr"
+
         if not clean_query:
             return QueryResponse(
-                query=query,
+                query=clean_query,
                 found=False,
                 confidence=0.0,
-                answer=t("query_empty", await BotSettingsService.get_language(session)),
+                answer=t("query_empty", target_language),
                 article_id=None,
                 requires_resolution_confirmation=False,
             )
@@ -49,25 +57,25 @@ class QueryOrchestrator:
                 query=clean_query,
                 found=False,
                 confidence=0.0,
-                answer=t("query_no_match", await BotSettingsService.get_language(session)),
+                answer=t("query_no_match", target_language),
                 article_id=None,
                 requires_resolution_confirmation=True,
             )
 
         best_article, confidence = matches[0]
 
-        # 2. Check if AI synthesis is enabled
-        answer = best_article.solution
-        if settings.AI_ENABLED:
-            ai_answer = await AIAssistantService.generate_answer(clean_query, matches)
-            if ai_answer:
-                answer = ai_answer
+        # 2. Delegate to the specialized agent for target_language
+        agent = AgentCoordinator.get_agent(target_language)
+        answer = await agent.answer_query(clean_query, matches)
+        if not answer or not answer.strip():
+            answer = t("query_no_match", target_language)
 
         return QueryResponse(
             query=clean_query,
             found=True,
             confidence=confidence,
             answer=answer,
-            article_id=best_article.id,
+            article_id=best_article.id if best_article else None,
             requires_resolution_confirmation=True,
         )
+

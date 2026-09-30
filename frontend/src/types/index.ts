@@ -2,7 +2,9 @@ export interface QueryRequest {
   query: string;
   user_id?: number | null;
   user_handle?: string | null;
+  language?: string | null;
 }
+
 
 export interface QueryResponse {
   query: string;
