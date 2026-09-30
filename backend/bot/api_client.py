@@ -60,13 +60,19 @@ class BackendClient:
         return response
 
     async def query(
-        self, query: str, user_id: int, user_handle: Optional[str] = None
+        self,
+        query: str,
+        user_id: int,
+        user_handle: Optional[str] = None,
+        language: Optional[str] = None,
     ) -> Dict[str, Any]:
         """Ask the knowledge base (`POST /api/query`)."""
-        response = await self._request(
-            "post", "/api/query", json={"query": query, "user_id": user_id, "user_handle": user_handle}
-        )
+        payload: Dict[str, Any] = {"query": query, "user_id": user_id, "user_handle": user_handle}
+        if language is not None:
+            payload["language"] = language
+        response = await self._request("post", "/api/query", json=payload)
         return response.json()
+
 
     async def create_ticket(
         self,
