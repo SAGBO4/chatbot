@@ -18,6 +18,9 @@ class Settings(BaseSettings):
     TELEGRAM_SUPPORT_GROUP_ID: Union[int, str] = 0
     TELEGRAM_WEBAPP_URL: Optional[str] = None
 
+    # Language configuration (default language for new instances: 'en' or 'fr')
+    DEFAULT_BOT_LANGUAGE: str = "en"
+
     # Legacy: only seeds the persisted `community_group_id` setting on first startup
     # (app/services/bot_settings_service.py); afterwards /setup_community is the only way to change it.
     TELEGRAM_COMMUNITY_GROUP_ID: Union[int, str] = 0

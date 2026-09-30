@@ -79,6 +79,22 @@ class BotSettingsService:
         )
         return True
 
+    @classmethod
+    async def seed_default_language(
+        cls, session: AsyncSession, default_lang: str = "en"
+    ) -> bool:
+        """
+        One-time seed of the persisted language setting when none exists yet.
+        Only seeds when no persisted value exists; never overwrites an existing one.
+        Returns True if seeding happened.
+        """
+        existing = await cls.get_value(session, LANGUAGE_KEY)
+        if existing is not None:
+            return False
+        await cls.set_language(session, default_lang, updated_by="default_lang_seed")
+        logger.info("Seeded persisted bot language=%s", default_lang)
+        return True
+
 
 class WhitelistService:
     """Users allowed to run admin commands, on top of the bot owner who always is."""

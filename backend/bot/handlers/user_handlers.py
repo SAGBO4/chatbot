@@ -28,9 +28,22 @@ class UserQueryState(StatesGroup):
 
 
 @user_router.message(CommandStart())
-async def handle_start(message: Message, state: FSMContext, backend_client: Optional[BackendClient] = None):
-    """/start: welcome message, with the WebApp button when TELEGRAM_WEBAPP_URL is set."""
+async def handle_start(
+    message: Message,
+    state: FSMContext,
+    bot: Optional[Bot] = None,
+    backend_client: Optional[BackendClient] = None,
+):
+    """/start: welcome message, with the WebApp button when TELEGRAM_WEBAPP_URL is set in DM,
+    or group bot welcome / help in group chats."""
     await state.clear()
+    chat = getattr(message, "chat", None)
+    is_group = bool(chat and getattr(chat, "type", None) in ("group", "supergroup"))
+    if is_group:
+        actual_bot = bot or getattr(message, "bot", None)
+        await handle_help(message, bot=actual_bot, backend_client=backend_client)
+        return
+
     lang = await get_active_language(backend_client=backend_client)
     url = settings.TELEGRAM_WEBAPP_URL
     keyboard = get_webapp_keyboard(url, lang=lang) if url else None
@@ -59,31 +72,35 @@ async def handle_webapp(message: Message, backend_client: Optional[BackendClient
 
 
 @user_router.message(Command("help", "list"))
-async def handle_help(message: Message, bot: Bot, backend_client: Optional[BackendClient] = None):
+async def handle_help(
+    message: Message,
+    bot: Optional[Bot] = None,
+    backend_client: Optional[BackendClient] = None,
+):
     """/help, /list: how to use the bot, plus every command the sender may run given their role and chat."""
     client = backend_client or BackendClient()
     lang = await get_active_language(backend_client=client)
     user_id = message.from_user.id
-    is_group_chat = message.chat.type in ("group", "supergroup")
+    chat = getattr(message, "chat", None)
+    is_group_chat = bool(chat and getattr(chat, "type", None) in ("group", "supergroup"))
 
     url = settings.TELEGRAM_WEBAPP_URL
     sections = []
 
     if is_group_chat:
-        sections.append(t("help_group_intro", lang))
-        sections.append(t("help_group_member_commands", lang))
-        sections.append(t("help_crypto_commands", lang))
+        sections.append(t("group_welcome", lang))
 
-        if await is_bot_admin(bot, message.chat.id, user_id, backend_client=client):
+        actual_bot = bot or getattr(message, "bot", None)
+        if await is_bot_admin(actual_bot, message.chat.id, user_id, backend_client=client):
             sections.append(t("help_admin_commands", lang))
         # Setup commands (/setup_community, /whitelist) are owner/whitelist-only in
         # setup_handlers.py, not is_bot_admin (which also grants a native Telegram group
         # admin who was never whitelisted): gate the help text the same way, or it lists
         # commands to a group admin that they cannot actually run.
         if await is_authorized(user_id, backend_client=client):
-            sections.append(t("help_setup_commands", lang))
+            sections.append(t("help_group_setup_commands", lang))
             if is_owner(user_id):
-                sections.append(t("help_owner_commands", lang))
+                sections.append(t("help_group_owner_commands", lang))
     else:
         sections.append(t("help_intro", lang))
         sections.append(t("help_general_commands", lang))

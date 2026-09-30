@@ -54,6 +54,78 @@ TRANSLATIONS = {
             "`/list` — show the list of commands"
         ),
     },
+    "group_welcome": {
+        "fr": (
+            "🤖 **Bienvenue sur le Bot du Groupe !**\n\n"
+            "Mon rôle est simple :\n\n"
+            "▲ Vous aider à obtenir les informations dont vous avez besoin\n"
+            "▲ Répondre directement à vos questions dans le groupe\n"
+            "▲ Fournir les cours des cryptomonnaies en direct (BTC, ETH, XMR, TRX...)\n"
+            "▲ Aider les administrateurs à maintenir un espace d'échange sûr et organisé\n\n"
+            "Voici la liste des commandes que vous pouvez utiliser dans ce groupe :\n\n"
+            "• `/help` — Afficher ce menu d'aide\n\n"
+            "• `/list` — Afficher la liste complète des commandes\n\n"
+            "• `/ask <question>` — Poser une question directement dans le groupe\n\n"
+            "• `/<symbole>` — Consulter le cours en direct d'une cryptomonnaie\n"
+            "Exemple : `/btc` · `/eth` · `/xmr` · `/trx`\n\n"
+            "• `/language fr|en` — Changer la langue du bot (Français / Anglais)\n\n\n"
+            "Besoin d'aide ?\n\n"
+            "Utilisez simplement `/help` à tout moment pour voir les commandes disponibles."
+        ),
+        "en": (
+            "🤖 **Welcome to the Group Bot!**\n\n"
+            "My job is simple:\n\n"
+            "▲ Help you get the information you need\n"
+            "▲ Answer your questions directly in the group\n"
+            "▲ Provide live cryptocurrency prices (BTC, ETH, XMR, TRX...)\n"
+            "▲ Help admins keep the community safe and organized\n\n"
+            "Below is a list of commands you can use in this group:\n\n"
+            "• `/help` — Show this help menu\n\n"
+            "• `/list` — Show the complete list of commands\n\n"
+            "• `/ask <question>` — Ask me a question directly in the group\n\n"
+            "• `/<symbol>` — Check the live price of a cryptocurrency\n"
+            "Example: `/btc` · `/eth` · `/xmr` · `/trx`\n\n"
+            "• `/language fr|en` — Change the bot's language\n\n\n"
+            "Need help?\n\n"
+            "Simply use `/help` anytime to see the available commands."
+        ),
+    },
+    "help_group_welcome": {
+        "fr": (
+            "🤖 **Bienvenue sur le Bot du Groupe !**\n\n"
+            "Mon rôle est simple :\n\n"
+            "▲ Vous aider à obtenir les informations dont vous avez besoin\n"
+            "▲ Répondre directement à vos questions dans le groupe\n"
+            "▲ Fournir les cours des cryptomonnaies en direct (BTC, ETH, XMR, TRX...)\n"
+            "▲ Aider les administrateurs à maintenir un espace d'échange sûr et organisé\n\n"
+            "Voici la liste des commandes que vous pouvez utiliser dans ce groupe :\n\n"
+            "• `/help` — Afficher ce menu d'aide\n\n"
+            "• `/list` — Afficher la liste complète des commandes\n\n"
+            "• `/ask <question>` — Poser une question directement dans le groupe\n\n"
+            "• `/<symbole>` — Consulter le cours en direct d'une cryptomonnaie\n"
+            "Exemple : `/btc` · `/eth` · `/xmr` · `/trx`\n\n"
+            "• `/language fr|en` — Changer la langue du bot (Français / Anglais)\n\n\n"
+            "Besoin d'aide ?\n\n"
+            "Utilisez simplement `/help` à tout moment pour voir les commandes disponibles."
+        ),
+        "en": (
+            "🤖 **Welcome to the Group Bot!**\n\n"
+            "My job is simple:\n\n"
+            "▲ Help you get the information you need\n"
+            "▲ Answer your questions directly in the group\n"
+            "▲ Provide live cryptocurrency prices (BTC, ETH, XMR, TRX...)\n"
+            "▲ Help admins keep the community safe and organized\n\n"
+            "Below is a list of commands you can use in this group:\n\n"
+            "• `/help` — Show this help menu\n\n"
+            "• `/list` — Show the complete list of commands\n\n"
+            "• `/ask <question>` — Ask me a question directly in the group\n\n"
+            "• `/<symbol>` — Check the live price of a cryptocurrency\n"
+            "Example: `/btc` · `/eth` · `/xmr` · `/trx`\n\n"
+            "• `/language fr|en` — Change the bot's language\n\n\n"
+            "Need help?\n\n"
+            "Simply use `/help` anytime to see the available commands."
+        ),
+    },
     "help_group_intro": {
         "fr": "ℹ️ **Aide du groupe**\n\nVoici les commandes autorisées :",
         "en": "ℹ️ **Group Help**\n\nHere are the authorized commands:",
@@ -86,23 +158,43 @@ TRANSLATIONS = {
     },
     "help_admin_commands": {
         "fr": (
-            "\n\n**Commandes de modération** (admin uniquement, cible : réponse, `@username` ou ID)\n"
-            "`/mute [durée en secondes]` — rendre un membre muet\n"
-            "`/unmute` — lever le mute d'un membre\n"
-            "`/ban` — bannir un membre\n"
-            "`/kick` — expulser un membre\n"
-            "`/warn <raison>` — avertir un membre\n"
-            "`/purge [nombre]` — supprimer les dernières réponses du bot"
+            "\n\n\n🛡️ **COMMANDES DE MODÉRATION**\n\n"
+            "Disponible pour les administrateurs du groupe uniquement.\n\n"
+            "Les commandes peuvent cibler un membre en répondant à son message, en mentionnant `@username` ou par son ID.\n\n"
+            "• `/mute [durée]` — Rendre un membre muet temporairement (durée en secondes, ex : `/mute 300`)\n\n"
+            "• `/unmute` — Rétablir la parole d'un membre\n\n"
+            "• `/ban` — Bannir définitivement un membre du groupe\n\n"
+            "• `/kick` — Expulser un membre du groupe (réintégration possible)\n\n"
+            "• `/warn <raison>` — Avertir un membre avec motif officiel\n\n"
+            "• `/purge [nombre]` — Supprimer les dernières réponses du bot pour garder le chat lisible"
         ),
         "en": (
-            "\n\n**Moderation commands** (admin only, target: a reply, `@username`, or an id)\n"
-            "`/mute [duration in seconds]` — mute a member\n"
-            "`/unmute` — unmute a member\n"
-            "`/ban` — ban a member\n"
-            "`/kick` — kick a member\n"
-            "`/warn <reason>` — warn a member\n"
-            "`/purge [count]` — delete the bot's latest answers"
+            "\n\n\n🛡️ **MODERATION COMMANDS**\n\n"
+            "Available to group administrators only.\n\n"
+            "Commands can target a member by replying to their message, using `@username`, or using their ID.\n\n"
+            "• `/mute [duration]` — Temporarily mute a member (duration in seconds, e.g. `/mute 300`)\n\n"
+            "• `/unmute` — Unmute a member\n\n"
+            "• `/ban` — Permanently ban a member from the group\n\n"
+            "• `/kick` — Remove a member from the group\n\n"
+            "• `/warn <reason>` — Issue an official warning to a member\n\n"
+            "• `/purge [count]` — Delete the bot's latest answers to keep chat clean"
         ),
+    },
+    "help_group_setup_commands": {
+        "fr": (
+            "\n\n\n⚙️ **COMMANDES DE CONFIGURATION**\n\n"
+            "Disponible pour le propriétaire ou les administrateurs whitelistés.\n\n"
+            "• `/setup_community` — Définir ce groupe comme le groupe officiel de la communauté"
+        ),
+        "en": (
+            "\n\n\n⚙️ **SETUP COMMANDS**\n\n"
+            "Available to the owner or whitelisted admins.\n\n"
+            "• `/setup_community` — Set this group as the official community group"
+        ),
+    },
+    "help_group_owner_commands": {
+        "fr": "\n\n• `/whitelist add|remove <user_id>` — Gérer les administrateurs whitelistés (propriétaire uniquement)",
+        "en": "\n\n• `/whitelist add|remove <user_id>` — Manage whitelisted admins (owner only)",
     },
     "help_setup_commands": {
         "fr": (
