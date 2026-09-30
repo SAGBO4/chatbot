@@ -15,6 +15,8 @@ class TicketService:
         user_handle: Optional[str],
         question: str,
         automated_answer: Optional[str] = None,
+        source_chat_id: Optional[int] = None,
+        source_message_id: Optional[int] = None,
     ) -> Ticket:
         """Create an OPEN ticket."""
         ticket = Ticket(
@@ -23,6 +25,8 @@ class TicketService:
             question=question.strip(),
             status=TicketStatus.OPEN.value,
             automated_answer=automated_answer,
+            source_chat_id=source_chat_id,
+            source_message_id=source_message_id,
         )
         session.add(ticket)
         await session.commit()

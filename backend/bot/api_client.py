@@ -74,17 +74,24 @@ class BackendClient:
         user_handle: Optional[str],
         question: str,
         automated_answer: Optional[str] = None,
+        source_chat_id: Optional[int] = None,
+        source_message_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Open a support ticket (`POST /api/tickets`)."""
+        payload: Dict[str, Any] = {
+            "user_id": user_id,
+            "user_handle": user_handle,
+            "question": question,
+            "automated_answer": automated_answer,
+        }
+        if source_chat_id is not None:
+            payload["source_chat_id"] = source_chat_id
+        if source_message_id is not None:
+            payload["source_message_id"] = source_message_id
         response = await self._request(
             "post",
             "/api/tickets",
-            json={
-                "user_id": user_id,
-                "user_handle": user_handle,
-                "question": question,
-                "automated_answer": automated_answer,
-            },
+            json=payload,
         )
         return response.json()
 

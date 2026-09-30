@@ -48,6 +48,12 @@ class TicketCreateRequest(BaseModel):
         default=None, max_length=MAX_SOLUTION_LENGTH,
         description="The answer the bot gave, so the agent sees what already failed.",
     )
+    source_chat_id: Optional[int] = Field(
+        default=None, description="Telegram chat id where the ticket originated (group id if opened in a group)."
+    )
+    source_message_id: Optional[int] = Field(
+        default=None, description="Telegram message id of the question in the source chat."
+    )
 
 
 class TicketResolveRequest(BaseModel):
@@ -76,6 +82,8 @@ class TicketResponse(BaseModel):
     created_at: datetime = Field(description="When the ticket was opened (UTC).")
     resolved_at: Optional[datetime] = Field(default=None, description="When the ticket was resolved (UTC).")
     support_group_message_id: Optional[int] = Field(default=None, description="Telegram message id of the ticket card in the support group.")
+    source_chat_id: Optional[int] = Field(default=None, description="Telegram chat id where the ticket originated.")
+    source_message_id: Optional[int] = Field(default=None, description="Telegram message id of the question in the source chat.")
     is_newly_resolved: Optional[bool] = Field(
         default=None,
         description="Only set by the resolve endpoint: false when another agent had already resolved the ticket.",

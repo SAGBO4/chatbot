@@ -153,6 +153,8 @@ async def _answer_community_question(
         last_answer_message_id=sent.message_id,
         asking_user_handle=user_handle,
         last_photo_file_id=photo_file_id,
+        source_chat_id=getattr(getattr(message, "chat", None), "id", None),
+        source_message_id=getattr(message, "message_id", None),
     )
     task = asyncio.create_task(_schedule_expiry(bot, state, message.chat.id, sent.message_id, timestamp))
     _background_tasks.add(task)
@@ -312,6 +314,12 @@ async def handle_community_resolve_no(
     last_answer = user_data.get("last_answer", t("no_answer", lang))
     user_id = callback.from_user.id
     user_handle = user_data.get("asking_user_handle") or callback.from_user.username or f"User_{user_id}"
+    cb_msg = getattr(callback, "message", None)
+    source_chat_id = user_data.get("source_chat_id") or getattr(getattr(cb_msg, "chat", None), "id", None)
+    source_message_id = user_data.get("source_message_id")
+    if not source_message_id and cb_msg:
+        reply_to = getattr(cb_msg, "reply_to_message", None)
+        source_message_id = getattr(reply_to, "message_id", None) or getattr(cb_msg, "message_id", None)
 
     try:
         ticket = await create_ticket_and_notify_admin_group(
@@ -323,6 +331,8 @@ async def handle_community_resolve_no(
             automated_answer=last_answer,
             lang=lang,
             photo_file_id=user_data.get("last_photo_file_id"),
+            source_chat_id=source_chat_id,
+            source_message_id=source_message_id,
         )
         ticket_id = ticket["id"]
         await callback.answer(t("ticket_created_ack", lang))
