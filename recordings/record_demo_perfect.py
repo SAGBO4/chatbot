@@ -1,6 +1,7 @@
 import asyncio
-import time
 import os
+import time
+
 from playwright.async_api import async_playwright
 
 TOUCH_SCRIPT = """
@@ -95,7 +96,7 @@ async def tap_loc(page, locator, wait_after=0.4):
             await page.evaluate(f"window.__triggerRipple({cx}, {cy});")
             await asyncio.sleep(0.12)
         await locator.click()
-    except Exception as e:
+    except Exception as e:  # noqa: BLE001
         print(f"Tap info on locator: {e}")
     await asyncio.sleep(wait_after)
 

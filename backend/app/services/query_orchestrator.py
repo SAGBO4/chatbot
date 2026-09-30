@@ -27,13 +27,16 @@ class QueryOrchestrator:
         Ensures that responses are strictly monolingual in French or English, preventing
         duplicate bilingual responses.
         """
-        clean_query = query.strip()
+        clean_query = (query or "").strip()
         configured_language = await BotSettingsService.get_language(session)
-        target_language = language if language in SUPPORTED_LANGUAGES else configured_language
+        clean_language = language.strip().lower() if isinstance(language, str) else None
+        target_language = clean_language if clean_language in SUPPORTED_LANGUAGES else configured_language
+        if target_language not in SUPPORTED_LANGUAGES:
+            target_language = "fr"
 
         if not clean_query:
             return QueryResponse(
-                query=query,
+                query=clean_query,
                 found=False,
                 confidence=0.0,
                 answer=t("query_empty", target_language),
@@ -64,13 +67,15 @@ class QueryOrchestrator:
         # 2. Delegate to the specialized agent for target_language
         agent = AgentCoordinator.get_agent(target_language)
         answer = await agent.answer_query(clean_query, matches)
+        if not answer or not answer.strip():
+            answer = t("query_no_match", target_language)
 
         return QueryResponse(
             query=clean_query,
             found=True,
             confidence=confidence,
             answer=answer,
-            article_id=best_article.id,
+            article_id=best_article.id if best_article else None,
             requires_resolution_confirmation=True,
         )
 

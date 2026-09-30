@@ -1,8 +1,7 @@
 import asyncio
 import os
-import subprocess
-from playwright.async_api import async_playwright
 
+from playwright.async_api import async_playwright
 
 # 2. Scene definitions
 scenes = [

@@ -42,8 +42,11 @@ PURE_ENGLISH_WORDS = {
 }
 
 
-def detect_text_language(text: str) -> str:
+def detect_text_language(text: Optional[str]) -> str:
     """Detect whether a snippet is French ('fr') or English ('en')."""
+    if not text or not isinstance(text, str):
+        return "unknown"
+
     words = set(re.findall(r"\b\w{2,}\b", text.lower()))
     fr_accents = len(re.findall(r"[éèêëàâôûùçîï«»]", text.lower()))
     fr_score = len(words & PURE_FRENCH_WORDS) + fr_accents * 2
@@ -56,32 +59,37 @@ def detect_text_language(text: str) -> str:
     return "unknown"
 
 
-def extract_monolingual_solution(text: str, target_lang: str) -> str:
+def extract_monolingual_solution(text: Optional[str], target_lang: Optional[str]) -> str:
     """
     Extracts strictly the text in target_lang ('fr' or 'en') from a knowledge base solution.
     If the text is bilingual (e.g. French section on top, English section below),
     it isolates and returns ONLY the section in target_lang.
     If the text is not bilingual, returns the text as is.
     """
+    if not text or not isinstance(text, str):
+        return ""
+
     cleaned = text.strip()
     if not cleaned:
-        return cleaned
+        return ""
+
+    norm_target = (target_lang or "fr").strip().lower()
 
     # 1. Try splitting by double newline (\n\n) - paragraphs
     paragraphs = [p.strip() for p in cleaned.split("\n\n") if p.strip()]
     if len(paragraphs) >= 2:
         langs = [detect_text_language(p) for p in paragraphs]
         if "fr" in langs and "en" in langs:
-            matching = [p for p, lg in zip(paragraphs, langs) if lg == target_lang]
+            matching = [p for p, lg in zip(paragraphs, langs) if lg == norm_target]
             if matching:
                 return "\n\n".join(matching)
 
     # 2. Try splitting by single newline (\n) - lines
-    lines = [l.strip() for l in cleaned.split("\n") if l.strip()]
+    lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
     if len(lines) >= 2:
-        langs = [detect_text_language(l) for l in lines]
+        langs = [detect_text_language(line) for line in lines]
         if "fr" in langs and "en" in langs:
-            matching = [l for l, lg in zip(lines, langs) if lg == target_lang]
+            matching = [line for line, lg in zip(lines, langs) if lg == norm_target]
             if matching:
                 return "\n".join(matching)
 
@@ -94,7 +102,7 @@ class BaseSupportAgent(ABC):
     language: str
     name: str
 
-    def extract_solution(self, text: str) -> str:
+    def extract_solution(self, text: Optional[str]) -> str:
         """Extracts only the content corresponding to this agent's specialty language."""
         return extract_monolingual_solution(text, self.language)
 
@@ -139,7 +147,7 @@ class BaseSupportAgent(ABC):
         1. Attempts LLM synthesis with specialized language prompt if AI is enabled.
         2. Falls back to extracting ONLY this agent's language from the best article's solution.
         """
-        if not retrieved_articles:
+        if not retrieved_articles or not retrieved_articles[0] or retrieved_articles[0][0] is None:
             return ""
 
         best_article = retrieved_articles[0][0]
@@ -178,8 +186,11 @@ class FrenchSupportAgent(BaseSupportAgent):
     ) -> str:
         context_snippets = []
         for idx, (art, _) in enumerate(retrieved_articles[:AIAssistantService.CONTEXT_ARTICLES], start=1):
-            fr_sol = self.extract_solution(art.solution)
-            context_snippets.append(f"[{idx}] Question: {art.question}\nSolution: {fr_sol}")
+            if not art:
+                continue
+            fr_sol = self.extract_solution(getattr(art, "solution", "") or "")
+            q = getattr(art, "question", "") or ""
+            context_snippets.append(f"[{idx}] Question: {q}\nSolution: {fr_sol}")
         context_str = "\n\n".join(context_snippets)
 
         return (
@@ -218,8 +229,11 @@ class EnglishSupportAgent(BaseSupportAgent):
     ) -> str:
         context_snippets = []
         for idx, (art, _) in enumerate(retrieved_articles[:AIAssistantService.CONTEXT_ARTICLES], start=1):
-            en_sol = self.extract_solution(art.solution)
-            context_snippets.append(f"[{idx}] Question: {art.question}\nSolution: {en_sol}")
+            if not art:
+                continue
+            en_sol = self.extract_solution(getattr(art, "solution", "") or "")
+            q = getattr(art, "question", "") or ""
+            context_snippets.append(f"[{idx}] Question: {q}\nSolution: {en_sol}")
         context_str = "\n\n".join(context_snippets)
 
         return (
@@ -245,7 +259,10 @@ class AgentCoordinator:
     @classmethod
     def get_agent(cls, language: Optional[str] = None) -> BaseSupportAgent:
         """Returns the specialized agent for the given language (defaults to French)."""
-        lang = (language or "fr").strip().lower()
+        if not language or not isinstance(language, str):
+            lang = "fr"
+        else:
+            lang = language.strip().lower()
         return cls._agents.get(lang, cls._agents["fr"])
 
     @classmethod

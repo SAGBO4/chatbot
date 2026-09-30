@@ -421,3 +421,74 @@ def test_real_chatbot_db_seed_articles_monolingual_extraction():
 
         assert detect_text_language(fr_extract) == "fr", f"DB Article #{art_id} not detected as FR"
         assert detect_text_language(en_extract) == "en", f"DB Article #{art_id} not detected as EN"
+
+
+def test_detect_text_language_edge_cases():
+    assert detect_text_language(None) == "unknown"
+    assert detect_text_language("") == "unknown"
+    assert detect_text_language("   ") == "unknown"
+    assert detect_text_language("123456 !!! ???") == "unknown"
+    assert detect_text_language(12345) == "unknown"
+
+
+def test_extract_monolingual_solution_edge_cases():
+    assert extract_monolingual_solution(None, "fr") == ""
+    assert extract_monolingual_solution("", "en") == ""
+    assert extract_monolingual_solution("   ", "fr") == ""
+    assert extract_monolingual_solution(12345, "fr") == ""
+    assert extract_monolingual_solution("Text without bilingual content", None) == "Text without bilingual content"
+    assert extract_monolingual_solution("Text without bilingual content", "invalid_lang") == "Text without bilingual content"
+
+
+def test_agent_coordinator_edge_cases():
+    assert isinstance(AgentCoordinator.get_agent(None), FrenchSupportAgent)
+    assert isinstance(AgentCoordinator.get_agent(""), FrenchSupportAgent)
+    assert isinstance(AgentCoordinator.get_agent("   "), FrenchSupportAgent)
+    assert isinstance(AgentCoordinator.get_agent(12345), FrenchSupportAgent)
+    assert isinstance(AgentCoordinator.get_agent("FR"), FrenchSupportAgent)
+    assert isinstance(AgentCoordinator.get_agent("EN"), EnglishSupportAgent)
+    assert isinstance(AgentCoordinator.get_agent("es"), FrenchSupportAgent)
+
+
+@pytest.mark.asyncio
+async def test_specialized_agent_answer_query_empty_matches():
+    fr_agent = FrenchSupportAgent()
+    en_agent = EnglishSupportAgent()
+
+    assert await fr_agent.answer_query("test", []) == ""
+    assert await en_agent.answer_query("test", []) == ""
+    assert await fr_agent.answer_query("test", [(None, 0.9)]) == ""
+
+
+@pytest.mark.asyncio
+async def test_specialized_agent_answer_query_with_none_solution():
+    fr_agent = FrenchSupportAgent()
+    art = KnowledgeArticle(question="Test question", solution="")
+    art.solution = None
+    res = await fr_agent.answer_query("Test", [(art, 0.95)])
+    assert res == ""
+
+
+@pytest.mark.asyncio
+async def test_orchestrator_query_none_and_case_insensitive_language(app_test_env):
+    from app.services.query_orchestrator import QueryOrchestrator
+    from app.i18n import t
+
+    _, session_maker, _ = app_test_env
+
+    async with session_maker() as session:
+        # 1. query is None
+        res_none = await QueryOrchestrator.process_query(session, query=None, language="FR")
+        assert res_none.found is False
+        assert res_none.answer == t("query_empty", "fr")
+        assert res_none.query == ""
+
+        # 2. uppercase language 'EN'
+        res_upper_en = await QueryOrchestrator.process_query(session, query="", language="EN")
+        assert res_upper_en.found is False
+        assert res_upper_en.answer == t("query_empty", "en")
+
+        # 3. language with whitespace ' en '
+        res_ws_en = await QueryOrchestrator.process_query(session, query="", language="  en  ")
+        assert res_ws_en.found is False
+        assert res_ws_en.answer == t("query_empty", "en")

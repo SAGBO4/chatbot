@@ -62,7 +62,7 @@ class BackendClient:
     async def query(
         self,
         query: str,
-        user_id: int,
+        user_id: Optional[int] = None,
         user_handle: Optional[str] = None,
         language: Optional[str] = None,
     ) -> Dict[str, Any]:
