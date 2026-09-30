@@ -70,6 +70,21 @@ async def test_seed_legacy_community_group_never_overwrites(async_session):
 
 
 @pytest.mark.asyncio
+async def test_seed_default_language_when_absent(async_session):
+    seeded = await BotSettingsService.seed_default_language(async_session, "en")
+    assert seeded is True
+    assert await BotSettingsService.get_language(async_session) == "en"
+
+
+@pytest.mark.asyncio
+async def test_seed_default_language_never_overwrites(async_session):
+    await BotSettingsService.set_language(async_session, "fr", updated_by="owner")
+    seeded = await BotSettingsService.seed_default_language(async_session, "en")
+    assert seeded is False
+    assert await BotSettingsService.get_language(async_session) == "fr"
+
+
+@pytest.mark.asyncio
 async def test_whitelist_add_and_is_whitelisted(async_session):
     assert await WhitelistService.is_whitelisted(async_session, 42) is False
     await WhitelistService.add(async_session, 42, added_by="owner")
