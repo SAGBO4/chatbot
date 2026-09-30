@@ -12,6 +12,9 @@ BOT_TOKEN = "123456789:AAH-Secret_Token-Value123"
         (f"https://api.telegram.org/file/bot{BOT_TOKEN}/photos/file_1.jpg", BOT_TOKEN),
         ("https://x.test/hook?token=abc123&keep=yes", "abc123"),
         ("https://x.test/hook?a=1&api_key=k3y&password=p4ss&secret=s3c", "k3y"),
+        ("https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&x_cg_demo_api_key=CG-SecretKey12345", "CG-SecretKey12345"),
+        ("CoinGecko error 401: Invalid API Key: CG-SecretKey12345", "CG-SecretKey12345"),
+        ("Request headers: {'x-cg-demo-api-key': 'CG-SecretKey12345'}", "CG-SecretKey12345"),
     ],
 )
 def test_redact_secrets_removes_the_secret(text, forbidden):
