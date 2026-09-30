@@ -19,6 +19,8 @@ async def create_ticket_and_notify_admin_group(
     automated_answer: str,
     lang: str = DEFAULT_LANGUAGE,
     photo_file_id: Optional[str] = None,
+    source_chat_id: Optional[int] = None,
+    source_message_id: Optional[int] = None,
 ) -> dict:
     """
     Create a ticket through the backend and post its card to the admin/support group.
@@ -32,12 +34,18 @@ async def create_ticket_and_notify_admin_group(
     after the card, so an agent can look at it. Best effort: never persisted, and a failure to send it
     never fails ticket creation.
     """
-    ticket = await client.create_ticket(
-        user_id=user_id,
-        user_handle=user_handle,
-        question=question,
-        automated_answer=automated_answer,
-    )
+    create_kwargs = {
+        "user_id": user_id,
+        "user_handle": user_handle,
+        "question": question,
+        "automated_answer": automated_answer,
+    }
+    if source_chat_id is not None:
+        create_kwargs["source_chat_id"] = source_chat_id
+    if source_message_id is not None:
+        create_kwargs["source_message_id"] = source_message_id
+
+    ticket = await client.create_ticket(**create_kwargs)
     ticket_id = ticket["id"]
 
     support_group_id = settings.TELEGRAM_SUPPORT_GROUP_ID

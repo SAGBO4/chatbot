@@ -205,6 +205,342 @@ async def test_support_agent_reply_handler_resolves_by_message_id(monkeypatch):
 
 
 @pytest.mark.asyncio
+async def test_support_agent_reply_notifies_both_user_and_community_group(monkeypatch):
+    """When a ticket originated in a community group, resolving it notifies both the user inbox AND the group."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+    replied_card.text = "🚨 NOUVEAU TICKET SUPPORT #102\n👤 Utilisateur : @marc789 (ID: 789)\n❓ Question : Erreur sync"
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 52
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Voici la solution officielle."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 102,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": 444,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 102,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": 444,
+    }
+
+    await handle_support_agent_reply(
+        agent_message, bot=mock_bot, backend_client=mock_client
+    )
+
+    # 1. Backend resolve_ticket called
+    mock_client.resolve_ticket.assert_called_once()
+
+    # 2. Bot sent 2 messages: 1 to user DM, 1 to community group
+    assert mock_bot.send_message.call_count == 2
+    calls = mock_bot.send_message.call_args_list
+
+    # First call: private user DM
+    assert calls[0].kwargs["chat_id"] == 789
+    assert "Voici la solution officielle" in calls[0].kwargs["text"]
+
+    # Second call: community group with reply_to_message_id
+    assert calls[1].kwargs["chat_id"] == -100555666
+    assert calls[1].kwargs["reply_to_message_id"] == 444
+    assert "@marc789" in calls[1].kwargs["text"]
+    assert "Voici la solution officielle" in calls[1].kwargs["text"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "invalid_source_chat_id",
+    [
+        None,             # Absent source_chat_id (opened in private)
+        789,              # Equals user_id (private chat)
+        999999,           # Another positive user ID (must never be treated as group)
+        -100999888,       # Matches the support group itself (settings.TELEGRAM_SUPPORT_GROUP_ID)
+    ],
+)
+async def test_support_agent_reply_privacy_never_broadcasts_to_group(invalid_source_chat_id, monkeypatch):
+    """
+    Absolute privacy guarantee:
+    If source_chat_id is absent, equals user_id, is positive (private chat), or matches
+    the support group itself, NO group message is ever sent. Only the private user DM is delivered.
+    """
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+    replied_card.text = "🚨 NOUVEAU TICKET SUPPORT #103\n👤 Utilisateur : @marc789 (ID: 789)\n❓ Question : Secret query"
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 53
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Private solution only."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 103,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": invalid_source_chat_id,
+        "source_message_id": 123 if invalid_source_chat_id else None,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 103,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": invalid_source_chat_id,
+        "source_message_id": 123 if invalid_source_chat_id else None,
+    }
+
+    await handle_support_agent_reply(
+        agent_message, bot=mock_bot, backend_client=mock_client
+    )
+
+    # Exactly 1 message sent: ONLY to the private user DM (chat_id=789)
+    assert mock_bot.send_message.call_count == 1
+    call = mock_bot.send_message.call_args
+    assert call.kwargs["chat_id"] == 789
+    assert "Private solution only" in call.kwargs["text"]
+
+    # Resolution confirmed to agent in the support group
+    agent_message.reply.assert_called_once()
+    assert "Ticket #103 résolu" in agent_message.reply.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_fallback_when_source_message_deleted_in_group(monkeypatch):
+    """
+    Robustness test:
+    When the question message in the community group was deleted before the ticket was resolved,
+    replying to source_message_id fails. The handler must catch the failure and post unattached
+    to the community group without breaking ticket resolution.
+    """
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+    replied_card.text = "🚨 NOUVEAU TICKET SUPPORT #104\n👤 Utilisateur : @marc789 (ID: 789)\n❓ Question : Erreur sync"
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 54
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Solution pour message supprimé."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 104,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": 999,  # Message deleted in Telegram
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 104,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": 999,
+    }
+
+    # Simulate bot.send_message:
+    # 1. User DM -> succeeds
+    # 2. Community group with reply_to_message_id=999 -> fails (message deleted)
+    # 3. Community group unattached fallback -> succeeds
+    async def mock_send_message(*args, **kwargs):
+        if kwargs.get("reply_to_message_id") == 999:
+            raise Exception("Bad Request: message to be replied not found")
+        return MagicMock(message_id=12345)
+
+    mock_bot.send_message = AsyncMock(side_effect=mock_send_message)
+
+    await handle_support_agent_reply(
+        agent_message, bot=mock_bot, backend_client=mock_client
+    )
+
+    # 1. Private DM sent
+    # 2. Group call with reply_to_message_id attempted (failed in Markdown and plain text)
+    # 3. Unattached group fallback succeeded
+    calls = mock_bot.send_message.call_args_list
+    assert len(calls) >= 3
+
+    # First call: private user DM
+    assert calls[0].kwargs["chat_id"] == 789
+    assert "Solution pour message supprimé" in calls[0].kwargs["text"]
+
+    # Final call: unattached message to community group (no reply_to_message_id)
+    last_call = calls[-1]
+    assert last_call.kwargs["chat_id"] == -100555666
+    assert "reply_to_message_id" not in last_call.kwargs
+    assert "@marc789" in last_call.kwargs["text"]
+    assert "Solution pour message supprimé" in last_call.kwargs["text"]
+
+    # Ticket resolution still confirmed in support group
+    agent_message.reply.assert_called_once()
+    assert "Ticket #104 résolu" in agent_message.reply.call_args[0][0]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_community_group_without_source_message_id(monkeypatch):
+    """When source_message_id is None, message is sent unattached to the community group directly."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+    replied_card.text = "🚨 NOUVEAU TICKET SUPPORT #105\n👤 Utilisateur : @marc789 (ID: 789)\n❓ Question : Question sans msg id"
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 55
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Solution directe."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 105,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": None,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 105,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": None,
+    }
+
+    await handle_support_agent_reply(
+        agent_message, bot=mock_bot, backend_client=mock_client
+    )
+
+    assert mock_bot.send_message.call_count == 2
+    calls = mock_bot.send_message.call_args_list
+
+    # User DM
+    assert calls[0].kwargs["chat_id"] == 789
+
+    # Community group unattached
+    assert calls[1].kwargs["chat_id"] == -100555666
+    assert "reply_to_message_id" not in calls[1].kwargs
+    assert "@marc789" in calls[1].kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_user_dm_failure_still_notifies_community_group(monkeypatch):
+    """If delivering to user DM fails (e.g. user blocked bot), community group reply still succeeds."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+    replied_card.text = "🚨 NOUVEAU TICKET SUPPORT #106\n👤 Utilisateur : @marc789 (ID: 789)\n❓ Question : Test block"
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 56
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Solution avec user bloqué."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 106,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": 333,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 106,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": 333,
+    }
+
+    async def mock_send_message(*args, **kwargs):
+        if kwargs.get("chat_id") == 789:
+            raise Exception("Bot was blocked by the user")
+        return MagicMock(message_id=999)
+
+    mock_bot.send_message = AsyncMock(side_effect=mock_send_message)
+
+    await handle_support_agent_reply(
+        agent_message, bot=mock_bot, backend_client=mock_client
+    )
+
+    # Community group still received the notification
+    community_calls = [c for c in mock_bot.send_message.call_args_list if c.kwargs.get("chat_id") == -100555666]
+    assert len(community_calls) == 1
+    assert community_calls[0].kwargs["reply_to_message_id"] == 333
+    assert "Solution avec user bloqué" in community_calls[0].kwargs["text"]
+
+
+@pytest.mark.asyncio
 async def test_support_agent_reply_falls_back_to_text_when_id_lookup_misses(monkeypatch):
     """When the id-based lookup finds nothing (e.g. a ticket created before this
     mechanism existed), the previous text-parsing behavior still resolves it."""

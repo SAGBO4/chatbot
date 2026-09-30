@@ -362,6 +362,14 @@ TRANSLATIONS = {
         "fr": "📬 **Réponse de l'équipe support (Ticket #{ticket_id})**\n\n{solution}\n\n━━━━━━━━━━━━━━━━━━━\nTraité par : *{agent}*\nMerci de votre confiance ! 👋",
         "en": "📬 **Reply from the support team (Ticket #{ticket_id})**\n\n{solution}\n\n━━━━━━━━━━━━━━━━━━━\nHandled by: *{agent}*\nThank you for your trust! 👋",
     },
+    "support_community_group_notification": {
+        "fr": "📬 **Réponse du support pour {mention} (Ticket #{ticket_id})**\n\n{solution}\n\n━━━━━━━━━━━━━━━━━━━\nTraité par : *{agent}*",
+        "en": "📬 **Support reply for {mention} (Ticket #{ticket_id})**\n\n{solution}\n\n━━━━━━━━━━━━━━━━━━━\nHandled by: *{agent}*",
+    },
+    "support_community_group_notification_plain": {
+        "fr": "📬 Réponse du support pour {mention} (Ticket #{ticket_id})\n\n{solution}\n\nTraité par : {agent}",
+        "en": "📬 Support reply for {mention} (Ticket #{ticket_id})\n\n{solution}\n\nHandled by: {agent}",
+    },
     "support_resolved_confirmation": {
         "fr": "✅ **Ticket #{ticket_id} résolu !**\n• La réponse a été transmise à l'utilisateur (`ID: {user_id}`).\n• La solution a été automatiquement intégrée dans la base de connaissances.",
         "en": "✅ **Ticket #{ticket_id} resolved!**\n• The reply was forwarded to the user (`ID: {user_id}`).\n• The solution was automatically added to the knowledge base.",

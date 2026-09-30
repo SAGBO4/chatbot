@@ -274,7 +274,7 @@ async def test_resolve_no_creates_ticket_and_only_posts_neutral_ack_in_community
     await handle_community_resolve_no(callback, state, bot=mock_bot, backend_client=mock_client)
 
     mock_client.create_ticket.assert_called_once_with(
-        user_id=42, user_handle="alice", question="Erreur de sync", automated_answer="Solution auto"
+        user_id=42, user_handle="alice", question="Erreur de sync", automated_answer="Solution auto", source_chat_id=COMMUNITY_GROUP_ID
     )
     # Ticket card only posted to the admin group, not the community group
     mock_bot.send_message.assert_called_once()
@@ -285,6 +285,39 @@ async def test_resolve_no_creates_ticket_and_only_posts_neutral_ack_in_community
     assert "Ticket ouvert" in ack_text
     assert "Erreur de sync" not in ack_text
     assert "Solution auto" not in ack_text
+
+
+@pytest.mark.asyncio
+async def test_resolve_no_forwards_source_chat_id_and_source_message_id(memory_storage, monkeypatch):
+    """When _answer_community_question saved source_chat_id and source_message_id, NO forwards both to create_ticket."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100777)
+    state = make_fsm_context(memory_storage, 42, COMMUNITY_GROUP_ID)
+    await state.update_data(
+        last_question="Question avec ids",
+        last_answer="Solution auto",
+        last_answer_timestamp=time.time(),
+        last_answer_message_id=10,
+        asking_user_handle="alice",
+        source_chat_id=COMMUNITY_GROUP_ID,
+        source_message_id=8888,
+    )
+    callback = make_callback(memory_storage, COMMUNITY_GROUP_ID, 42, "cresolve:no")
+
+    mock_client = AsyncMock()
+    mock_client.create_ticket.return_value = {"id": 56, "user_id": 42}
+    mock_bot = AsyncMock()
+    mock_bot.send_message.return_value = MagicMock(message_id=999)
+
+    await handle_community_resolve_no(callback, state, bot=mock_bot, backend_client=mock_client)
+
+    mock_client.create_ticket.assert_called_once_with(
+        user_id=42,
+        user_handle="alice",
+        question="Question avec ids",
+        automated_answer="Solution auto",
+        source_chat_id=COMMUNITY_GROUP_ID,
+        source_message_id=8888,
+    )
 
 
 @pytest.mark.asyncio
