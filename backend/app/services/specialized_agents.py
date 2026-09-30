@@ -77,11 +77,11 @@ def extract_monolingual_solution(text: str, target_lang: str) -> str:
                 return "\n\n".join(matching)
 
     # 2. Try splitting by single newline (\n) - lines
-    lines = [l.strip() for l in cleaned.split("\n") if l.strip()]
+    lines = [line.strip() for line in cleaned.split("\n") if line.strip()]
     if len(lines) >= 2:
-        langs = [detect_text_language(l) for l in lines]
+        langs = [detect_text_language(line) for line in lines]
         if "fr" in langs and "en" in langs:
-            matching = [l for l, lg in zip(lines, langs) if lg == target_lang]
+            matching = [line for line, lg in zip(lines, langs) if lg == target_lang]
             if matching:
                 return "\n".join(matching)
 
