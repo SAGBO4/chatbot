@@ -461,7 +461,10 @@ async def test_specialized_agent_answer_query_empty_matches():
 
 
 @pytest.mark.asyncio
-async def test_specialized_agent_answer_query_with_none_solution():
+async def test_specialized_agent_answer_query_with_none_solution(monkeypatch):
+    from app.config import settings
+
+    monkeypatch.setattr(settings, "AI_ENABLED", False)
     fr_agent = FrenchSupportAgent()
     art = KnowledgeArticle(question="Test question", solution="")
     art.solution = None

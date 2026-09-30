@@ -33,3 +33,22 @@ frontend/public/uploads/*
 # OS cruft
 .DS_Store
 Thumbs.db
+
+# Local presentation & video demo assets (kept locally, never tracked)
+brag*
+build_youtube_presentation.py
+demo_presentation_youtube*
+demo_webapp_mobile.mp4
+final_frame_scene*
+mobile_screen_clean.mp4
+phone_screen_mask.png
+presentation_audio*
+recordings/
+share-copy.txt
+slides_concat.txt
+slides_yt/
+verified_qa_frames/
+*.mp4
+*.webm
+*.m4a
+*.mp3
