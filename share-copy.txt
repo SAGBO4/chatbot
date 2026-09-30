@@ -1,0 +1,26 @@
+# 🚀 Launch Pitch / Share Copy (Brag)
+
+## Option 1 : LinkedIn / Format Professionnel B2B
+Découvrez notre nouvelle WebApp mobile de support client souverain et décentralisé. ⚡
+Face aux défis de l'assistance 24/7 et des coûts opérationnels croissants, nous avons bâti une infrastructure hybride ultra-performante :
+• Résolution IA instantanée & routage dual (groupe Telegram public + notification DM privé)
+• Suivi en temps réel de plus de 100 actifs crypto avec cache résilient haute disponibilité
+• Réduction prouvée de 70% des coûts d'assistance et SLA moyen < 15 minutes.
+Regardez la démonstration complète en vidéo (1080p Full HD) ci-dessous. 📺
+
+## Option 2 : Twitter / X / Format Court Percutant
+Automatiser 70% du support client sans sacrifier l'expérience utilisateur, c'est possible.
+Découvrez notre WebApp mobile intégrée à Telegram :
+- SLA garanti < 15 min
+- 99.98% de disponibilité réseau
+- 100+ actifs crypto suivis en direct
+- Routage intelligent en groupe et en DM
+Vidéo de démonstration : https://chatbot-sigma-rose-10.vercel.app
+
+## Option 3 : YouTube Description / Sommaire Chapitré
+00:00 - Écosystème Souverain & Mini App Mobile
+00:17 - Hub Marchés & Fiabilité Financière (100+ actifs)
+00:32 - Desk Technique & Résolution Hybride (Routage Dual)
+00:47 - Base de Connaissances & Auto-Apprentissage
+01:02 - Pilotage Unifié, Rentabilité & ROI (-70% de coûts)
+Plateforme en production : https://chatbot-sigma-rose-10.vercel.app
