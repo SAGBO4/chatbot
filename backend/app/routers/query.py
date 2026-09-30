@@ -27,4 +27,6 @@ async def handle_query(
         query=payload.query,
         user_id=payload.user_id,
         user_handle=payload.user_handle,
+        language=payload.language,
     )
+

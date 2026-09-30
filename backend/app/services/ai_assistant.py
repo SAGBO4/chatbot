@@ -79,6 +79,8 @@ class AIAssistantService:
         query: str,
         retrieved_articles: List[Tuple[KnowledgeArticle, float]],
         client: Optional[httpx.AsyncClient] = None,
+        system_prompt: Optional[str] = None,
+        user_prompt: Optional[str] = None,
     ) -> Optional[str]:
         """Synthesize a context-grounded response using an LLM if enabled, or return None to bypass."""
         if not settings.AI_ENABLED or not settings.AI_API_KEY:
@@ -88,22 +90,24 @@ class AIAssistantService:
             return None
 
         effective_client = client or cls._shared_client
-        prompt = cls._build_prompt(query, retrieved_articles)
+        prompt = user_prompt or cls._build_prompt(query, retrieved_articles)
         provider = (settings.AI_PROVIDER or "openai").strip().lower()
         model = settings.AI_MODEL or cls.DEFAULT_MODELS.get(provider, cls.DEFAULT_MODELS["openai"])
 
         try:
             if provider == "gemini":
-                return await cls._call_gemini(prompt, model, effective_client)
+                return await cls._call_gemini(prompt, model, effective_client, system_prompt=system_prompt)
             elif provider == "deepseek":
                 return await cls._call_openai_compatible(
                     prompt, model, effective_client,
                     base_url="https://api.deepseek.com/chat/completions",
+                    system_prompt=system_prompt,
                 )
             elif provider == "openai":
                 return await cls._call_openai_compatible(
                     prompt, model, effective_client,
                     base_url="https://api.openai.com/v1/chat/completions",
+                    system_prompt=system_prompt,
                 )
             else:
                 logger.warning("Unknown AI_PROVIDER '%s', falling back to no AI answer.", provider)
@@ -118,8 +122,13 @@ class AIAssistantService:
         model: str,
         client: Optional[httpx.AsyncClient],
         base_url: str,
+        system_prompt: Optional[str] = None,
     ) -> Optional[str]:
         """Calls an OpenAI-compatible chat completions endpoint (used by OpenAI and DeepSeek)."""
+        sys_msg = system_prompt or (
+            "You are a helpful, concise support assistant. Always answer in the same "
+            "language as the user's question (French or English)."
+        )
         async with _borrowed_client(client) as session:
             response = await session.post(
                 base_url,
@@ -132,10 +141,7 @@ class AIAssistantService:
                     "messages": [
                         {
                             "role": "system",
-                            "content": (
-                                "You are a helpful, concise support assistant. Always answer in the same "
-                                "language as the user's question (French or English)."
-                            ),
+                            "content": sys_msg,
                         },
                         {"role": "user", "content": prompt},
                     ],
@@ -161,6 +167,7 @@ class AIAssistantService:
         prompt: str,
         model: str,
         client: Optional[httpx.AsyncClient],
+        system_prompt: Optional[str] = None,
     ) -> Optional[str]:
         """Calls the Google Gemini generateContent endpoint."""
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent"
@@ -168,17 +175,20 @@ class AIAssistantService:
             "Content-Type": "application/json",
             "x-goog-api-key": settings.AI_API_KEY or "",
         }
+        body = {
+            "contents": [{"parts": [{"text": prompt}]}],
+            "generationConfig": {
+                "temperature": AI_TEMPERATURE,
+                "maxOutputTokens": AI_MAX_OUTPUT_TOKENS,
+            },
+        }
+        if system_prompt:
+            body["system_instruction"] = {"parts": [{"text": system_prompt}]}
         async with _borrowed_client(client) as session:
             response = await session.post(
                 url,
                 headers=headers,
-                json={
-                    "contents": [{"parts": [{"text": prompt}]}],
-                    "generationConfig": {
-                        "temperature": AI_TEMPERATURE,
-                        "maxOutputTokens": AI_MAX_OUTPUT_TOKENS,
-                    },
-                },
+                json=body,
             )
             if response.status_code == 200:
                 data = response.json()

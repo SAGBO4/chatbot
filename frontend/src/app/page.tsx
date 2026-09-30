@@ -165,7 +165,7 @@ export default function HomePage() {
     triggerHaptic('light');
 
     try {
-      const res = await api.querySupport({ query: searchQuery.trim() });
+      const res = await api.querySupport({ query: searchQuery.trim(), language: locale });
       setResult(res);
       if (!res.found || res.confidence < 0.35) {
         setShowEscalation(true);

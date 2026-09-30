@@ -22,6 +22,11 @@ class QueryRequest(BaseModel):
     )
     user_id: Optional[int] = Field(default=None, description="Telegram id of the user asking.", examples=[123456789])
     user_handle: Optional[str] = Field(default=None, description="Telegram @username of the user, if any.", examples=["alice"])
+    language: Optional[str] = Field(
+        default=None,
+        description="Preferred language for the response ('fr' or 'en'). Defaults to the configured bot language.",
+        examples=["fr", "en"],
+    )
 
 
 class QueryResponse(BaseModel):
