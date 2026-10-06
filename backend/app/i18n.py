@@ -451,16 +451,62 @@ TRANSLATIONS = {
         "en": "ℹ️ **Ticket #{ticket_id} already resolved!**\nThis ticket was already resolved by *{resolved_by}*.\nYour reply was not sent to the user to avoid duplicates.",
     },
     "support_user_notification": {
-        "fr": "📬 **Réponse de l'équipe support (Ticket #{ticket_id})**\n\n{solution}\n\n━━━━━━━━━━━━━━━━━━━\nTraité par : *{agent}*\nMerci de votre confiance ! 👋",
-        "en": "📬 **Reply from the support team (Ticket #{ticket_id})**\n\n{solution}\n\n━━━━━━━━━━━━━━━━━━━\nHandled by: *{agent}*\nThank you for your trust! 👋",
+        "fr": (
+            "📬 **Réponse de l'équipe support (Ticket #{ticket_id})**\n\n"
+            "{solution}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "Si vous n'êtes pas satisfait, vous pouvez contacter directement {admin_handle}.\n"
+            "Merci de votre confiance ! 👋"
+        ),
+        "en": (
+            "📬 **Reply from the support team (Ticket #{ticket_id})**\n\n"
+            "{solution}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "If you are not satisfied, you can contact {admin_handle} directly.\n"
+            "Thank you for your trust! 👋"
+        ),
+    },
+    "support_user_notification_plain": {
+        "fr": (
+            "📬 Réponse de l'équipe support (Ticket #{ticket_id})\n\n"
+            "{solution}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "Si vous n'êtes pas satisfait, vous pouvez contacter directement {admin_handle}.\n"
+            "Merci de votre confiance ! 👋"
+        ),
+        "en": (
+            "📬 Reply from the support team (Ticket #{ticket_id})\n\n"
+            "{solution}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "If you are not satisfied, you can contact {admin_handle} directly.\n"
+            "Thank you for your trust! 👋"
+        ),
     },
     "support_community_group_notification": {
-        "fr": "📬 **Réponse du support pour {mention} (Ticket #{ticket_id})**\n\n{solution}\n\n━━━━━━━━━━━━━━━━━━━\nTraité par : *{agent}*",
-        "en": "📬 **Support reply for {mention} (Ticket #{ticket_id})**\n\n{solution}\n\n━━━━━━━━━━━━━━━━━━━\nHandled by: *{agent}*",
+        "fr": (
+            "📬 **Réponse du support pour {mention} (Ticket #{ticket_id})**\n\n"
+            "{solution}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "Si vous n'êtes pas satisfait, vous pouvez contacter directement {admin_handle}."
+        ),
+        "en": (
+            "📬 **Support reply for {mention} (Ticket #{ticket_id})**\n\n"
+            "{solution}\n\n"
+            "━━━━━━━━━━━━━━━━━━━\n"
+            "If you are not satisfied, you can contact {admin_handle} directly."
+        ),
     },
     "support_community_group_notification_plain": {
-        "fr": "📬 Réponse du support pour {mention} (Ticket #{ticket_id})\n\n{solution}\n\nTraité par : {agent}",
-        "en": "📬 Support reply for {mention} (Ticket #{ticket_id})\n\n{solution}\n\nHandled by: {agent}",
+        "fr": (
+            "📬 Réponse du support pour {mention} (Ticket #{ticket_id})\n\n"
+            "{solution}\n\n"
+            "Si vous n'êtes pas satisfait, vous pouvez contacter directement {admin_handle}."
+        ),
+        "en": (
+            "📬 Support reply for {mention} (Ticket #{ticket_id})\n\n"
+            "{solution}\n\n"
+            "If you are not satisfied, you can contact {admin_handle} directly."
+        ),
     },
     "support_resolved_confirmation": {
         "fr": "✅ **Ticket #{ticket_id} résolu !**\n• La réponse a été transmise à l'utilisateur (`ID: {user_id}`).\n• La solution a été automatiquement intégrée dans la base de connaissances.",
