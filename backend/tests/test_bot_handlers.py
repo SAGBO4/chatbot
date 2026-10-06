@@ -2040,3 +2040,359 @@ async def test_bot_handlers_help_in_group_excludes_setup_for_native_admin_who_is
     assert "/mute" in help_text, "moderation commands should still show for is_bot_admin"
     assert "/setup_community" not in help_text
     assert "/whitelist" not in help_text
+
+
+# ---------------------------------------------------------------------------
+# Ticket reply admin contact notice tests
+# ---------------------------------------------------------------------------
+
+def test_agent_handle_helper():
+    """Verify _agent_handle formats @username, full name, or Admin_<id>."""
+    from bot.handlers.support_handlers import _agent_handle
+
+    u1 = MagicMock(spec=User, id=101, username="agent_sophie", first_name="Sophie", last_name=None)
+    assert _agent_handle(u1) == "@agent_sophie"
+
+    u2 = MagicMock(spec=User, id=102, username="@agent_marc", first_name="Marc", last_name=None)
+    assert _agent_handle(u2) == "@agent_marc"
+
+    u3 = MagicMock(spec=User, id=103, username="  agent_claire  ", first_name="Claire", last_name=None)
+    assert _agent_handle(u3) == "@agent_claire"
+
+    u4 = MagicMock(spec=User, id=104, username=None, first_name="Jean", last_name="Dupont")
+    assert _agent_handle(u4) == "Jean Dupont"
+
+    u5 = MagicMock(spec=User, id=105, username="", first_name="Sophie", last_name=None)
+    assert _agent_handle(u5) == "Sophie"
+
+    u6 = MagicMock(spec=User, id=106, username="", first_name="", last_name=None)
+    assert _agent_handle(u6) == "Admin_106"
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_notifies_user_and_group_with_admin_handle(monkeypatch):
+    """When an agent resolves a ticket, both user DM and community group include admin contact notice."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 50
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Voici la solution au problème."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "fr"
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 200,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": 333,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 200,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": 333,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    assert mock_bot.send_message.call_count == 2
+    dm_call = mock_bot.send_message.call_args_list[0]
+    group_call = mock_bot.send_message.call_args_list[1]
+
+    # 1. User DM checks
+    assert dm_call.kwargs["chat_id"] == 789
+    dm_text = dm_call.kwargs["text"]
+    assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement @agent\\_sophie." in dm_text
+
+    # 2. Community group notification checks
+    assert group_call.kwargs["chat_id"] == -100555666
+    group_text = group_call.kwargs["text"]
+    assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement @agent\\_sophie." in group_text
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_markdown_fallback_uses_plain_notice(monkeypatch):
+    """When sending with Markdown fails, fallback sends plain notification with unescaped handle."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    # Bot fails on markdown for DM, then succeeds in plain text
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+    mock_bot.send_message.side_effect = [
+        Exception("Bad Request: can't parse entities"),
+        MagicMock(message_id=101),
+    ]
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 555
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 50
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Voici la solution."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "fr"
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 200,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": None,
+        "source_message_id": None,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 200,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    assert mock_bot.send_message.call_count == 2
+    retry_call = mock_bot.send_message.call_args_list[1]
+    assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement @agent_sophie." in retry_call.kwargs["text"]
+    assert "parse_mode" not in retry_call.kwargs
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_admin_without_username_uses_full_name(monkeypatch):
+    """When an agent has no Telegram username, their display name is used in the contact notice."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=88, username=None, first_name="Sophie", last_name="Martin")
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 556
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 51
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Solution de Sophie."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "fr"
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 201,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": 334,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 201,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": 334,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    dm_call = mock_bot.send_message.call_args_list[0]
+    group_call = mock_bot.send_message.call_args_list[1]
+
+    assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement Sophie Martin." in dm_call.kwargs["text"]
+    assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement Sophie Martin." in group_call.kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_english_localization(monkeypatch):
+    """Verify English localization includes the dissatisfaction notice with admin handle."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 557
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 52
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "English solution."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "en"
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 202,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": 335,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 202,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": 335,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    dm_call = mock_bot.send_message.call_args_list[0]
+    group_call = mock_bot.send_message.call_args_list[1]
+
+    assert "If you are not satisfied, you can contact @agent\\_sophie directly." in dm_call.kwargs["text"]
+    assert "If you are not satisfied, you can contact @agent\\_sophie directly." in group_call.kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_community_group_markdown_fallback_uses_plain_notice(monkeypatch):
+    """When sending community group notification with Markdown fails, fallback sends plain notification."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=99, username="agent_sophie", first_name="Sophie", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    # DM succeeds, group reply fails on markdown then succeeds on plain text
+    mock_bot.send_message.side_effect = [
+        MagicMock(message_id=201),  # DM send succeeds
+        Exception("Bad Request: can't parse entities"),  # Group markdown fails
+        MagicMock(message_id=202),  # Group plain retry succeeds
+    ]
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 558
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 53
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Solution pour le groupe."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "fr"
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 203,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": 336,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 203,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": 336,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    assert mock_bot.send_message.call_count == 3
+    # Call 0: DM
+    # Call 1: Group (markdown attempt, failed)
+    # Call 2: Group (plain text fallback)
+    group_fallback_call = mock_bot.send_message.call_args_list[2]
+    assert group_fallback_call.kwargs["chat_id"] == -100555666
+    assert "parse_mode" not in group_fallback_call.kwargs
+    assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement @agent_sophie." in group_fallback_call.kwargs["text"]
+
+
+@pytest.mark.asyncio
+async def test_support_agent_reply_admin_with_markdown_characters_escaped_in_notice(monkeypatch):
+    """Admin display name containing markdown special characters is escaped in Markdown and unescaped in plain."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=77, username=None, first_name="Super_Admin*", last_name="[Staff]")
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 559
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 54
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = "Solution avec admin aux caractères spéciaux."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "fr"
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 204,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "source_chat_id": -100555666,
+        "source_message_id": 337,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 204,
+        "user_id": 789,
+        "user_handle": "marc789",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100555666,
+        "source_message_id": 337,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    dm_call = mock_bot.send_message.call_args_list[0]
+    group_call = mock_bot.send_message.call_args_list[1]
+
+    # Markdown escaped handle in message
+    assert "Super\\_Admin\\* \\[Staff]" in dm_call.kwargs["text"]
+    assert "Super\\_Admin\\* \\[Staff]" in group_call.kwargs["text"]
+
+
