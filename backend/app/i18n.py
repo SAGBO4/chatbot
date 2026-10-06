@@ -455,7 +455,6 @@ TRANSLATIONS = {
             "📬 **Réponse de l'équipe support (Ticket #{ticket_id})**\n\n"
             "{solution}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
-            "Traité par : *{agent}*\n"
             "Si vous n'êtes pas satisfait, vous pouvez contacter directement {admin_handle}.\n"
             "Merci de votre confiance ! 👋"
         ),
@@ -463,7 +462,6 @@ TRANSLATIONS = {
             "📬 **Reply from the support team (Ticket #{ticket_id})**\n\n"
             "{solution}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
-            "Handled by: *{agent}*\n"
             "If you are not satisfied, you can contact {admin_handle} directly.\n"
             "Thank you for your trust! 👋"
         ),
@@ -473,7 +471,6 @@ TRANSLATIONS = {
             "📬 Réponse de l'équipe support (Ticket #{ticket_id})\n\n"
             "{solution}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
-            "Traité par : {agent}\n"
             "Si vous n'êtes pas satisfait, vous pouvez contacter directement {admin_handle}.\n"
             "Merci de votre confiance ! 👋"
         ),
@@ -481,7 +478,6 @@ TRANSLATIONS = {
             "📬 Reply from the support team (Ticket #{ticket_id})\n\n"
             "{solution}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
-            "Handled by: {agent}\n"
             "If you are not satisfied, you can contact {admin_handle} directly.\n"
             "Thank you for your trust! 👋"
         ),
@@ -491,14 +487,12 @@ TRANSLATIONS = {
             "📬 **Réponse du support pour {mention} (Ticket #{ticket_id})**\n\n"
             "{solution}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
-            "Traité par : *{agent}*\n"
             "Si vous n'êtes pas satisfait, vous pouvez contacter directement {admin_handle}."
         ),
         "en": (
             "📬 **Support reply for {mention} (Ticket #{ticket_id})**\n\n"
             "{solution}\n\n"
             "━━━━━━━━━━━━━━━━━━━\n"
-            "Handled by: *{agent}*\n"
             "If you are not satisfied, you can contact {admin_handle} directly."
         ),
     },
@@ -506,13 +500,11 @@ TRANSLATIONS = {
         "fr": (
             "📬 Réponse du support pour {mention} (Ticket #{ticket_id})\n\n"
             "{solution}\n\n"
-            "Traité par : {agent}\n"
             "Si vous n'êtes pas satisfait, vous pouvez contacter directement {admin_handle}."
         ),
         "en": (
             "📬 Support reply for {mention} (Ticket #{ticket_id})\n\n"
             "{solution}\n\n"
-            "Handled by: {agent}\n"
             "If you are not satisfied, you can contact {admin_handle} directly."
         ),
     },
