@@ -128,6 +128,15 @@ def _agent_name(user: User) -> str:
     )
 
 
+def _agent_handle(user: User) -> str:
+    """How the admin handle/contact is formatted: @username if username exists, else full name, else `Admin_<id>`."""
+    if user.username:
+        handle = user.username.strip()
+        return handle if handle.startswith("@") else f"@{handle}"
+    name = f"{user.first_name} {user.last_name or ''}".strip()
+    return name or f"Admin_{user.id}"
+
+
 async def _is_reply_in_support_group(message: Message) -> bool:
     """
     Filter: only replies sent in the support group reach `handle_support_agent_reply`.
@@ -175,6 +184,8 @@ async def handle_support_agent_reply(
         return
 
     agent_name = _agent_name(message.from_user)
+    admin_handle = _agent_handle(message.from_user)
+    safe_admin_handle = escape_telegram_markdown(admin_handle)
 
     try:
         # The backend rejects longer solutions
@@ -202,11 +213,29 @@ async def handle_support_agent_reply(
             safe_solution = escape_telegram_markdown(capped_solution)
             safe_agent = escape_telegram_markdown(agent_name)
             user_notification = t(
-                "support_user_notification", lang, ticket_id=ticket_id, solution=safe_solution, agent=safe_agent
+                "support_user_notification",
+                lang,
+                ticket_id=ticket_id,
+                solution=safe_solution,
+                agent=safe_agent,
+                admin_handle=safe_admin_handle,
+            )
+            plain_user_notification = t(
+                "support_user_notification_plain",
+                lang,
+                ticket_id=ticket_id,
+                solution=capped_solution,
+                agent=agent_name,
+                admin_handle=admin_handle,
             )
             await call_with_markdown_fallback(
-                bot.send_message, chat_id=user_id, text=user_notification,
-                what=f"Notification to user {user_id}", swallow_failure=True, failure_level=logging.ERROR,
+                bot.send_message,
+                chat_id=user_id,
+                text=user_notification,
+                plain_overrides={"text": plain_user_notification},
+                what=f"Notification to user {user_id}",
+                swallow_failure=True,
+                failure_level=logging.ERROR,
             )
 
         # 2. If the ticket originated in a community group, also reply in the group.
@@ -251,6 +280,7 @@ async def handle_support_agent_reply(
                 mention=safe_mention,
                 solution=safe_solution,
                 agent=safe_agent,
+                admin_handle=safe_admin_handle,
             )
             plain_group_notification = t(
                 "support_community_group_notification_plain",
@@ -259,6 +289,7 @@ async def handle_support_agent_reply(
                 mention=mention_str,
                 solution=capped_solution,
                 agent=agent_name,
+                admin_handle=admin_handle,
             )
 
             source_msg_id_int: Optional[int] = None
