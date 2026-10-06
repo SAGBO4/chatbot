@@ -2408,3 +2408,73 @@ async def test_support_agent_reply_admin_with_markdown_characters_escaped_in_not
     assert "Super\\_Admin\\* \\[Staff]" in group_call.kwargs["text"]
 
 
+@pytest.mark.parametrize(
+    "raw_username,expected_in_markdown,expected_in_plain",
+    [
+        ("SAGBO4", "@SAGBO4", "@SAGBO4"),
+        ("alice_support", "@alice\\_support", "@alice_support"),
+        ("charlie_admin", "@charlie\\_admin", "@charlie_admin"),
+    ],
+)
+@pytest.mark.asyncio
+async def test_support_agent_reply_dynamic_admin_username_per_admin(
+    raw_username, expected_in_markdown, expected_in_plain, monkeypatch
+):
+    """Prove that each different admin replying gets their own specific username dynamically inserted."""
+    monkeypatch.setattr("app.config.settings.TELEGRAM_SUPPORT_GROUP_ID", -100999888)
+
+    agent_user = MagicMock(spec=User, id=123, username=raw_username, first_name="Admin", last_name=None)
+    group_chat = MagicMock(spec=Chat, id=-100999888, type="supergroup")
+
+    mock_bot = AsyncMock()
+    mock_bot.id = 42
+
+    replied_card = MagicMock(spec=Message)
+    replied_card.message_id = 700
+    replied_card.from_user = MagicMock(spec=User, id=mock_bot.id)
+
+    agent_message = MagicMock(spec=Message)
+    agent_message.message_id = 60
+    agent_message.chat = group_chat
+    agent_message.from_user = agent_user
+    agent_message.text = f"Solution fournie par {raw_username}."
+    agent_message.reply_to_message = replied_card
+    agent_message.reply = AsyncMock()
+
+    mock_client = AsyncMock()
+    mock_client.get_setting.return_value = "fr"
+    mock_client.get_ticket_by_support_message.return_value = {
+        "id": 300,
+        "user_id": 999,
+        "user_handle": "client999",
+        "source_chat_id": -100444555,
+        "source_message_id": 888,
+    }
+    mock_client.resolve_ticket.return_value = {
+        "id": 300,
+        "user_id": 999,
+        "user_handle": "client999",
+        "status": "RESOLVED",
+        "is_newly_resolved": True,
+        "source_chat_id": -100444555,
+        "source_message_id": 888,
+    }
+
+    await handle_support_agent_reply(agent_message, bot=mock_bot, backend_client=mock_client)
+
+    assert mock_bot.send_message.call_count == 2
+    dm_call = mock_bot.send_message.call_args_list[0]
+    group_call = mock_bot.send_message.call_args_list[1]
+
+    # 1. Verify User DM contains the admin's specific username
+    assert dm_call.kwargs["chat_id"] == 999
+    dm_text = dm_call.kwargs["text"]
+    assert f"Si vous n'êtes pas satisfait, vous pouvez contacter directement {expected_in_markdown}." in dm_text
+
+    # 2. Verify Community Group Reply contains the admin's specific username
+    assert group_call.kwargs["chat_id"] == -100444555
+    group_text = group_call.kwargs["text"]
+    assert f"Si vous n'êtes pas satisfait, vous pouvez contacter directement {expected_in_markdown}." in group_text
+
+
+
