@@ -2121,11 +2121,15 @@ async def test_support_agent_reply_notifies_user_and_group_with_admin_handle(mon
     assert dm_call.kwargs["chat_id"] == 789
     dm_text = dm_call.kwargs["text"]
     assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement @agent\\_sophie." in dm_text
+    assert "Traité par" not in dm_text
+    assert "Handled by" not in dm_text
 
     # 2. Community group notification checks
     assert group_call.kwargs["chat_id"] == -100555666
     group_text = group_call.kwargs["text"]
     assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement @agent\\_sophie." in group_text
+    assert "Traité par" not in group_text
+    assert "Handled by" not in group_text
 
 
 @pytest.mark.asyncio
@@ -2178,6 +2182,8 @@ async def test_support_agent_reply_markdown_fallback_uses_plain_notice(monkeypat
     assert mock_bot.send_message.call_count == 2
     retry_call = mock_bot.send_message.call_args_list[1]
     assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement @agent_sophie." in retry_call.kwargs["text"]
+    assert "Traité par" not in retry_call.kwargs["text"]
+    assert "Handled by" not in retry_call.kwargs["text"]
     assert "parse_mode" not in retry_call.kwargs
 
 
@@ -2281,6 +2287,10 @@ async def test_support_agent_reply_english_localization(monkeypatch):
 
     assert "If you are not satisfied, you can contact @agent\\_sophie directly." in dm_call.kwargs["text"]
     assert "If you are not satisfied, you can contact @agent\\_sophie directly." in group_call.kwargs["text"]
+    assert "Handled by" not in dm_call.kwargs["text"]
+    assert "Handled by" not in group_call.kwargs["text"]
+    assert "Traité par" not in dm_call.kwargs["text"]
+    assert "Traité par" not in group_call.kwargs["text"]
 
 
 @pytest.mark.asyncio
@@ -2342,6 +2352,8 @@ async def test_support_agent_reply_community_group_markdown_fallback_uses_plain_
     assert group_fallback_call.kwargs["chat_id"] == -100555666
     assert "parse_mode" not in group_fallback_call.kwargs
     assert "Si vous n'êtes pas satisfait, vous pouvez contacter directement @agent_sophie." in group_fallback_call.kwargs["text"]
+    assert "Traité par" not in group_fallback_call.kwargs["text"]
+    assert "Handled by" not in group_fallback_call.kwargs["text"]
 
 
 @pytest.mark.asyncio
